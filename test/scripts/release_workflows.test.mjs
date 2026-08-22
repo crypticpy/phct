@@ -170,3 +170,56 @@ test('every npm dependency install selects the exact package manager after setup
     }
   }
 });
+
+test('protected-main automation stays reviewable and generated PRs can satisfy required checks', () => {
+  const generatedPullRequestWorkflows = [
+    'apply-setup.yml',
+    'new-entry.yml',
+    'new-event.yml',
+    'new-year.yml',
+    'update-event-attachments.yml',
+    'update-schedule.yml',
+    'metrics.yml',
+    'pages.yml',
+    'thumbnails.yml',
+  ];
+  for (const name of generatedPullRequestWorkflows) {
+    assert.match(
+      workflow(name),
+      /for workflow in validate\.yml quality\.yml lint-workflows\.yml/u,
+      `${name} does not dispatch every default-branch entrypoint required for a built-in-token PR`
+    );
+  }
+
+  const lint = workflow('lint-workflows.yml');
+  assert.match(lint, /pull_request:\n\s+workflow_dispatch:/u);
+  assert.doesNotMatch(lint, /pull_request:\n\s+paths:/u);
+  assert.match(lint, /statuses: write/u);
+  assert.match(lint, /context: 'lint'/u);
+
+  const metrics = workflow('metrics.yml');
+  assert.match(metrics, /uses: peter-evans\/create-pull-request@/u);
+  assert.match(metrics, /branch: automation\/catalog-metrics/u);
+  assert.match(metrics, /pull-requests: write/u);
+  assert.doesNotMatch(metrics, /git push/u);
+
+  const pages = workflow('pages.yml');
+  assert.match(pages, /uses: peter-evans\/create-pull-request@/u);
+  assert.match(pages, /branch: automation\/stamp-entry-updates/u);
+  assert.match(pages, /ref: \$\{\{ github\.sha \}\}/u);
+  assert.doesNotMatch(pages, /needs\.stamp\.outputs\.sha/u);
+  assert.doesNotMatch(pages, /git push/u);
+
+  const thumbnails = workflow('thumbnails.yml');
+  assert.match(thumbnails, /branch: automation\/entry-media/u);
+  assert.match(
+    thumbnails,
+    /if: steps\.media\.outputs\.changed == 'true' && github\.event_name == 'pull_request'/u
+  );
+  assert.match(thumbnails, /git push origin "HEAD:refs\/heads\/\$BRANCH"/u);
+
+  const codeql = workflow('codeql.yml');
+  assert.match(codeql, /'Analyze javascript-typescript'/u);
+  assert.match(codeql, /'Analyze ruby'/u);
+  assert.match(workflow('performance.yml'), /\['scale', 'Performance and scale \(dispatch\)'\]/u);
+});
