@@ -197,6 +197,11 @@ test('protected-main automation stays reviewable and generated PRs can satisfy r
   assert.match(lint, /statuses: write/u);
   assert.match(lint, /context: 'lint'/u);
 
+  const validate = workflow('validate.yml');
+  assert.match(validate, /\['checks', 'Lint, test and build'\]/u);
+  assert.match(validate, /\['build-matrix', 'Build every preset and module combination'\]/u);
+  assert.match(validate, /\['coverage', 'Coverage evidence'\]/u);
+
   const metrics = workflow('metrics.yml');
   assert.match(metrics, /uses: peter-evans\/create-pull-request@/u);
   assert.match(metrics, /branch: automation\/catalog-metrics/u);
