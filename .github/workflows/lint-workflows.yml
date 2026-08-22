@@ -17,9 +17,10 @@ name: Lint workflows
 # comment saying why, so the reason travels with the code.
 
 on:
+  # This check is a required status on protected branches. Run it for every
+  # pull request so content-only changes cannot be left waiting for a
+  # path-filtered status that GitHub never creates.
   pull_request:
-    paths:
-      - ".github/**"
   workflow_dispatch:
 
 permissions: {}
