@@ -194,6 +194,8 @@ test('protected-main automation stays reviewable and generated PRs can satisfy r
   const lint = workflow('lint-workflows.yml');
   assert.match(lint, /pull_request:\n\s+workflow_dispatch:/u);
   assert.doesNotMatch(lint, /pull_request:\n\s+paths:/u);
+  assert.match(lint, /statuses: write/u);
+  assert.match(lint, /context: 'lint'/u);
 
   const metrics = workflow('metrics.yml');
   assert.match(metrics, /uses: peter-evans\/create-pull-request@/u);
