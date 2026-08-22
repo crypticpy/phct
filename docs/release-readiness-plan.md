@@ -281,12 +281,19 @@ The BCHC updater consumes the exact release-candidate tag and opens
 5. Use the locked and target tags to reconcile the complete template-owned tree to the target,
    including files unchanged between releases, while leaving deployment-owned paths untouched
    without assuming shared Git ancestry.
-6. Regenerate downstream outputs.
-7. Compare checksums for every protected deployment-owned path.
-8. Fail on an unexplained protected-path change.
-9. Run the full BCHC suite and build.
-10. Publish an inspectable preview artifact.
-11. Open or update one pull request containing release notes and migration decisions.
+6. If the candidate changes `.github/workflows`, require the dedicated repository-scoped
+   `PHCT_UPDATE_TOKEN` with Contents, Pull requests, and Workflows read/write permissions; fail with
+   setup guidance before the expensive candidate gates when it is absent. Keep that credential out
+   of checkout and all candidate-controlled commands. Transfer the verified commit through a
+   digest-checked Git bundle to a fresh runner that neither checks out nor executes candidate code,
+   then supply the credential only to that runner's push and pull-request operations without
+   persisting it in Git configuration or a remote URL.
+7. Regenerate downstream outputs.
+8. Compare checksums for every protected deployment-owned path.
+9. Fail on an unexplained protected-path change.
+10. Run the full BCHC suite and build.
+11. Publish an inspectable preview artifact.
+12. Open or update one pull request containing release notes and migration decisions.
 
 The updater runs in BCHC and pulls from the public parent. This avoids giving the parent
 repository a credential capable of writing into BCHC's organization. It supports manual dispatch,

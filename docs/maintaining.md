@@ -57,8 +57,10 @@ content, images, or `docs/bchc/`.
    performance matrix, CodeQL, supply-chain checks, workflow lint, and link checks.
 3. Build the PHCT landing page and every preset from the candidate commit. Retain the artifacts.
 4. Tag the commit `vNEXT-rc.1` and publish candidate notes with the full SHA and rollback point.
-5. In BCHC, run **Update from PHCT** with that exact candidate tag. Review its checksum evidence,
-   preview, migrations, and full downstream checks. Perform the real issue-to-deploy rehearsal.
+5. Confirm the downstream `PHCT_UPDATE_TOKEN` is present and unexpired when the release changes
+   `.github/workflows`. In BCHC, run **Update from PHCT** with that exact candidate tag. Review its
+   checksum evidence, preview, migrations, and full downstream checks. Perform the real
+   issue-to-deploy rehearsal.
 6. Fix compatibility failures in PHCT and issue `rc.2`; do not patch generic code in BCHC.
 7. Only after BCHC is green, put stable `vNEXT` on the same audited PHCT commit and attach the
    CycloneDX SBOM. Run the updater once more for the stable lock, approve, and deploy BCHC.

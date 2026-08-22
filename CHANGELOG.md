@@ -8,6 +8,20 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.9.0-rc.2] — 2026-08-22
+
+### Fixed
+
+- The downstream updater now uses a dedicated `PHCT_UPDATE_TOKEN` for releases that change
+  `.github/workflows`. It detects that requirement immediately after the protected reconciliation
+  and checksum check, then fails with setup guidance before installing the candidate toolchain or
+  running the full suite. Routine content automation retains its narrower token.
+- The privileged updater credential stays out of checkout and candidate-controlled install,
+  generation, verification, processes, and Git hooks. The verified commit crosses a digest-checked
+  Git bundle into a fresh publication runner that never checks out or executes it; only that clean
+  job receives the token for push and pull-request operations, without storing it in Git
+  configuration or a remote URL.
+
 ## [1.9.0-rc.1] — 2026-08-22
 
 ### Changed
@@ -950,7 +964,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.1...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.2...HEAD
+[1.9.0-rc.2]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.1...v1.9.0-rc.2
 [1.9.0-rc.1]: https://github.com/crypticpy/phct/compare/v1.8.1...v1.9.0-rc.1
 [1.8.1]: https://github.com/crypticpy/phct/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/crypticpy/phct/compare/v1.7.0...v1.8.0

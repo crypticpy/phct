@@ -53,6 +53,42 @@ request. Review that previous commit against the named PHCT release before appro
 then records the target tag and full commit, so every later run can fail closed if the previously
 consumed tag has moved or the lock is inconsistent.
 
+## Workflow token required for workflow updates
+
+GitHub's built-in Actions token can create ordinary code branches, but GitHub refuses to let it
+create or update files under `.github/workflows/`. PHCT releases normally improve those workflows,
+so configure a separate repository secret named `PHCT_UPDATE_TOKEN` before the first protected
+update:
+
+1. Create a fine-grained personal access token owned by the deployment's machine or release
+   account, scoped to this repository only.
+2. Grant **Contents: Read and write**, **Pull requests: Read and write**, and **Workflows: Read and
+   write**. GitHub lists workflow-file access as the separate
+   [Workflows repository permission](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens#repository-permissions-for-workflows),
+   and its token guide explains how to
+   [create and limit a fine-grained token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+3. Add the value at **Settings → Secrets and variables → Actions → New repository secret** with the
+   exact name `PHCT_UPDATE_TOKEN`.
+4. Give the token a short expiry, record its owner and rotation date outside the public repository,
+   and test the update again before the expiry date.
+
+Do not reuse the narrower `CONTENT_BOT_TOKEN`: routine content automation does not need permission
+to rewrite its own workflows. Never paste either credential into the workflow's release input,
+logs, an issue, or a pull request.
+
+The updater checks out and validates the candidate with GitHub's built-in token and does not
+persist checkout credentials. After verification, it commits without repository hooks and sends
+that exact commit through a digest-checked Git bundle to a fresh publication runner. That clean
+runner never checks out or executes the candidate. It exposes `PHCT_UPDATE_TOKEN` only to the push
+and pull-request operations, through an ephemeral askpass helper rather than a remote URL or Git
+configuration. This separation prevents candidate install/build code, background processes, and
+Git hooks from reading the workflow-capable credential.
+
+If a target release changes workflow files and this secret is absent, **Update from PHCT** stops
+immediately after the protected reconciliation and checksum check. It explains the missing
+permission in the run summary and creates neither a branch nor a pull request. A release with no
+workflow-file changes can still use the built-in token and its explicit check-dispatch fallback.
+
 ## Recommended: one protected update pull request
 
 From the repository's **Actions** tab, run **Update from PHCT**, enter the exact release tag (for
