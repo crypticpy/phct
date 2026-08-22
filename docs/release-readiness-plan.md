@@ -7,6 +7,10 @@
 - Parent repository: [`crypticpy/phct`](https://github.com/crypticpy/phct)
 - Downstream demo: [`crypticpy/bchc-ai-use-case-catalog`](https://github.com/crypticpy/bchc-ai-use-case-catalog)
 
+The audit baseline and release contract below remain authoritative. The current executable
+sequence for interface polish, open-source publication, and the final BCHC update is maintained in
+[polish-and-publish-plan.md](polish-and-publish-plan.md).
+
 ## Purpose
 
 Make Pub Health Catalog Template (PHCT) the single, thoroughly reviewed source of all reusable
