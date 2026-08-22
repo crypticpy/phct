@@ -33,8 +33,9 @@ PHCT parent main
   -> immutable release candidate
   -> BCHC updater PR at the exact tag and commit
   -> protected-file checksum, CI, preview, accessibility and rollback review
-  -> stable tag on the same accepted parent commit
-  -> BCHC lock updated to the stable tag
+  -> live candidate and operational rehearsals
+  -> stable release-record commit derived from the accepted candidate
+  -> BCHC updater PR at the stable tag and matching package version
   -> human merge and Pages verification
 ```
 
@@ -94,9 +95,8 @@ unaccepted P2 findings.
 
 ## Work package 0 — close the protected-automation loop
 
-1. Merge PHCT PR #17 only after its corrected head passes every required check and all review
-   threads are resolved.
-2. Confirm `main` points to the expected merge tree and post-merge Validate, CodeQL, workflow-lint,
+1. Record PHCT PR #17's reviewed head, merge SHA, resolved thread, and green protected checks.
+2. Confirm `main` points to that merge tree and post-merge Validate, CodeQL, workflow-lint,
    supply-chain, scale, browser-quality, and Pages runs finish green.
 3. Confirm a maintenance workflow can use the built-in `GITHUB_TOKEN` to open a PR under the new
    combined repository setting.
@@ -271,32 +271,16 @@ Exit: one immutable parent candidate contains all intended reusable polish and c
 Exit: the current BCHC configuration proves the exact candidate without content drift, and rollback
 is demonstrated from retained evidence.
 
-## Work package 7 — stable publication and deployment
+## Work package 7 — candidate live rehearsal and presentation proof
 
-1. If the BCHC candidate is green, create stable `v1.9.0` on the exact accepted candidate commit;
-   do not rebuild or retag a different tree.
-2. Publish final GitHub release notes, migration/rollback guidance, SBOM and checksum, support
-   statement, known limitations, and links to exact CI runs.
-3. Change the BCHC update branch lock from the candidate label to stable `v1.9.0` while retaining
-   the same full commit SHA; rerun required downstream checks.
-4. Human-review and merge the BCHC update, then verify the Pages deployment SHA and all
-   presentation-critical routes.
-5. Verify the PHCT showcase, release links, repository metadata, quick start, issue forms, private
-   vulnerability route, and downloadable artifacts from a signed-out browser.
-6. Run the BCHC demo for at least one business day with no unresolved P0/P1; review Actions, Pages,
-   browser console, links, layout, and submission behaviour during the soak.
-7. Record the PHCT tag/SHA, BCHC lock/SHA, deployment URL/SHA, release assets, check runs, reviewers,
-   rollback point, and go/no-go decision in both ledgers.
-
-Exit: stable parent and BCHC deployment are the same audited code, and the wider-demo checklist is
-signed from evidence rather than expectation.
-
-## Work package 8 — live rehearsal and presentation readiness
-
-Before the wider presentation:
+Complete these gates before creating the stable-version commit or tag:
 
 - Run a clearly fake issue through submission -> generated PR -> media processing -> checks ->
-  review -> merge -> Pages -> notification in PHCT and BCHC; remove the test content afterward.
+  review -> merge -> Pages -> notification on both current default branches; remove the test
+  content afterward.
+- Prove candidate-specific issue, media, review, and deploy behaviour in a temporary BCHC rehearsal
+  repository built from the exact candidate plus BCHC's protected configuration. This is required
+  whenever the candidate changes those paths relative to BCHC's current default branch.
 - Check all presentation links and contact destinations from a signed-out browser.
 - Confirm the demo banner and fictional-data explanation are visible on home, catalog, entry,
   search/share/print, and presentation entry points.
@@ -310,17 +294,50 @@ Before the wider presentation:
 Exit: the presentation can proceed even if the network or newest deploy fails, and the live demo
 does not imply that fictional content is real.
 
+## Work package 8 — stable publication and deployment
+
+1. After the candidate and live gates pass, open a stable release-record PR directly on top of the
+   accepted rc.3 commit. Change `package.json`, `package-lock.json`, CHANGELOG, release status, and
+   other version-bearing release documentation from `1.9.0-rc.3` to `1.9.0`; do not include a
+   reusable behaviour change.
+2. Review the candidate-to-stable diff against that allowlist and run every protected parent check
+   on the exact stable-version head.
+3. Create immutable tag `v1.9.0` only on the merged stable-version commit. The tag must equal
+   `v${packageVersion}` so the updater and ownership verifier accept it.
+4. Publish final GitHub release notes, migration/rollback guidance, SBOM and checksum, support
+   statement, known limitations, candidate provenance, and links to exact CI runs.
+5. Run BCHC's updater against `v1.9.0`. Let it open a stable update PR whose lock release, lock SHA,
+   parent package version, and fetched tag all agree; do not hand-edit the candidate lock.
+6. Mark the rc.3 BCHC candidate PR superseded only after the stable update PR exists and its
+   provenance is verified. Retain both PRs as evidence.
+7. Re-run protected-file checksums and the complete downstream suite on the stable update head.
+8. Human-review and merge the stable BCHC update, then verify the Pages deployment SHA and all
+   presentation-critical routes.
+9. Verify the PHCT showcase, release links, repository metadata, quick start, issue forms, private
+   vulnerability route, and downloadable artifacts from a signed-out browser.
+10. Run the BCHC demo for at least one business day with no unresolved P0/P1; review Actions,
+    Pages, browser console, links, layout, and submission behaviour during the soak.
+11. Record the PHCT tag/SHA, BCHC lock/SHA, deployment URL/SHA, release assets, check runs,
+    reviewers, rollback point, and go/no-go decision in both ledgers.
+
+Exit: BCHC consumes the stable tag and matching stable package version derived from the audited
+candidate, and the wider-demo checklist is signed from evidence rather than expectation.
+
 ## Pull-request sequence
 
 Use small reviewable parent PRs. The anticipated sequence is:
 
-1. PHCT #17 — protected maintenance automation and generated-PR status compatibility.
+1. PHCT #17 — completed protected maintenance automation and generated-PR status compatibility.
 2. Parent interface PRs — grouped by coherent surface/journey with screenshots and regression tests.
 3. Parent reliability/documentation PRs — only findings from the remaining audit, avoiding broad
    style-only rewrites.
 4. Parent release-record PR — rc.3 version, changelog, migration notes, and current evidence.
-5. New BCHC candidate update PR — generated from the immutable tag; human merge only after stable.
-6. Small BCHC-only presentation-content PR, if needed — wording/contacts/demo material only, with no
+5. New BCHC candidate update PR — generated from the immutable tag and retained as compatibility
+   evidence without merging.
+6. Candidate live-rehearsal and presentation-proof gates.
+7. Parent stable release-record PR — stable package/lock version and release records only.
+8. New BCHC stable update PR — generated from `v1.9.0`; human merge only after all gates pass.
+9. Small BCHC-only presentation-content PR, if needed — wording/contacts/demo material only, with no
    reusable code.
 
 Any reusable correction requested on a BCHC PR returns to step 2 in PHCT and produces a new
@@ -362,7 +379,7 @@ and rotation rehearsal must be recorded without recording its value.
 | ID | Deliverable | State |
 |---|---|---|
 | PP-00 | Enable and verify Actions PR creation in both repositories | Complete 2026-08-22 |
-| PP-01 | Merge PHCT #17 and prove protected maintenance end to end | In progress |
+| PP-01 | Record PHCT #17 and prove protected maintenance end to end | In progress |
 | PP-02 | Complete parent interface/state screenshot audit | Not started |
 | PP-03 | Implement and verify interface/usability polish | Not started |
 | PP-04 | Complete manual browser and assistive-technology matrix | Not started |
