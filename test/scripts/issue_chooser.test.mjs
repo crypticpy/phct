@@ -10,7 +10,8 @@ import { isRepositoryIdentity, renderIssueChooser } from '../../assets/js/config
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 test('the checked-in issue chooser matches the canonical generator', () => {
-  const expected = renderIssueChooser('crypticpy/phct');
+  const site = YAML.parse(fs.readFileSync(path.join(ROOT, '_data/site.yml'), 'utf8'));
+  const expected = renderIssueChooser(site.github.repository, site.github.branch);
   const actual = fs.readFileSync(path.join(ROOT, '.github/ISSUE_TEMPLATE/config.yml'), 'utf8');
   assert.equal(actual, expected);
 });
