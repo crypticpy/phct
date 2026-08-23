@@ -15,12 +15,21 @@ function form(name) {
   return YAML.parse(read(`.github/ISSUE_TEMPLATE/${name}.yml`));
 }
 
+function isSameRepository(left, right) {
+  return String(left).trim().toLowerCase() === String(right).trim().toLowerCase();
+}
+
 function isCanonicalParent() {
   const site = YAML.parse(read('_data/site.yml'));
   const manifest = YAML.parse(read('.phct/ownership.yml'));
   const parentRepository = new URL(manifest.template.repository).pathname.replace(/^\//u, '');
-  return site.github.repository === parentRepository;
+  return isSameRepository(site.github.repository, parentRepository);
 }
+
+test('canonical repository identity comparison matches GitHub casing semantics', () => {
+  assert.equal(isSameRepository('CrypticPy/phct', 'crypticpy/phct'), true);
+  assert.equal(isSameRepository('crypticpy/phct', 'crypticpy/another-repository'), false);
+});
 
 for (const [name, label] of [
   ['bug', 'bug'],
