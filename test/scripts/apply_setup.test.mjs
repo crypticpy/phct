@@ -181,14 +181,27 @@ test('_config.yml is patched, not replaced', () => {
 test('the derived files come out of the pasted ones, so they cannot drift', () => {
   const renamed = {
     ...shipped,
-    site: { ...shipped.site, name: 'Rewritten Catalog' },
+    site: {
+      ...shipped.site,
+      name: 'Rewritten Catalog',
+      github: { repository: 'example/community-catalog', branch: 'release/catalog-v2' },
+    },
   };
   const files = filesFor(ROOT, renamed);
   assert.match(files['_data/site.yml'], /Rewritten Catalog/);
   assert.match(files['_config.yml'], /Rewritten Catalog/, '_config.yml follows site.yml');
-  assert.match(
-    files['.github/ISSUE_TEMPLATE/config.yml'],
-    /github\.com\/crypticpy\/phct\/security\/advisories\/new/u,
+  const chooser = yaml.load(files['.github/ISSUE_TEMPLATE/config.yml']);
+  assert.ok(
+    chooser.contact_links.some(
+      (link) => link.url === 'https://github.com/example/community-catalog/security/advisories/new'
+    ),
     'the issue chooser follows site.yml repository identity'
+  );
+  assert.ok(
+    chooser.contact_links.some(
+      (link) =>
+        link.url === 'https://github.com/example/community-catalog/blob/release/catalog-v2/SECURITY.md'
+    ),
+    'the issue chooser follows site.yml branch identity'
   );
 });
