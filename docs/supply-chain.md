@@ -13,9 +13,10 @@ Controls:
 - `quality/vendored-assets.json` inventories copied JavaScript, generated icons, and bundled fonts
   by exact SHA-256, license, version, and notice section. `npm run licenses:check` rejects changed or
   missing files, unsafe or duplicate paths, missing attribution, and unreviewed licenses. It also
-  recursively scans `assets/fonts/**/*.woff2` and `assets/js/**/*.min.js`, rejecting any copied file
-  omitted from the manifest. Keep the `.min.js` suffix on vendored JavaScript so this boundary stays
-  explicit; project-authored source uses ordinary `.js` names;
+  independently discovers `_includes/icon.html` and recursively scans `assets/fonts/**/*.woff2`
+  and `assets/js/**/*.min.js`, rejecting any copied/generated file omitted from the manifest. Keep
+  the `.min.js` suffix on vendored JavaScript so this boundary stays explicit; project-authored
+  source uses ordinary `.js` names;
 - `npm run sbom` creates a deterministic CycloneDX 1.5 inventory from both lockfiles, consolidates
   repeated npm package/version entries while retaining their lockfile paths, assigns distinct
   package URLs to Ruby platform artifacts, and fails if any BOM reference is duplicated; and

@@ -10,12 +10,14 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// These paths are the fail-closed boundary for copied binary/minified assets.
+// These paths are the fail-closed boundary for copied binary/minified assets
+// and the generated include that embeds the reviewed Heroicons source.
 // Project-authored JavaScript remains outside it; vendored JavaScript must keep
 // the `.min.js` convention so a newly copied file cannot bypass the manifest.
 export const VENDORED_LOCATIONS = Object.freeze([
   Object.freeze({ root: 'assets/fonts', suffixes: Object.freeze(['.woff2']) }),
   Object.freeze({ root: 'assets/js', suffixes: Object.freeze(['.min.js']) }),
+  Object.freeze({ root: '_includes', names: Object.freeze(['icon.html']) }),
 ]);
 
 export function npmLicenseFindings(lock, allowed) {
@@ -204,7 +206,9 @@ export function discoverVendoredPaths(root = ROOT, locations = VENDORED_LOCATION
             pending.push(absolute);
             continue;
           }
-          if (!location.suffixes.some((suffix) => entry.name.endsWith(suffix))) continue;
+          const matchesName = location.names?.includes(entry.name) ?? false;
+          const matchesSuffix = location.suffixes?.some((suffix) => entry.name.endsWith(suffix)) ?? false;
+          if (!matchesName && !matchesSuffix) continue;
           const relative = path.relative(realRoot, absolute).split(path.sep).join('/');
           paths.add(relative);
         }

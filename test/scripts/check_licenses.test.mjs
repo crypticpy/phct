@@ -137,13 +137,16 @@ test('vendored location discovery recursively finds copied files and ignores aut
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'assets/fonts/nested'), { recursive: true });
   fs.mkdirSync(path.join(root, 'assets/js/lib'), { recursive: true });
+  fs.mkdirSync(path.join(root, '_includes'), { recursive: true });
   fs.writeFileSync(path.join(root, 'assets/fonts/nested/NewFont.woff2'), 'font');
   fs.writeFileSync(path.join(root, 'assets/js/lib/vendor.min.js'), 'vendor');
   fs.writeFileSync(path.join(root, 'assets/js/lib/authored.js'), 'authored');
+  fs.writeFileSync(path.join(root, '_includes/icon.html'), 'icons');
 
   const result = discoverVendoredPaths(root);
   assert.deepEqual(result.findings, []);
   assert.deepEqual([...result.paths].sort(), [
+    '_includes/icon.html',
     'assets/fonts/nested/NewFont.woff2',
     'assets/js/lib/vendor.min.js',
   ]);
