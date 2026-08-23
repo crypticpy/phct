@@ -225,7 +225,10 @@ test('the updater fails safely with actionable recovery when a required dispatch
   assert.deepEqual(result.calls, { 'quality.yml': 3, 'validate.yml': 1 });
   assert.match(result.stderr, /simulated GitHub API failure/u);
   assert.match(result.stdout, /::error title=Required update checks were not dispatched/u);
-  assert.match(result.summary, /https:\/\/github\.com\/example\/catalog\/pull\/42/u);
+  assert.match(
+    result.summary,
+    /^The verified update pull request already exists: https:\/\/github\.com\/example\/catalog\/pull\/42$/mu
+  );
   assert.match(result.summary, /Main is unchanged\. Do not merge/u);
   assert.match(result.summary, /quality\.yml/u);
   assert.match(result.summary, /Actions → Quality \(a11y \+ Lighthouse\) → Run workflow/u);
