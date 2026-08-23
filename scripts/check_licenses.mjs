@@ -10,6 +10,14 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// These paths are the fail-closed boundary for copied binary/minified assets.
+// Project-authored JavaScript remains outside it; vendored JavaScript must keep
+// the `.min.js` convention so a newly copied file cannot bypass the manifest.
+export const VENDORED_LOCATIONS = Object.freeze([
+  Object.freeze({ root: 'assets/fonts', suffixes: Object.freeze(['.woff2']) }),
+  Object.freeze({ root: 'assets/js', suffixes: Object.freeze(['.min.js']) }),
+]);
+
 export function npmLicenseFindings(lock, allowed) {
   const findings = [];
   for (const [location, metadata] of Object.entries(lock?.packages ?? {})) {
@@ -49,8 +57,15 @@ function noticeSection(notice, heading) {
 /**
  * Validate the checked-in inventory and its matching notice without touching disk.
  * `digests` maps repository-relative paths to the SHA-256 read from the current tree.
+ * `discoveredPaths` is the complete file set found in VENDORED_LOCATIONS.
  */
-export function vendoredAssetFindings(manifest, notice, digests, allowed) {
+export function vendoredAssetFindings(
+  manifest,
+  notice,
+  digests,
+  allowed,
+  discoveredPaths = new Set(digests.keys())
+) {
   const findings = [];
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
     return ['quality/vendored-assets.json: expected an object'];
@@ -148,7 +163,58 @@ export function vendoredAssetFindings(manifest, notice, digests, allowed) {
         );
     }
   }
+
+  if (!(discoveredPaths instanceof Set)) {
+    findings.push('vendored inventory: discovered paths must be a set');
+  } else {
+    for (const discovered of [...discoveredPaths].sort()) {
+      if (!files.has(discovered)) {
+        findings.push(`vendored inventory: unmanifested file ${discovered}`);
+      }
+    }
+  }
   return findings;
+}
+
+export function discoverVendoredPaths(root = ROOT, locations = VENDORED_LOCATIONS) {
+  const findings = [];
+  const paths = new Set();
+  const realRoot = fs.realpathSync(root);
+
+  for (const location of locations) {
+    const absoluteRoot = path.join(root, location.root);
+    try {
+      const stat = fs.lstatSync(absoluteRoot);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        findings.push(`${location.root}: vendored inventory root must be a regular directory`);
+        continue;
+      }
+      const real = fs.realpathSync(absoluteRoot);
+      if (real !== realRoot && !real.startsWith(`${realRoot}${path.sep}`)) {
+        findings.push(`${location.root}: vendored inventory root resolves outside the repository`);
+        continue;
+      }
+
+      const pending = [real];
+      while (pending.length > 0) {
+        const directory = pending.pop();
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+          const absolute = path.join(directory, entry.name);
+          if (entry.isDirectory()) {
+            pending.push(absolute);
+            continue;
+          }
+          if (!location.suffixes.some((suffix) => entry.name.endsWith(suffix))) continue;
+          const relative = path.relative(realRoot, absolute).split(path.sep).join('/');
+          paths.add(relative);
+        }
+      }
+    } catch (error) {
+      findings.push(`${location.root}: ${error.code === 'ENOENT' ? 'missing' : 'unreadable'}`);
+    }
+  }
+
+  return { findings, paths };
 }
 
 function readVendoredEvidence(manifest) {
@@ -162,6 +228,10 @@ function readVendoredEvidence(manifest) {
     }
   }
 
+  const realRoot = fs.realpathSync(ROOT);
+  const discovered = discoverVendoredPaths(ROOT);
+  findings.push(...discovered.findings);
+
   const digests = new Map();
   const paths = new Set(
     (Array.isArray(manifest?.assets) ? manifest.assets : [])
@@ -169,7 +239,6 @@ function readVendoredEvidence(manifest) {
       .map((file) => file?.path)
       .filter(isSafeRepositoryPath)
   );
-  const realRoot = fs.realpathSync(ROOT);
   for (const relative of paths) {
     const absolute = path.join(ROOT, relative);
     try {
@@ -188,7 +257,7 @@ function readVendoredEvidence(manifest) {
       findings.push(`${relative}: ${error.code === 'ENOENT' ? 'missing' : 'unreadable'}`);
     }
   }
-  return { digests, findings, notice };
+  return { digests, discoveredPaths: discovered.paths, findings, notice };
 }
 
 function main() {
@@ -205,7 +274,9 @@ function main() {
   }
   const evidence = readVendoredEvidence(vendored);
   findings.push(...evidence.findings);
-  findings.push(...vendoredAssetFindings(vendored, evidence.notice, evidence.digests, allowed));
+  findings.push(
+    ...vendoredAssetFindings(vendored, evidence.notice, evidence.digests, allowed, evidence.discoveredPaths)
+  );
 
   const ruby = spawnSync('bundle', ['exec', 'ruby', 'scripts/check_gem_licenses.rb'], {
     cwd: ROOT,

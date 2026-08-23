@@ -40,6 +40,9 @@ test('the issue chooser disables unstructured reports and exposes private securi
   const security = chooser.contact_links.find((link) => link.url.endsWith('/security/advisories/new'));
   assert.ok(security, 'missing private security contact link');
   assert.match(security.about, /never put.*public issue/iu);
+  const fallback = chooser.contact_links.find((link) => link.url.endsWith('/blob/main/SECURITY.md'));
+  assert.ok(fallback, 'missing durable security-reporting fallback');
+  assert.match(fallback.about, /private email fallback/iu);
 });
 
 test('bootstrap and support guidance cover every reusable report route', () => {
@@ -50,6 +53,8 @@ test('bootstrap and support guidance cover every reusable report route', () => {
   }
   assert.match(support, /bug, accessibility, documentation, or feature issue form/u);
   assert.match(read('SECURITY.md'), /private vulnerability reporting/iu);
+  assert.match(read('docs/launch.md'), /Private vulnerability reporting.*Enable/isu);
+  assert.match(read('docs/launch.md'), /organization\.contact_email.*fallback/isu);
 });
 
 test('unassigned backup ownership blocks handoff, not technical release preparation', () => {

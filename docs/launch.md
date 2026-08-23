@@ -25,7 +25,7 @@ private repository needs a paid plan, and a public catalog is the point.
 Fork instead of templating only if you intend to send changes back upstream. A fork carries the
 template's whole history and its open issues; a template copy starts clean.
 
-## 2. Turn on the three GitHub settings
+## 2. Turn on the four GitHub settings
 
 Do these before configuring, because the browser configurator only exists once the site has been
 built and deployed at least once.
@@ -36,6 +36,12 @@ built and deployed at least once.
       tick **Allow GitHub Actions to create and approve pull requests**. Without this, every
       content workflow — `new-entry`, `new-year`, `new-event`, `update-schedule`,
       `update-event-attachments` — runs, does its work, and then fails on the last step.
+- [ ] **Private vulnerability reporting.** Settings → Security → Code security and analysis →
+      **Private vulnerability reporting** → **Enable**. Then open **Issues → New issue → Report a
+      security vulnerability privately** in a signed-out/private window and confirm GitHub shows
+      the private reporting form. If your plan or repository type does not offer that setting,
+      keep the contact inbox below current: the chooser also links to `SECURITY.md`, whose fallback
+      sends reports to `_data/site.yml` → `organization.contact_email` without using a public issue.
 - [ ] **Create the content labels.** Actions tab → **Bootstrap labels** → **Run workflow**. It
       creates `content:new-entry`, `content:new-event`, `content:schedule`,
       `content:event-attachments`, `content:new-year` and `content:site-config` (the Apply setup
@@ -222,6 +228,8 @@ request and merge. That is the whole removal mechanism — see
       `_data/site.yml`; or the module left off until it is
 - [ ] Branch protection on `main`: require a pull request before merging
       (see [SECURITY.md](../SECURITY.md), "What you should still do")
+- [ ] Private vulnerability reporting is enabled and its chooser link opens while signed out; or
+      the documented `organization.contact_email` fallback has been tested
 - [ ] You have opened one test submission yourself and merged it (steps 6–7)
 - [ ] Someone other than you has merged a pull request, so the process survives your holiday
 

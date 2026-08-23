@@ -46,6 +46,7 @@ export const ROOT = process.env.BUILD_VARIANTS_ROOT
  * empties the catalog so the empty state renders.
  *
  * @type {{id: string, preset: string|null, modules: object|null, demo?: boolean, themeFonts?: object,
+ *         legacyIssueChooser?: boolean,
  *         entries: 'keep'|'fixtures'|'none', build: boolean,
  *         expectFrontMatter: 'pass'|'fail', why: string}[]}
  */
@@ -78,6 +79,16 @@ export const VARIANTS = [
     build: true,
     expectFrontMatter: 'pass',
     why: 'a protected pre-rename theme file must load the current derivative font binaries',
+  },
+  {
+    id: 'legacy-issue-chooser',
+    preset: null,
+    modules: null,
+    legacyIssueChooser: true,
+    entries: 'none',
+    build: false,
+    expectFrontMatter: 'pass',
+    why: 'a protected pre-upgrade issue chooser must receive current safety routing during generation',
   },
   {
     id: 'all-modules',
@@ -198,6 +209,13 @@ export function buildVariant(variant, { scratchRoot, log = () => {} }) {
   }
   if (variant.themeFonts) {
     patchThemeFonts(path.join(dir, '_data', 'theme.yml'), variant.themeFonts);
+  }
+  if (variant.legacyIssueChooser) {
+    fs.writeFileSync(
+      path.join(dir, '.github', 'ISSUE_TEMPLATE', 'config.yml'),
+      'blank_issues_enabled: true\ncontact_links: []\n',
+      'utf8'
+    );
   }
 
   if (variant.entries !== 'keep') {

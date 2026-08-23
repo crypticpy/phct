@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-import { npmLicenseFindings, vendoredAssetFindings } from '../../scripts/check_licenses.mjs';
+import {
+  discoverVendoredPaths,
+  npmLicenseFindings,
+  vendoredAssetFindings,
+} from '../../scripts/check_licenses.mjs';
 
 test('npm license review fails closed on missing and new values', () => {
   const lock = {
@@ -65,7 +72,11 @@ function vendoredManifest() {
   };
 }
 
-function review(manifest = vendoredManifest(), notice = NOTICE) {
+function review(
+  manifest = vendoredManifest(),
+  notice = NOTICE,
+  discoveredPaths = new Set(['assets/example.js', 'assets/example.woff2'])
+) {
   return vendoredAssetFindings(
     manifest,
     notice,
@@ -73,7 +84,8 @@ function review(manifest = vendoredManifest(), notice = NOTICE) {
       ['assets/example.js', HASH_A],
       ['assets/example.woff2', HASH_B],
     ]),
-    new Set(['MIT', 'OFL-1.1'])
+    new Set(['MIT', 'OFL-1.1']),
+    discoveredPaths
   );
 }
 
@@ -95,6 +107,7 @@ test('vendored asset review rejects unsafe and duplicate paths', () => {
   assert.deepEqual(review(manifest), [
     'vendored asset 1 file 1: path must be a safe repository-relative path',
     'vendored asset 2 file 2: duplicate path assets/example.woff2',
+    'vendored inventory: unmanifested file assets/example.js',
   ]);
 });
 
@@ -105,5 +118,33 @@ test('vendored asset review rejects unapproved licenses and digest drift', () =>
   assert.deepEqual(review(manifest), [
     'vendored asset 1: unreviewed license UNKNOWN',
     `vendored asset 2 file 1: SHA-256 mismatch for assets/example.woff2; expected ${HASH_A}, got ${HASH_B}`,
+  ]);
+});
+
+test('vendored asset review rejects files omitted from the manifest', () => {
+  assert.deepEqual(
+    review(
+      vendoredManifest(),
+      NOTICE,
+      new Set(['assets/example.js', 'assets/example.woff2', 'assets/NewFont.woff2'])
+    ),
+    ['vendored inventory: unmanifested file assets/NewFont.woff2']
+  );
+});
+
+test('vendored location discovery recursively finds copied files and ignores authored source', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phct-vendored-assets-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'assets/fonts/nested'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'assets/js/lib'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'assets/fonts/nested/NewFont.woff2'), 'font');
+  fs.writeFileSync(path.join(root, 'assets/js/lib/vendor.min.js'), 'vendor');
+  fs.writeFileSync(path.join(root, 'assets/js/lib/authored.js'), 'authored');
+
+  const result = discoverVendoredPaths(root);
+  assert.deepEqual(result.findings, []);
+  assert.deepEqual([...result.paths].sort(), [
+    'assets/fonts/nested/NewFont.woff2',
+    'assets/js/lib/vendor.min.js',
   ]);
 });

@@ -227,6 +227,26 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
   );
 
   test(
+    'legacy-issue-chooser: generation migrates protected safety routing',
+    { skip: needs('legacy-issue-chooser') },
+    () => {
+      const { dir } = built.get('legacy-issue-chooser');
+      const chooser = yaml.load(
+        fs.readFileSync(path.join(dir, '.github', 'ISSUE_TEMPLATE', 'config.yml'), 'utf8')
+      );
+      assert.equal(chooser.blank_issues_enabled, false);
+      assert.ok(
+        chooser.contact_links.some((link) => link.url.endsWith('/security/advisories/new')),
+        'private vulnerability route was not migrated'
+      );
+      assert.ok(
+        chooser.contact_links.some((link) => link.url.endsWith('/blob/main/SECURITY.md')),
+        'security fallback route was not migrated'
+      );
+    }
+  );
+
+  test(
     'shipped: built-site distributions retain the complete third-party notice',
     { skip: needs('shipped') },
     () => {

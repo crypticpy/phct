@@ -133,7 +133,7 @@ Other useful scripts:
 
 ```bash
 npm run setup      # configuration wizard (see Quick start)
-npm run generate   # regenerate the issue template + configurator defaults, and sync _config.yml from _data/site.yml
+npm run generate   # regenerate issue forms/routing + configurator defaults, and sync _config.yml from _data/site.yml
 npm run validate   # parse all _data/*.yml and run the front-matter / file-size checks CI runs on pull requests
 npm test           # Node unit tests; `npm run test:ruby` for the Ruby validators
 npm run test:build # build every preset and module combination and check the rendered copy (needs Ruby; minutes, not seconds)

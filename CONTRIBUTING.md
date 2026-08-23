@@ -88,6 +88,8 @@ subprocess-only CLI fails the gate. Change a floor only with an explained, revie
    include, or bundled font, review the exact upstream license and version. Update
    `THIRD_PARTY_NOTICES.md` and `quality/vendored-assets.json` with the same change, then run `npm
    run licenses:check`. Never refresh a digest without explaining and reviewing the changed bytes.
+   Copied JavaScript must retain a `.min.js` suffix: the gate scans every such file and every
+   bundled `.woff2` recursively, so an unmanifested addition fails closed.
 
 ## Adding a schema hint or field type (walkthrough)
 

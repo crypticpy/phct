@@ -359,7 +359,7 @@ calls the same `renderFiles()` and opens a pull request.
   pasted YAML becomes the site's configuration, so this is the one content workflow that is not
   open to the public. It is still only ever a pull request.
 
-After hand-editing any `_data/*.yml` file directly (without going through a wizard), run `npm run generate`. It regenerates `.github/ISSUE_TEMPLATE/new-entry.yml` and `assets/js/configurator/defaults.generated.js`, and resyncs `_config.yml`'s title and description. It is idempotent, and `npm run generate -- --check` is the CI gate that fails when a generated file is out of date — so regenerate and commit in the same change.
+After hand-editing any `_data/*.yml` file directly (without going through a wizard), run `npm run generate`. It regenerates `.github/ISSUE_TEMPLATE/new-entry.yml`, the issue chooser's canonical safety routes, and `assets/js/configurator/defaults.generated.js`, and resyncs `_config.yml`'s title and description. This also migrates an older chooser after a PHCT update while retaining your `github.repository` identity. It is idempotent, and `npm run generate -- --check` is the CI gate that fails when a generated file is out of date — so regenerate and commit in the same change.
 
 ## The showcase
 

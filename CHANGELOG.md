@@ -13,10 +13,12 @@ major version, and each entry says so when it happens.
 - `THIRD_PARTY_NOTICES.md` now records the version, provenance, modification history, copyright,
   and complete license text for every copied JavaScript, generated icon, and bundled font asset.
   `quality/vendored-assets.json` pins those files by SHA-256, and the license gate fails closed on
-  missing attribution, unsafe or duplicate paths, changed bytes, or an unreviewed license.
+  missing attribution, unsafe or duplicate paths, changed bytes, an unreviewed license, or a new
+  bundled font/minified script omitted from the manifest.
 - The issue chooser now routes documentation corrections through a structured form and security
   vulnerabilities directly to GitHub's private advisory form; unstructured public issues are
-  disabled and the label-bootstrap workflow creates the documentation label.
+  disabled, the chooser links durable fallback instructions, launch guidance covers enabling the
+  private route, and the label-bootstrap workflow creates the documentation label.
 
 ### Fixed
 
@@ -34,6 +36,9 @@ major version, and each entry says so when it happens.
   GitHub remains unavailable or rate-limited, the updater fails safely after trying both independent
   gates and gives nontechnical recovery steps that identify the existing pull request, confirm
   `main` is unchanged, and prevent a merge before all required checks are green.
+- The downstream generator now rebuilds the complete issue chooser from protected repository
+  identity after an update, so existing deployments receive new routing safeguards instead of
+  retaining the older chooser structure protected by their ownership rules.
 
 ## [1.9.0-rc.2] — 2026-08-22
 
