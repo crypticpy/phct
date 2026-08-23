@@ -15,6 +15,13 @@ function form(name) {
   return YAML.parse(read(`.github/ISSUE_TEMPLATE/${name}.yml`));
 }
 
+function isCanonicalParent() {
+  const site = YAML.parse(read('_data/site.yml'));
+  const manifest = YAML.parse(read('.phct/ownership.yml'));
+  const parentRepository = new URL(manifest.template.repository).pathname.replace(/^\//u, '');
+  return site.github.repository === parentRepository;
+}
+
 for (const [name, label] of [
   ['bug', 'bug'],
   ['accessibility', 'accessibility'],
@@ -45,20 +52,26 @@ test('the issue chooser disables unstructured reports and exposes private securi
   assert.match(fallback.about, /private email fallback/iu);
 });
 
-test('bootstrap and support guidance cover every reusable report route', () => {
+test('bootstrap covers every reusable label and support guidance retains safe report routes', () => {
   const labels = read('.github/workflows/bootstrap-labels.yml');
   const support = read('SUPPORT.md');
   for (const label of ['bug', 'accessibility', 'documentation', 'enhancement']) {
     assert.match(labels, new RegExp(`create "${label}"`, 'u'));
   }
-  assert.match(support, /bug, accessibility, documentation, or feature issue form/u);
+  assert.match(support, /structured.*bug.*accessibility.*feature issue form/isu);
+  if (isCanonicalParent()) {
+    assert.match(support, /bug, accessibility, documentation, or feature issue form/u);
+  }
   assert.match(read('SECURITY.md'), /private vulnerability reporting/iu);
   assert.match(read('docs/launch.md'), /Private vulnerability reporting.*Enable/isu);
   assert.match(read('docs/launch.md'), /organization\.contact_email.*fallback/isu);
 });
 
-test('unassigned backup ownership blocks handoff, not technical release preparation', () => {
+test('canonical backup ownership blocks handoff while downstream maintainer policy stays protected', () => {
   const maintainers = read('MAINTAINERS.md');
-  assert.match(maintainers, /Unassigned — handoff blocker/u);
-  assert.doesNotMatch(maintainers, /Unassigned — release blocker/u);
+  assert.match(maintainers, /Backup release maintainer/u);
+  if (isCanonicalParent()) {
+    assert.match(maintainers, /Unassigned — handoff blocker/u);
+    assert.doesNotMatch(maintainers, /Unassigned — release blocker/u);
+  }
 });

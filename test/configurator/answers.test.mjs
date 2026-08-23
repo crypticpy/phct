@@ -97,8 +97,11 @@ test('applied answers regenerate the navigation and the hero link', () => {
 test('answersFromConfig round-trips through applyAnswers', () => {
   const base = defaultConfig();
   const rebuilt = applyAnswers(base, answersFromConfig(base));
+  const expectedTheme = structuredClone(base.theme);
+  expectedTheme.fonts.heading = normalizeBundledFontName(expectedTheme.fonts.heading);
+  expectedTheme.fonts.body = normalizeBundledFontName(expectedTheme.fonts.body);
   assert.deepEqual(rebuilt.site, base.site);
-  assert.deepEqual(rebuilt.theme, base.theme);
+  assert.deepEqual(rebuilt.theme, expectedTheme);
 });
 
 test('legacy bundled font names normalize without changing custom families', () => {
