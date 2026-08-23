@@ -339,79 +339,121 @@ describe('assistive-technology flows', { skip: SKIP, concurrency: false }, () =>
     await page.close();
   });
 
-  test('shared mobile actions meet the 44 × 44 touch-target contract', async (t) => {
+  test('shared touch-layout actions meet the 44 × 44 touch-target contract', async (t) => {
     if (emptyCatalog) return t.skip(CATALOG_SKIP);
-    const mobile = { width: 390, height: 844 };
+    const viewports = [
+      ['phone', { width: 390, height: 844 }],
+      ['tablet', { width: 768, height: 1024 }],
+    ];
 
-    const home = await openPage(browser, '/', mobile);
-    await assertTouchTargets(
-      home,
-      '.site-brand, .hero-search-btn, .browse-option, .browse-all, .section-link, .footer-link',
-      'home'
-    );
-    await home.close();
+    for (const [label, viewport] of viewports) {
+      const home = await openPage(browser, '/', viewport);
+      // Shortlist and wizard state persist by design; clear them so each
+      // responsive pass starts from the same visitor state.
+      await home.evaluate(() => localStorage.clear());
+      await assertTouchTargets(
+        home,
+        '.site-brand, .hero-search-btn, .browse-option, .browse-all, .section-link, .footer-link',
+        `${label} home`
+      );
+      await home.close();
 
-    const catalog = await openPage(browser, catalogPath, mobile);
-    await catalog.waitForSelector('.compare-toggle');
-    await assertTouchTargets(
-      catalog,
-      '.site-brand, main .btn-sm, .compare-toggle, .view-toggle, .results-select, .search-box, [data-sheet-open], .footer-link',
-      'catalog'
-    );
+      const catalog = await openPage(browser, catalogPath, viewport);
+      await catalog.waitForSelector('.compare-toggle');
+      await assertTouchTargets(
+        catalog,
+        '.site-brand, main .btn-sm, .compare-toggle, .view-toggle, .results-select, .search-box, [data-sheet-open], .footer-link',
+        `${label} catalog`
+      );
 
-    // Open the modal through its real keyboard activation, then measure the
-    // controls that only have boxes while the sheet is in the top layer.
-    await catalog.evaluate(() => document.querySelector('[data-sheet-open]').focus());
-    await catalog.keyboard.press('Enter');
-    await catalog.waitForSelector('[data-filter-sheet][open]');
-    await assertTouchTargets(
-      catalog,
-      '[data-filter-sheet] .filter-group-toggle, [data-filter-sheet] .filter-pill, [data-filter-sheet] .filter-showall, [data-filter-sheet] .icon-btn, [data-filter-sheet] .btn',
-      'catalog filter sheet'
-    );
-    await catalog.keyboard.press('Escape');
+      // Search suggestions are generated only after input, so explicitly open
+      // the listbox before measuring the rows changed by the touch fix.
+      await catalog.focus('#catalog-search');
+      await catalog.keyboard.type('data');
+      await catalog.waitForFunction(
+        () =>
+          document.querySelector('#catalog-search')?.getAttribute('aria-expanded') === 'true' &&
+          document.querySelectorAll('#search-listbox [role="option"]').length > 0
+      );
+      await settledListbox(catalog);
+      await assertTouchTargets(catalog, '.search-option', `${label} catalog search suggestions`);
+      await catalog.keyboard.press('Escape');
+      await catalog.evaluate(() => {
+        const input = document.querySelector('#catalog-search');
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await catalog.waitForFunction(
+        () => document.querySelectorAll('[data-entry-grid] > [data-entry]:not([hidden])').length >= 2
+      );
 
-    // Selecting two entries exposes the fixed tray and its remove targets; the
-    // same browser context carries that shortlist onto /compare/.
-    await catalog.evaluate(() => {
-      const toggles = [...document.querySelectorAll('.compare-toggle')].slice(0, 2);
-      for (const toggle of toggles) toggle.click();
-    });
-    await catalog.waitForSelector('.compare-tray');
-    await assertTouchTargets(
-      catalog,
-      '.compare-tray-remove, .compare-tray-actions .btn-sm',
-      'comparison tray'
-    );
-    const entryPath = await catalog.evaluate(
-      () => new URL(document.querySelector('[data-entry] .entry-title a').href).pathname
-    );
-    await catalog.close();
+      // Open the modal through its real keyboard activation, then measure the
+      // controls that only have boxes while the sheet is in the top layer.
+      await catalog.evaluate(() => document.querySelector('[data-sheet-open]').focus());
+      await catalog.keyboard.press('Enter');
+      await catalog.waitForSelector('[data-filter-sheet][open]');
+      await assertTouchTargets(
+        catalog,
+        '[data-filter-sheet] .filter-group-toggle, [data-filter-sheet] .filter-pill, [data-filter-sheet] .filter-showall, [data-filter-sheet] .icon-btn, [data-filter-sheet] .btn',
+        `${label} catalog filter sheet`
+      );
+      await catalog.keyboard.press('Escape');
 
-    const compare = await openPage(browser, '/compare/', mobile);
-    await compare.waitForSelector('.compare-head-remove');
-    await assertTouchTargets(
-      compare,
-      '[data-compare-app] a, [data-compare-app] button, main .btn-sm',
-      'comparison page'
-    );
-    await compare.close();
+      // Selecting two entries exposes the fixed tray and its remove targets;
+      // the same browser context carries that shortlist onto /compare/.
+      await catalog.evaluate(() => {
+        const toggles = [...document.querySelectorAll('.compare-toggle')].slice(0, 2);
+        for (const toggle of toggles) toggle.click();
+      });
+      await catalog.waitForSelector('.compare-tray');
+      await assertTouchTargets(
+        catalog,
+        '.compare-tray-remove, .compare-tray-actions .btn-sm',
+        `${label} comparison tray`
+      );
+      const entryPath = await catalog.evaluate(
+        () => new URL(document.querySelector('[data-entry] .entry-title a').href).pathname
+      );
+      await catalog.close();
 
-    const entry = await openPage(browser, entryPath, mobile);
-    await assertTouchTargets(
-      entry,
-      '.site-brand, .breadcrumb-link, .toc-link, .entry-action-link, .rail-link, main .btn-sm, .footer-link',
-      'entry'
-    );
-    await entry.close();
+      const compare = await openPage(browser, '/compare/', viewport);
+      await compare.waitForSelector('.compare-head-remove');
+      await assertTouchTargets(
+        compare,
+        '[data-compare-app] a, [data-compare-app] button, main .btn-sm',
+        `${label} comparison page`
+      );
+      await compare.close();
 
-    const submit = await openPage(browser, '/submit/', mobile);
-    await assertTouchTargets(
-      submit,
-      '.site-brand, .preview-summary, .field-input, .field-option, main .btn, .footer-link',
-      'submission form'
-    );
-    await submit.close();
+      const entry = await openPage(browser, entryPath, viewport);
+      await assertTouchTargets(
+        entry,
+        '.site-brand, .breadcrumb-link, .toc-link, .entry-action-link, .rail-link, main .btn-sm, .footer-link',
+        `${label} entry`
+      );
+      await entry.close();
+
+      const az = await openPage(browser, `${catalogPath}a-z/`, viewport);
+      await assertTouchTargets(az, '.az-jump a, .az-tags a', `${label} A–Z directory`);
+      await az.close();
+
+      const submit = await openPage(browser, '/submit/', viewport);
+      await assertTouchTargets(
+        submit,
+        '.site-brand, .preview-summary, .field-input, .field-option, main .btn, .footer-link',
+        `${label} submission form`
+      );
+      await submit.close();
+
+      const setup = await openPage(browser, '/setup/', viewport);
+      await setup.click('#wizard-steps button[data-step="fields"]');
+      await setup.waitForSelector('.schema-field-toggle');
+      await assertTouchTargets(setup, '.schema-field-toggle', `${label} setup entry model`);
+      // Do not leave the geometry pass on step 6 for the independent wizard
+      // journey below; persistence is product behavior, test isolation is ours.
+      await setup.evaluate(() => localStorage.clear());
+      await setup.close();
+    }
   });
 
   test('the submission form reports its errors where a reader is', async () => {
