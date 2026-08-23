@@ -46,6 +46,7 @@ export const ROOT = process.env.BUILD_VARIANTS_ROOT
  * empties the catalog so the empty state renders.
  *
  * @type {{id: string, preset: string|null, modules: object|null, demo?: boolean, themeFonts?: object,
+ *         githubBranch?: string,
  *         legacyIssueChooser?: boolean,
  *         entries: 'keep'|'fixtures'|'none', build: boolean,
  *         expectFrontMatter: 'pass'|'fail', why: string}[]}
@@ -85,6 +86,7 @@ export const VARIANTS = [
     preset: null,
     modules: null,
     legacyIssueChooser: true,
+    githubBranch: 'release/catalog-v2',
     entries: 'none',
     build: false,
     expectFrontMatter: 'pass',
@@ -150,10 +152,11 @@ function timedRun(command, args, options) {
 }
 
 /** Turn on/off modules in a scratch `_data/site.yml`. Comments are not preserved. */
-function patchSite(file, { modules, demo }) {
+function patchSite(file, { modules, demo, githubBranch }) {
   const site = readYaml(file);
   if (modules) site.modules = { ...(site.modules ?? {}), ...modules };
   if (typeof demo === 'boolean') site.demo = demo;
+  if (githubBranch) site.github = { ...(site.github ?? {}), branch: githubBranch };
   writeYaml(file, site);
 }
 
@@ -204,7 +207,7 @@ export function buildVariant(variant, { scratchRoot, log = () => {} }) {
     if (!ok) return { variant, dir, siteDir: null, steps, ok: false };
   }
 
-  if (variant.modules || typeof variant.demo === 'boolean') {
+  if (variant.modules || typeof variant.demo === 'boolean' || variant.githubBranch) {
     patchSite(path.join(dir, '_data', 'site.yml'), variant);
   }
   if (variant.themeFonts) {

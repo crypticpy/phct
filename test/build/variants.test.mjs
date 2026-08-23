@@ -240,8 +240,8 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
         'private vulnerability route was not migrated'
       );
       assert.ok(
-        chooser.contact_links.some((link) => link.url.endsWith('/blob/main/SECURITY.md')),
-        'security fallback route was not migrated'
+        chooser.contact_links.some((link) => link.url.endsWith('/blob/release/catalog-v2/SECURITY.md')),
+        'security fallback route did not use the configured branch'
       );
     }
   );

@@ -16,19 +16,27 @@ test('the checked-in issue chooser matches the canonical generator', () => {
 });
 
 test('the canonical chooser migrates safety structure while preserving downstream identity', () => {
-  const chooser = YAML.parse(renderIssueChooser('example/community-catalog'));
+  const chooser = YAML.parse(renderIssueChooser('example/community-catalog', 'release/catalog-v2'));
   assert.equal(chooser.blank_issues_enabled, false);
   assert.deepEqual(
     chooser.contact_links.map((link) => link.url),
     [
       'https://github.com/example/community-catalog/security/advisories/new',
-      'https://github.com/example/community-catalog/blob/main/SECURITY.md',
-      'https://github.com/example/community-catalog/blob/main/docs/admin-guide.md',
-      'https://github.com/example/community-catalog/blob/main/docs/launch.md',
+      'https://github.com/example/community-catalog/blob/release/catalog-v2/SECURITY.md',
+      'https://github.com/example/community-catalog/blob/release/catalog-v2/docs/admin-guide.md',
+      'https://github.com/example/community-catalog/blob/release/catalog-v2/docs/launch.md',
     ]
   );
 });
 
 test('the canonical chooser rejects malformed repository identity', () => {
   assert.throws(() => renderIssueChooser('not-a-repository'), /owner\/repository/u);
+});
+
+test('the canonical chooser defaults a missing branch and URL-encodes branch segments', () => {
+  assert.match(renderIssueChooser('example/community-catalog', ''), /blob\/main\/SECURITY\.md/u);
+  assert.match(
+    renderIssueChooser('example/community-catalog', 'release/catalog#2'),
+    /blob\/release\/catalog%232\/SECURITY\.md/u
+  );
 });

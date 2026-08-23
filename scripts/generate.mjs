@@ -141,7 +141,11 @@ if (fs.existsSync(configFile)) {
 // the update.
 
 if (ownRepository) {
-  sync(CONTACT_LINKS_PATH, renderIssueChooser(repository), `routing generated for ${repository}`);
+  sync(
+    CONTACT_LINKS_PATH,
+    renderIssueChooser(repository, site.github?.branch),
+    `routing generated for ${repository}`
+  );
 }
 
 // --- report -----------------------------------------------------------------
