@@ -72,6 +72,54 @@ async function settledListbox(page) {
   }
 }
 
+/**
+ * Assert the template's stricter touch contract (44 × 44 CSS px below `lg`)
+ * against real rendered boxes. Static CSS assertions miss cascade/order bugs,
+ * and axe applies WCAG's narrower 24px rule rather than this design system's
+ * mobile baseline.
+ */
+async function assertTouchTargets(page, selector, context) {
+  const result = await page.evaluate((query) => {
+    const clean = (value) => String(value).replace(/\s+/g, ' ').trim();
+    const visible = (node) => {
+      const style = getComputedStyle(node);
+      const box = node.getBoundingClientRect();
+      return box.width > 0 && box.height > 0 && style.visibility !== 'hidden';
+    };
+    const nodes = [...document.querySelectorAll(query)].filter(visible);
+    return {
+      count: nodes.length,
+      failures: nodes
+        .map((node) => {
+          const box = node.getBoundingClientRect();
+          return {
+            node: `${node.tagName.toLowerCase()}${node.id ? `#${node.id}` : ''}${
+              node.classList.length ? `.${[...node.classList].join('.')}` : ''
+            }`,
+            name: clean(
+              node.getAttribute('aria-label') ||
+                node.labels?.[0]?.textContent ||
+                node.textContent ||
+                node.getAttribute('title') ||
+                ''
+            ).slice(0, 100),
+            width: Number(box.width.toFixed(1)),
+            height: Number(box.height.toFixed(1)),
+          };
+        })
+        .filter(({ width, height }) => width < 44 || height < 44),
+    };
+  }, selector);
+  assert.ok(result.count > 0, `${context}: "${selector}" matched no visible target`);
+  assert.deepEqual(
+    result.failures,
+    [],
+    `${context}: target below 44 × 44 CSS px:\n${result.failures
+      .map(({ node, name, width, height }) => `  ${node} "${name}" — ${width} × ${height}`)
+      .join('\n')}`
+  );
+}
+
 describe('assistive-technology flows', { skip: SKIP, concurrency: false }, () => {
   /** @type {import('puppeteer').Browser} */
   let browser;
@@ -289,6 +337,77 @@ describe('assistive-technology flows', { skip: SKIP, concurrency: false }, () =>
     assert.notEqual(await textOf(page, 'main h1'), '');
 
     await page.close();
+  });
+
+  test('shared mobile actions meet the 44 × 44 touch-target contract', async (t) => {
+    if (emptyCatalog) return t.skip(CATALOG_SKIP);
+    const mobile = { width: 390, height: 844 };
+
+    const home = await openPage(browser, '/', mobile);
+    await assertTouchTargets(
+      home,
+      '.site-brand, .hero-search-btn, .browse-option, .browse-all, .section-link, .footer-link',
+      'home'
+    );
+    await home.close();
+
+    const catalog = await openPage(browser, catalogPath, mobile);
+    await catalog.waitForSelector('.compare-toggle');
+    await assertTouchTargets(
+      catalog,
+      '.site-brand, main .btn-sm, .compare-toggle, .view-toggle, .results-select, .search-box, [data-sheet-open], .footer-link',
+      'catalog'
+    );
+
+    // Open the modal through its real keyboard activation, then measure the
+    // controls that only have boxes while the sheet is in the top layer.
+    await catalog.evaluate(() => document.querySelector('[data-sheet-open]').focus());
+    await catalog.keyboard.press('Enter');
+    await catalog.waitForSelector('[data-filter-sheet][open]');
+    await assertTouchTargets(
+      catalog,
+      '[data-filter-sheet] .filter-group-toggle, [data-filter-sheet] .filter-pill, [data-filter-sheet] .filter-showall, [data-filter-sheet] .icon-btn, [data-filter-sheet] .btn',
+      'catalog filter sheet'
+    );
+    await catalog.keyboard.press('Escape');
+
+    // Selecting two entries exposes the fixed tray and its remove targets; the
+    // same browser context carries that shortlist onto /compare/.
+    await catalog.evaluate(() => {
+      const toggles = [...document.querySelectorAll('.compare-toggle')].slice(0, 2);
+      for (const toggle of toggles) toggle.click();
+    });
+    await catalog.waitForSelector('.compare-tray');
+    await assertTouchTargets(
+      catalog,
+      '.compare-tray-remove, .compare-tray-actions .btn-sm',
+      'comparison tray'
+    );
+    const entryPath = await catalog.evaluate(
+      () => new URL(document.querySelector('[data-entry] .entry-title a').href).pathname
+    );
+    await catalog.close();
+
+    const compare = await openPage(browser, '/compare/', mobile);
+    await compare.waitForSelector('.compare-head-remove');
+    await assertTouchTargets(compare, '.compare-head-remove, main .btn-sm', 'comparison page');
+    await compare.close();
+
+    const entry = await openPage(browser, entryPath, mobile);
+    await assertTouchTargets(
+      entry,
+      '.site-brand, .breadcrumb-link, .toc-link, .entry-action-link, .rail-link, main .btn-sm, .footer-link',
+      'entry'
+    );
+    await entry.close();
+
+    const submit = await openPage(browser, '/submit/', mobile);
+    await assertTouchTargets(
+      submit,
+      '.site-brand, .preview-summary, .field-input, .field-option, main .btn, .footer-link',
+      'submission form'
+    );
+    await submit.close();
   });
 
   test('the submission form reports its errors where a reader is', async () => {
