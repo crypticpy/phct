@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
-import { renderIssueChooser } from '../../assets/js/configurator/issue-chooser.js';
+import { isRepositoryIdentity, renderIssueChooser } from '../../assets/js/configurator/issue-chooser.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -30,6 +30,9 @@ test('the canonical chooser migrates safety structure while preserving downstrea
 });
 
 test('the canonical chooser rejects malformed repository identity', () => {
+  assert.equal(isRepositoryIdentity(' example/community-catalog '), true);
+  assert.equal(isRepositoryIdentity(''), false);
+  assert.equal(isRepositoryIdentity('not-a-repository'), false);
   assert.throws(() => renderIssueChooser('not-a-repository'), /owner\/repository/u);
 });
 

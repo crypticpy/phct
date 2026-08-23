@@ -178,6 +178,23 @@ test('the three branding steps together ask every question the one step asked', 
   ]);
 });
 
+test('an empty or malformed repository is explained before review rendering', () => {
+  goToStep(2);
+  type('#field-repository', '');
+  press('Continue');
+  assert.equal($('#step-heading').textContent, 'Names & contact');
+  assert.match($('#wizard-error-summary').textContent, /owner\/repo/u);
+
+  type('#field-repository', 'not-a-repository');
+  press('Continue');
+  assert.equal($('#step-heading').textContent, 'Names & contact');
+  assert.match($('#wizard-error-summary').textContent, /owner\/repo/u);
+
+  type('#field-repository', 'bigcities/ai-catalog');
+  press('Continue');
+  assert.equal($('#step-heading').textContent, 'Colors & type');
+});
+
 test('jumping ahead by step pill validates the steps it would skip', () => {
   goToStep(3);
   type('#field-primary', 'nope');

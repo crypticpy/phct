@@ -131,8 +131,8 @@ export function configErrors(config) {
   const errors = core.validateSchema(config.schema).map((message) => `_data/schema.yml — ${message}`);
   if (!config.site?.name)
     errors.push('_data/site.yml — `name` is required; the header and every page title use it.');
-  if (!config.site?.github?.repository) {
-    errors.push('_data/site.yml — `github.repository` is required, as "owner/repo".');
+  if (!core.isRepositoryIdentity(config.site?.github?.repository)) {
+    errors.push('_data/site.yml — `github.repository` is required in the form "owner/repo".');
   }
   // The same pairs `npm run validate` gates on, checked here so the answer
   // arrives on the issue rather than as a red X on the pull request.

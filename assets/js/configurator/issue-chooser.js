@@ -1,5 +1,10 @@
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/u;
 
+/** @returns {boolean} whether a value is a complete owner/repository identity. */
+export function isRepositoryIdentity(value) {
+  return REPOSITORY.test(String(value ?? '').trim());
+}
+
 /**
  * Render the issue chooser from deployment-owned repository identity.
  *
@@ -8,7 +13,8 @@ const REPOSITORY = /^[\w.-]+\/[\w.-]+$/u;
  * replacing the deployment's identity or content.
  */
 export function renderIssueChooser(repository, branch = 'main') {
-  if (!REPOSITORY.test(repository)) {
+  const configuredRepository = String(repository ?? '').trim();
+  if (!isRepositoryIdentity(configuredRepository)) {
     throw new Error('github.repository must use the owner/repository form');
   }
   const configuredBranch = typeof branch === 'string' && branch.trim() ? branch.trim() : 'main';
@@ -19,16 +25,16 @@ export function renderIssueChooser(repository, branch = 'main') {
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability privately
-    url: https://github.com/${repository}/security/advisories/new
+    url: https://github.com/${configuredRepository}/security/advisories/new
     about: Never put credentials, personal information, PHI, private URLs, or exploit details in a public issue.
   - name: Security reporting help
-    url: https://github.com/${repository}/blob/${branchPath}/SECURITY.md
+    url: https://github.com/${configuredRepository}/blob/${branchPath}/SECURITY.md
     about: Use the documented private email fallback if private vulnerability reporting is not available.
   - name: Maintainer guide
-    url: https://github.com/${repository}/blob/${branchPath}/docs/admin-guide.md
+    url: https://github.com/${configuredRepository}/blob/${branchPath}/docs/admin-guide.md
     about: How submissions become pull requests, how to review them, and how to configure the site.
   - name: Launch checklist
-    url: https://github.com/${repository}/blob/${branchPath}/docs/launch.md
+    url: https://github.com/${configuredRepository}/blob/${branchPath}/docs/launch.md
     about: Setting this catalog up for the first time — settings, the /setup/ wizard, and clearing the demo content.
 `;
 }

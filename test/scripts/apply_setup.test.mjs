@@ -126,6 +126,15 @@ test('a missing repository or name is named in the error, not discovered later',
     errors.some((line) => line.includes('`github.repository` is required')),
     errors.join('\n')
   );
+
+  const malformed = configErrors({
+    ...shipped,
+    site: { ...shipped.site, github: { repository: 'not-a-repository' } },
+  });
+  assert.ok(
+    malformed.some((line) => line.includes('form "owner/repo"')),
+    malformed.join('\n')
+  );
 });
 
 test('an invalid schema is refused with the field named', () => {

@@ -48,6 +48,6 @@ export {
 } from './schema-validate.js';
 export { applyAnswers, answersFromConfig, navigationFromSite, COLOR_QUESTIONS } from './answers.js';
 export { issueTemplateFromSchema, groupedFormFields } from './issue-template.js';
-export { renderIssueChooser } from './issue-chooser.js';
+export { isRepositoryIdentity, renderIssueChooser } from './issue-chooser.js';
 export { jekyllConfig, patchJekyllConfig } from './jekyll-config.js';
 export { renderFiles, HEADERS } from './render-files.js';
