@@ -14,6 +14,10 @@ major version, and each entry says so when it happens.
   catalog, filter sheet, comparison, entry, submission, setup, header, footer, breadcrumb and A–Z
   surfaces. The real-Chrome assistive-flow gate measures their rendered boxes at the mobile
   viewport so later CSS changes cannot silently shrink them again.
+- Downstream update check dispatches now have a 45-second bound and three-attempt backoff. If
+  GitHub remains unavailable or rate-limited, the updater fails safely after trying both independent
+  gates and gives nontechnical recovery steps that identify the existing pull request, confirm
+  `main` is unchanged, and prevent a merge before all required checks are green.
 
 ## [1.9.0-rc.2] — 2026-08-22
 
