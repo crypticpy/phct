@@ -119,8 +119,10 @@ unaccepted P2 findings.
    does not approve or merge itself.
 5. Close the test maintenance PR without merging if it contains only rehearsal data; retain links
    to the run and PR in the evidence ledger.
-6. Re-query both repository settings and rulesets and update the operations inventory with the
-   exact live configuration. Never record secret values.
+6. Re-query both repository settings and rulesets and record their exact live configuration in the
+   parent status ledger. Carry the protected BCHC operations-inventory update in the final
+   generated BCHC pull request rather than editing downstream protected content from PHCT. Never
+   record secret values.
 
 Exit: scheduled and no-terminal automation can complete through protected review without a bypass
 or a maintainer's terminal.
