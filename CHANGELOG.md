@@ -8,6 +8,13 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- Shared mobile actions now meet the template's 44 × 44px touch-target contract across the home,
+  catalog, filter sheet, comparison, entry, submission, setup, header, footer, breadcrumb and A–Z
+  surfaces. The real-Chrome assistive-flow gate measures their rendered boxes at the mobile
+  viewport so later CSS changes cannot silently shrink them again.
+
 ## [1.9.0-rc.2] — 2026-08-22
 
 ### Fixed
