@@ -75,11 +75,26 @@ The following work is complete or already has durable evidence:
   Project workflows use the creation capability; they do not approve or merge their own PRs.
 - Parent [PR #17](https://github.com/crypticpy/phct/pull/17) merged at
   `f66a879a6251485c10e26c172c876b1269885b77`. It converts scheduled maintenance from direct
-  pushes to protected, reviewable PRs and makes dispatched checks publish the canonical required
-  contexts. Post-merge and real generated-PR proof are the first remaining actions.
+  pushes to protected, reviewable PRs.
+- Parent [PR #20](https://github.com/crypticpy/phct/pull/20) merged at
+  `4d53b11b23b184724490bdc2bd979b0192e0fa59`. It makes dispatched validation publish every
+  canonical required context for a generated pull request.
+- The live [catalog-metrics run](https://github.com/crypticpy/phct/actions/runs/32606412628)
+  opened and updated generated [PR #19](https://github.com/crypticpy/phct/pull/19). The exact
+  generated head passed the trusted
+  [Validate](https://github.com/crypticpy/phct/actions/runs/32606430910),
+  [Quality](https://github.com/crypticpy/phct/actions/runs/32606432004), and
+  [workflow-lint](https://github.com/crypticpy/phct/actions/runs/32606433063) dispatches, including
+  all seven required ruleset contexts. It had no review threads and was closed without merge
+  because the rehearsal would replace template sample metrics with repository-operational data.
+  The workflow neither approved nor merged its own pull request.
+- GitHub correctly parked the ordinary `pull_request` suites for that built-in-token PR as
+  `action_required`; the trusted dispatches posted the required commit statuses. This expected
+  GitHub behavior is distinct from a failed release gate and is retained in the PR history.
 
-The status and operations ledgers currently contain older checkpoint text. Updating them to the
-accepted release SHA and live settings is required before publication.
+The parent status ledger now records this checkpoint. BCHC's protected operations inventory still
+contains older checkpoint text; update it to the accepted release SHA and exact live settings in
+the final generated BCHC update before publication.
 
 ## Release policy
 
@@ -379,7 +394,7 @@ and rotation rehearsal must be recorded without recording its value.
 | ID | Deliverable | State |
 |---|---|---|
 | PP-00 | Enable and verify Actions PR creation in both repositories | Complete 2026-08-22 |
-| PP-01 | Record PHCT #17 and prove protected maintenance end to end | In progress |
+| PP-01 | Record PHCT #17/#20 and prove protected maintenance end to end | Complete 2026-08-22 |
 | PP-02 | Complete parent interface/state screenshot audit | Not started |
 | PP-03 | Implement and verify interface/usability polish | Not started |
 | PP-04 | Complete manual browser and assistive-technology matrix | Not started |
