@@ -8,8 +8,26 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- `THIRD_PARTY_NOTICES.md` now records the version, provenance, modification history, copyright,
+  and complete license text for every copied JavaScript, generated icon, and bundled font asset.
+  `quality/vendored-assets.json` pins those files by SHA-256, and the license gate fails closed on
+  missing attribution, unsafe or duplicate paths, changed bytes, an unreviewed license, or a new
+  bundled font/minified script omitted from the manifest.
+- The issue chooser now routes documentation corrections through a structured form and security
+  vulnerabilities directly to GitHub's private advisory form; unstructured public issues are
+  disabled, the chooser links durable fallback instructions, launch guidance covers enabling the
+  private route, and the label-bootstrap workflow creates the documentation label.
+
 ### Fixed
 
+- The modified Adobe font subsets now use the distinct embedded and public family names PHCT Sans
+  and PHCT Serif, retain upstream copyright and license metadata, and accept the legacy Source
+  family values in protected downstream themes. This satisfies the upstream Reserved Font Name
+  condition without changing an existing deployment's rendered typography.
+- Accepting the terminal setup wizard's defaults now preserves the bundled serif heading instead
+  of silently switching it to Inter; browser and terminal setup share the corrected font names.
 - Shared mobile actions now meet the template's 44 × 44px touch-target contract across the home,
   catalog, filter sheet, comparison, entry, submission, setup, header, footer, breadcrumb and A–Z
   surfaces. The real-Chrome assistive-flow gate measures their rendered boxes at the mobile
@@ -18,6 +36,12 @@ major version, and each entry says so when it happens.
   GitHub remains unavailable or rate-limited, the updater fails safely after trying both independent
   gates and gives nontechnical recovery steps that identify the existing pull request, confirm
   `main` is unchanged, and prevent a merge before all required checks are green.
+- The downstream generator now rebuilds the complete issue chooser from protected repository
+  identity after an update, so existing deployments receive new routing safeguards instead of
+  retaining the older chooser structure protected by their ownership rules.
+- Browser, terminal and issue-driven setup now generate the same issue chooser alongside the other
+  configuration outputs, including repository-file help links on the configured branch. A fresh
+  template copy therefore cannot retain upstream PHCT reporting links after setup.
 
 ## [1.9.0-rc.2] — 2026-08-22
 

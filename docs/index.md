@@ -31,6 +31,7 @@ Outside this folder: [README](../README.md) (what the template is),
 [CONTRIBUTING](../CONTRIBUTING.md) (working on the template itself),
 [ARCHITECTURE](../ARCHITECTURE.md) (how the pieces fit),
 [SECURITY](../SECURITY.md) (the trust model behind the issue-to-pull-request pipeline),
+[THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md) (licenses and attribution for bundled files),
 [CODE_OF_CONDUCT](../CODE_OF_CONDUCT.md) (how contributors and reviewers engage).
 
 **Submitting an entry?** Almost none of this is for you — use the **Submit** page on the site,

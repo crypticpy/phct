@@ -206,6 +206,59 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
   );
 
   test(
+    'legacy-font-names: protected aliases render the renamed families and preload current files',
+    { skip: needs('legacy-font-names') },
+    () => {
+      const { siteDir } = built.get('legacy-font-names');
+      const document = page(siteDir, '');
+      const theme = document.querySelector('style')?.textContent ?? '';
+      assert.match(theme, /--font-heading: "PHCT Serif"/u);
+      assert.match(theme, /--font-body: "PHCT Sans"/u);
+      const preloads = [...document.querySelectorAll('link[rel="preload"][as="font"]')].map((link) =>
+        link.getAttribute('href')
+      );
+      assert.ok(preloads.some((href) => href.endsWith('/assets/fonts/PHCTSerif-Variable.woff2')));
+      assert.ok(preloads.some((href) => href.endsWith('/assets/fonts/PHCTSans-Variable.woff2')));
+      assert.equal(
+        preloads.some((href) => /Source(?:Sans|Serif)/u.test(href)),
+        false
+      );
+    }
+  );
+
+  test(
+    'legacy-issue-chooser: generation migrates protected safety routing',
+    { skip: needs('legacy-issue-chooser') },
+    () => {
+      const { dir } = built.get('legacy-issue-chooser');
+      const chooser = yaml.load(
+        fs.readFileSync(path.join(dir, '.github', 'ISSUE_TEMPLATE', 'config.yml'), 'utf8')
+      );
+      assert.equal(chooser.blank_issues_enabled, false);
+      assert.ok(
+        chooser.contact_links.some((link) => link.url.endsWith('/security/advisories/new')),
+        'private vulnerability route was not migrated'
+      );
+      assert.ok(
+        chooser.contact_links.some((link) => link.url.endsWith('/blob/release/catalog-v2/SECURITY.md')),
+        'security fallback route did not use the configured branch'
+      );
+    }
+  );
+
+  test(
+    'shipped: built-site distributions retain the complete third-party notice',
+    { skip: needs('shipped') },
+    () => {
+      const { dir, siteDir } = built.get('shipped');
+      assert.equal(
+        fs.readFileSync(path.join(siteDir, 'THIRD_PARTY_NOTICES.md'), 'utf8'),
+        fs.readFileSync(path.join(dir, 'THIRD_PARTY_NOTICES.md'), 'utf8')
+      );
+    }
+  );
+
+  test(
     'blank-empty: the filter rail renders one fieldset per facet field',
     { skip: needs('blank-empty') },
     () => {

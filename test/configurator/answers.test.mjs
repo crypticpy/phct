@@ -9,6 +9,7 @@ import {
 } from '../../assets/js/configurator/answers.js';
 import { defaultConfig } from '../../assets/js/configurator/default-config.js';
 import { MOTION_PRESETS } from '../../assets/js/configurator/motion.js';
+import { BUNDLED_FONT_NAMES, normalizeBundledFontName } from '../../assets/js/configurator/fonts.js';
 import { renderFiles } from '../../assets/js/configurator/render-files.js';
 import {
   slugify,
@@ -98,6 +99,27 @@ test('answersFromConfig round-trips through applyAnswers', () => {
   const rebuilt = applyAnswers(base, answersFromConfig(base));
   assert.deepEqual(rebuilt.site, base.site);
   assert.deepEqual(rebuilt.theme, base.theme);
+});
+
+test('legacy bundled font names normalize without changing custom families', () => {
+  assert.equal(normalizeBundledFontName('Source Serif 4'), BUNDLED_FONT_NAMES.serif);
+  assert.equal(normalizeBundledFontName('Source Sans 3'), BUNDLED_FONT_NAMES.sans);
+  assert.equal(normalizeBundledFontName('Atkinson Hyperlegible'), 'Atkinson Hyperlegible');
+
+  const base = defaultConfig();
+  base.theme.fonts = {
+    heading: 'Source Serif 4',
+    body: 'Source Sans 3',
+    google_fonts_url: '',
+  };
+  const answers = answersFromConfig(base);
+  assert.equal(answers.headingFont, BUNDLED_FONT_NAMES.serif);
+  assert.equal(answers.bodyFont, BUNDLED_FONT_NAMES.sans);
+  assert.deepEqual(applyAnswers(base, {}).theme.fonts, {
+    heading: BUNDLED_FONT_NAMES.serif,
+    body: BUNDLED_FONT_NAMES.sans,
+    google_fonts_url: '',
+  });
 });
 
 /* --- theme.motion --------------------------------------------------------- */

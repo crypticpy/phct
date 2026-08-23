@@ -36,11 +36,19 @@ This repository is shipped configured as an **AI Use Case Catalog**, where publi
 - **Accessibility as a build rule, not a pass.** Nothing is signalled by colour or icon alone, every control has a visible focus ring and a ≥3:1 border, filter changes are announced once, and the whole catalog still works with JavaScript disabled.
 - **CI content pipeline.** Front-matter and file-size validation on every pull request, automatic thumbnail generation from uploaded PDFs, and workflows that scaffold cohort years, events and schedule updates from issues.
 
-## Quick start
+**Supported scale:** releases enforce the complete build, payload, DOM, and interaction budgets
+through 100 published entries. The deterministic release matrix also characterizes 500 entries as
+the next target and 1,000 as a stress case; see [`docs/performance.md`](docs/performance.md) before
+planning a larger catalog.
+
+## 15-minute start
+
+Allow roughly 15 minutes of hands-on setup. GitHub's initial builds can bring elapsed time to about
+40 minutes; the detailed no-terminal tutorial includes every wait and recovery path.
 
 1. **Use this template** on GitHub (or clone it) to create your own repository.
 2. **Turn on the three settings**: Pages source (Settings → Pages → Source → **GitHub Actions**), pull requests for Actions (Settings → Actions → General → Workflow permissions → **Allow GitHub Actions to create and approve pull requests**), and the content labels (Actions tab → **Bootstrap labels** → *Run workflow*).
-3. **Configure the site** — open `/setup/` on the deployed site for the browser wizard (no terminal), or run `npm install && npm run setup` locally. Both write `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`, `_config.yml` and `.github/ISSUE_TEMPLATE/new-entry.yml`, from the same four presets. With no terminal, paste the wizard's three `_data/*.yml` files into the **Apply setup** issue form and the automation opens the pull request for you.
+3. **Configure the site** — open `/setup/` on the deployed site for the browser wizard (no terminal), or run `npm ci && npm run setup` locally. Both write `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`, `_config.yml`, `.github/ISSUE_TEMPLATE/new-entry.yml` and `.github/ISSUE_TEMPLATE/config.yml`, from the same four presets. With no terminal, paste the wizard's three `_data/*.yml` files into the **Apply setup** issue form and the automation opens the pull request for you.
 4. **Clear the demo content** — ten fictional organizations, a sample events calendar, a sample cohort. Until they are gone every page carries a *Demo content* banner saying so. `npm run eject:samples` removes it all, turns the banner off and switches the `governance` module off until you have rewritten `_data/governance.yml` in your own words; the Apply setup issue has a checkbox that does the same thing.
 5. **Commit and push.** `Build & Deploy` publishes to `https://<owner>.github.io/<repo>/`, working out `url`/`baseurl` on its own (root domain for a `<owner>.github.io` repo or a `CNAME` file, `/<repo>` otherwise); an explicit `url` in `_config.yml` always wins.
 
@@ -125,7 +133,7 @@ Other useful scripts:
 
 ```bash
 npm run setup      # configuration wizard (see Quick start)
-npm run generate   # regenerate the issue template + configurator defaults, and sync _config.yml from _data/site.yml
+npm run generate   # regenerate issue forms/routing + configurator defaults, and sync _config.yml from _data/site.yml
 npm run validate   # parse all _data/*.yml and run the front-matter / file-size checks CI runs on pull requests
 npm test           # Node unit tests; `npm run test:ruby` for the Ruby validators
 npm run test:build # build every preset and module combination and check the rendered copy (needs Ruby; minutes, not seconds)
@@ -143,6 +151,8 @@ Contributing to the template itself? Start with [`CONTRIBUTING.md`](CONTRIBUTING
 - [`SUPPORT.md`](SUPPORT.md) explains public support routes and response expectations.
 - [`SECURITY.md`](SECURITY.md) is the private vulnerability-reporting route; never publish a
   credential, personal information, PHI, or exploit detail in an issue.
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) records licenses, provenance, and required
+  attribution for the JavaScript, icons, and fonts shipped with PHCT.
 - [`docs/maintaining.md`](docs/maintaining.md) is the release, downstream-update, rollback,
   backup/restore, incident, and succession runbook.
 
@@ -171,7 +181,7 @@ styleguide/              /styleguide/ — live rendering of the design system ag
 docs/                    index.md (start here), launch.md, admin-guide.md, contributor-guide.md, incidents.md,
                          configuration.md, content-model.md, search.md, images.md, upgrading.md, decisions.md,
                          glossary.md, design-brief.md, design-system.md, roadmap.md
-quality/                 pa11y-ci and Lighthouse CI config, plus urls.js (shared URL discovery for both)
+quality/                 pa11y/Lighthouse configuration, dependency-license policy, and the digest-checked vendored-asset inventory
 test/                    configurator/, plugins/, scripts/ and fixtures/ — Node's test runner + Ruby minitest
 ARCHITECTURE.md          how the pieces fit; CONTRIBUTING.md — working on the template itself; SECURITY.md;
 CODE_OF_CONDUCT.md       how contributors and reviewers engage (linked from the governance page)
@@ -179,4 +189,5 @@ CODE_OF_CONDUCT.md       how contributors and reviewers engage (linked from the 
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+PHCT is MIT-licensed — see [`LICENSE`](LICENSE). Bundled third-party files retain the licenses and
+attribution recorded in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
