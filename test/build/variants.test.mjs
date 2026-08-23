@@ -282,6 +282,11 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
       const rail = document.querySelector('[data-filter-rail]');
       const skip = rail?.querySelector('a.rail-skip');
       assert.ok(skip, 'no .rail-skip link inside the rail');
+      assert.equal(
+        rail.getAttribute('tabindex'),
+        '-1',
+        'the scrollable rail must not become an unnamed Firefox keyboard stop'
+      );
       assert.equal(rail.firstElementChild, skip, 'the skip link must be the first thing in the rail');
       const target = skip.getAttribute('href').replace(/^#/, '');
       const heading = document.getElementById(target);
