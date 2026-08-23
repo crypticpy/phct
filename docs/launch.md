@@ -64,7 +64,7 @@ part of the launch; merge them whenever their checks are green.
 ## 3. Configure the site
 
 Two paths, same result — both run the same code (`assets/js/configurator/core.js`) and write the
-same six files:
+same seven files:
 
 | Path | How | Good for |
 |---|---|---|
@@ -73,7 +73,8 @@ same six files:
 | Terminal | `npm ci && npm run setup` | Anyone with a checkout. Writes the files directly; `npm run setup -- --preset <id> --yes` skips every prompt. |
 
 Both write `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`,
-`_config.yml` and `.github/ISSUE_TEMPLATE/new-entry.yml`. Four starting presets ship: AI use case
+`_config.yml`, `.github/ISSUE_TEMPLATE/new-entry.yml` and `.github/ISSUE_TEMPLATE/config.yml`.
+Four starting presets ship: AI use case
 catalog, cohort/program portal, resource library, and blank.
 
 ### The no-terminal path, end to end
@@ -84,7 +85,7 @@ GitHub's file editor is where a launch usually goes wrong. Instead:
 1. Open **Issues → New issue → Apply setup (creates PR)**.
 2. Paste `_data/site.yml`, `_data/theme.yml` and `_data/schema.yml` from the wizard's review step
    into the three boxes (the **Copy** button on each file). You only paste three —
-   `_data/navigation.yml`, `_config.yml` and the submission form are rebuilt from them, so they
+   `_data/navigation.yml`, `_config.yml`, the submission form and the issue chooser are rebuilt from them, so they
    cannot end up out of step with what you pasted.
 3. Tick **Remove the demo content** if you are ready to lose the sample entries (step 4).
 4. Submit. Within a minute the automation replies with a pull request; review the diff and merge.

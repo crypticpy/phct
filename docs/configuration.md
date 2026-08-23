@@ -303,7 +303,7 @@ Written, not authored: `scripts/metrics.mjs` counts the last four calendar quart
 
 ## The three ways to configure
 
-All three read/write the same six files (`_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`, `_config.yml`, `.github/ISSUE_TEMPLATE/new-entry.yml`) using the same shared logic in `assets/js/configurator/core.js`, so they always produce equivalent output.
+All three read/write the same seven files (`_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`, `_config.yml`, `.github/ISSUE_TEMPLATE/new-entry.yml`, `.github/ISSUE_TEMPLATE/config.yml`) using the same shared logic in `assets/js/configurator/core.js`, so they always produce equivalent output.
 
 Their starting point — the defaults both wizards open with — is not hand-maintained JavaScript. `assets/js/configurator/defaults.generated.js` is produced from `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml` and `_data/navigation.yml` by `npm run generate`, so the wizards can never drift from the YAML that actually builds the site. Do not edit it; a `--check` run in CI fails the build if it is stale.
 
@@ -343,13 +343,13 @@ Same four presets (`ai-use-cases`, `cohort-portal`, `resource-library`, `blank`)
 
 ### The Apply setup issue — the browser wizard, finished
 
-`/setup/` hands back finished files but cannot commit them, so the last mile used to be six manual
+`/setup/` hands back finished files but cannot commit them, so the last mile used to be seven manual
 pastes into GitHub's file editor. `.github/ISSUE_TEMPLATE/apply-setup.yml` closes that: paste
 `_data/site.yml`, `_data/theme.yml` and `_data/schema.yml` from the wizard's review step into one
 issue, and `.github/workflows/apply-setup.yml` runs `scripts/apply_setup_from_issue.mjs`, which
 calls the same `renderFiles()` and opens a pull request.
 
-- Only three files are pasted. The other three are *derived* from them, so the generated half can
+- Only three files are pasted. The other four are *derived* from them, so the generated half can
   never drift from the pasted half — however stale the tab the maintainer copied from.
 - Invalid YAML, a schema `validateSchema()` rejects, and a palette that fails WCAG AA are all
   refused with a comment on the issue, before a pull request exists. Edit the issue and it retries.

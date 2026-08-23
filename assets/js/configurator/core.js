@@ -16,6 +16,7 @@
  *   schema-validate.js    schema v2 rules
  *   answers.js            the shared question model and answers -> config merge
  *   issue-template.js     .github/ISSUE_TEMPLATE/new-entry.yml
+ *   issue-chooser.js      .github/ISSUE_TEMPLATE/config.yml
  *   jekyll-config.js      _config.yml
  *   render-files.js       config -> {path: contents}
  */
@@ -47,5 +48,6 @@ export {
 } from './schema-validate.js';
 export { applyAnswers, answersFromConfig, navigationFromSite, COLOR_QUESTIONS } from './answers.js';
 export { issueTemplateFromSchema, groupedFormFields } from './issue-template.js';
+export { renderIssueChooser } from './issue-chooser.js';
 export { jekyllConfig, patchJekyllConfig } from './jekyll-config.js';
 export { renderFiles, HEADERS } from './render-files.js';

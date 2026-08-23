@@ -149,9 +149,10 @@ test('a palette that fails contrast is refused here, not on the pull request', (
   );
 });
 
-test('exactly the six configurator-owned files are written, and no others', () => {
+test('exactly the seven configurator-owned files are written, and no others', () => {
   const files = filesFor(ROOT, shipped);
   assert.deepEqual(Object.keys(files).sort(), [
+    '.github/ISSUE_TEMPLATE/config.yml',
     '.github/ISSUE_TEMPLATE/new-entry.yml',
     '_config.yml',
     '_data/navigation.yml',
@@ -185,4 +186,9 @@ test('the derived files come out of the pasted ones, so they cannot drift', () =
   const files = filesFor(ROOT, renamed);
   assert.match(files['_data/site.yml'], /Rewritten Catalog/);
   assert.match(files['_config.yml'], /Rewritten Catalog/, '_config.yml follows site.yml');
+  assert.match(
+    files['.github/ISSUE_TEMPLATE/config.yml'],
+    /github\.com\/crypticpy\/phct\/security\/advisories\/new/u,
+    'the issue chooser follows site.yml repository identity'
+  );
 });

@@ -39,6 +39,9 @@ major version, and each entry says so when it happens.
 - The downstream generator now rebuilds the complete issue chooser from protected repository
   identity after an update, so existing deployments receive new routing safeguards instead of
   retaining the older chooser structure protected by their ownership rules.
+- Browser, terminal and issue-driven setup now generate the same issue chooser alongside the other
+  configuration outputs, including repository-file help links on the configured branch. A fresh
+  template copy therefore cannot retain upstream PHCT reporting links after setup.
 
 ## [1.9.0-rc.2] — 2026-08-22
 

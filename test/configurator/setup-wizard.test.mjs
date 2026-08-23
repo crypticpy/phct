@@ -554,6 +554,7 @@ test('the review step renders every file, and the new field is in the schema out
     '_data/navigation.yml',
     '_config.yml',
     '.github/ISSUE_TEMPLATE/new-entry.yml',
+    '.github/ISSUE_TEMPLATE/config.yml',
   ]);
 
   const schemaYaml = $$('#wizard section.card')
@@ -562,6 +563,11 @@ test('the review step renders every file, and the new field is in the schema out
   assert.match(schemaYaml, /key: budget_range/);
   assert.match(schemaYaml, /group: reuse/);
   assert.match(schemaYaml, /weight: 7/);
+
+  const chooserYaml = $$('#wizard section.card')
+    .find((section) => section.textContent.includes('.github/ISSUE_TEMPLATE/config.yml'))
+    .querySelector('pre').textContent;
+  assert.match(chooserYaml, /security\/advisories\/new/u);
 
   assert.ok($$('#wizard button').some((button) => button.textContent === 'Copy'));
   assert.ok($$('#wizard button').some((button) => button.textContent === 'Download'));

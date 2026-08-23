@@ -5,7 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
-import { renderIssueChooser } from '../../scripts/lib/issue_chooser.mjs';
+import { renderIssueChooser } from '../../assets/js/configurator/issue-chooser.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 

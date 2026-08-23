@@ -193,7 +193,7 @@ export function buildVariant(variant, { scratchRoot, log = () => {} }) {
   // read it (`_config.yml` excludes it from the build).
   fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'));
 
-  // `--out` writes the wizard's six files into an existing tree and implies
+  // `--out` writes the wizard's seven files into an existing tree and implies
   // `--yes`; it patches the copy's _config.yml rather than overwriting it, so
   // excludes, plugins and defaults survive. Run from ROOT: setup.mjs resolves
   // assets/js/configurator/core.js relative to the working directory.
