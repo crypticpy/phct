@@ -390,7 +390,11 @@ describe('assistive-technology flows', { skip: SKIP, concurrency: false }, () =>
 
     const compare = await openPage(browser, '/compare/', mobile);
     await compare.waitForSelector('.compare-head-remove');
-    await assertTouchTargets(compare, '.compare-head-remove, main .btn-sm', 'comparison page');
+    await assertTouchTargets(
+      compare,
+      '[data-compare-app] a, [data-compare-app] button, main .btn-sm',
+      'comparison page'
+    );
     await compare.close();
 
     const entry = await openPage(browser, entryPath, mobile);
