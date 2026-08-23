@@ -10,7 +10,7 @@ dependencies, releases, security reports, and downstream compatibility.
 |---|---|---|
 | Primary technical maintainer | `@crypticpy` | Shared code review, security triage, PHCT releases, CI and update tooling. |
 | BCHC product owner | To be named by BCHC before transfer | Content policy, demo/publication decisions, taxonomy, governance language, and final go/no-go. |
-| Backup release maintainer | **Unassigned — release blocker** | Must be able to run a release, update BCHC, roll back, rotate credentials, and handle a takedown without the primary maintainer. |
+| Backup release maintainer | **Unassigned — handoff blocker** | Must be able to run a release, update BCHC, roll back, rotate credentials, and handle a takedown without the primary maintainer. |
 
 The project is not ready for operational handoff while the backup role is unassigned. Add the
 real GitHub account to `.github/CODEOWNERS`, branch rules, Pages/admin access, and this table only

@@ -149,7 +149,10 @@ names, never hex or literals. Component classes live in `assets/css/components/<
 `@apply` compositions. There is no `safelist`: a badge's tone is `data-tone`, not part of its class
 name, so nothing is composed at render time for the scanner to miss.
 `assets/css/site.css` is build output (`npm run build:css`) and is not committed.
-Fonts are self-hosted variable woff2 subsets (`assets/fonts/README.md`).
+Fonts are self-hosted variable woff2 subsets (`assets/fonts/README.md`). Copied JavaScript,
+generated icons, and fonts are pinned by digest in `quality/vendored-assets.json`; their complete
+provenance and license terms live in `THIRD_PARTY_NOTICES.md` and fail closed under `npm run
+licenses:check`.
 
 ### Testing
 

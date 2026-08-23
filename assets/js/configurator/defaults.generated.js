@@ -128,7 +128,7 @@ export const THEME = {
     "warn": "#B45309"
   },
   "fonts": {
-    "heading": "Source Serif 4",
+    "heading": "PHCT Serif",
     "body": "Inter",
     "google_fonts_url": ""
   },

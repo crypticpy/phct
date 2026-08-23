@@ -201,7 +201,7 @@ test('the Look step asks every colour question the CLI asks, and offers a custom
   const select = $('#field-headingFont');
   assert.equal(select.value, 'Roboto', 'a custom font left the select unselected');
   assert.ok([...select.options].some((o) => o.value === 'Roboto'));
-  wizardState.state.answers.headingFont = 'Source Sans 3';
+  wizardState.state.answers.headingFont = 'PHCT Sans';
 });
 
 test('the Look step renders and the live preview follows the primary colour', () => {

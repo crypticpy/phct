@@ -8,8 +8,24 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- `THIRD_PARTY_NOTICES.md` now records the version, provenance, modification history, copyright,
+  and complete license text for every copied JavaScript, generated icon, and bundled font asset.
+  `quality/vendored-assets.json` pins those files by SHA-256, and the license gate fails closed on
+  missing attribution, unsafe or duplicate paths, changed bytes, or an unreviewed license.
+- The issue chooser now routes documentation corrections through a structured form and security
+  vulnerabilities directly to GitHub's private advisory form; unstructured public issues are
+  disabled and the label-bootstrap workflow creates the documentation label.
+
 ### Fixed
 
+- The modified Adobe font subsets now use the distinct embedded and public family names PHCT Sans
+  and PHCT Serif, retain upstream copyright and license metadata, and accept the legacy Source
+  family values in protected downstream themes. This satisfies the upstream Reserved Font Name
+  condition without changing an existing deployment's rendered typography.
+- Accepting the terminal setup wizard's defaults now preserves the bundled serif heading instead
+  of silently switching it to Inter; browser and terminal setup share the corrected font names.
 - Shared mobile actions now meet the template's 44 × 44px touch-target contract across the home,
   catalog, filter sheet, comparison, entry, submission, setup, header, footer, breadcrumb and A–Z
   surfaces. The real-Chrome assistive-flow gate measures their rendered boxes at the mobile

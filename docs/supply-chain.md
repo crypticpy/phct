@@ -10,6 +10,9 @@ Controls:
 - `npm run security:audit` runs npm and Bundler audits against current advisory databases, blocks
   unregistered high/critical findings, and applies only exact active P2 exceptions;
 - `quality/allowed-licenses.json` is fail-closed: a new or missing npm/gem license blocks review;
+- `quality/vendored-assets.json` inventories copied JavaScript, generated icons, and bundled fonts
+  by exact SHA-256, license, version, and notice section. `npm run licenses:check` rejects changed or
+  missing files, unsafe or duplicate paths, missing attribution, and unreviewed licenses;
 - `npm run sbom` creates a deterministic CycloneDX 1.5 inventory from both lockfiles, consolidates
   repeated npm package/version entries while retaining their lockfile paths, assigns distinct
   package URLs to Ruby platform artifacts, and fails if any BOM reference is duplicated; and
@@ -19,6 +22,12 @@ GPL/LGPL dependencies presently approved are build/development tools, not code c
 published static site: `eventmachine` is dual GPL-2.0/Ruby licensed, `bundler-audit` is GPL-3.0,
 and Sharp's libvips distribution accounts for the LGPL metadata in npm's tree. Any change to how
 those packages are distributed requires a fresh license review.
+
+The full license text, copyright, modification history, and upstream source for each shipped
+third-party file are in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md). Keep that file with
+source archives and built-site distributions. When a vendored file is regenerated or upgraded,
+review the upstream license first, update its notice and manifest entry, then record the new digest;
+never update a digest merely to make the check green.
 
 ## Exceptions
 

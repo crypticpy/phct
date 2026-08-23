@@ -45,7 +45,7 @@ export const ROOT = process.env.BUILD_VARIANTS_ROOT
  * replaces them with ones generated from the variant's own schema, and `none`
  * empties the catalog so the empty state renders.
  *
- * @type {{id: string, preset: string|null, modules: object|null, demo?: boolean,
+ * @type {{id: string, preset: string|null, modules: object|null, demo?: boolean, themeFonts?: object,
  *         entries: 'keep'|'fixtures'|'none', build: boolean,
  *         expectFrontMatter: 'pass'|'fail', why: string}[]}
  */
@@ -68,6 +68,16 @@ export const VARIANTS = [
     build: true,
     expectFrontMatter: 'pass',
     why: 'the shipped entries with demo mode disabled, proving real contacts and resources stay live',
+  },
+  {
+    id: 'legacy-font-names',
+    preset: null,
+    modules: null,
+    themeFonts: { heading: 'Source Serif 4', body: 'Source Sans 3' },
+    entries: 'none',
+    build: true,
+    expectFrontMatter: 'pass',
+    why: 'a protected pre-rename theme file must load the current derivative font binaries',
   },
   {
     id: 'all-modules',
@@ -136,6 +146,13 @@ function patchSite(file, { modules, demo }) {
   writeYaml(file, site);
 }
 
+/** Replace only the font-family values in a scratch `_data/theme.yml`. */
+function patchThemeFonts(file, fonts) {
+  const theme = readYaml(file);
+  theme.fonts = { ...(theme.fonts ?? {}), ...fonts };
+  writeYaml(file, theme);
+}
+
 /**
  * Prepare and build one variant.
  *
@@ -178,6 +195,9 @@ export function buildVariant(variant, { scratchRoot, log = () => {} }) {
 
   if (variant.modules || typeof variant.demo === 'boolean') {
     patchSite(path.join(dir, '_data', 'site.yml'), variant);
+  }
+  if (variant.themeFonts) {
+    patchThemeFonts(path.join(dir, '_data', 'theme.yml'), variant.themeFonts);
   }
 
   if (variant.entries !== 'keep') {

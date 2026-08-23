@@ -173,7 +173,7 @@ colors:
   warn: "#B45309"           # caution only: sensitive-data indicators, validation errors
 
 fonts:
-  heading: "Source Serif 4"  # bundled: "Source Serif 4", "Source Sans 3", "Inter"; any other name needs google_fonts_url
+  heading: "PHCT Serif"  # bundled: "PHCT Serif", "PHCT Sans", "Inter"; any other name needs google_fonts_url
   body: "Inter"
   google_fonts_url: ""       # a Google Fonts <link> href, when using a non-bundled font
 
@@ -182,7 +182,12 @@ radius: "soft"                # sharp | soft | round
 
 Colors are hex values. `_includes/theme.html` converts each one to an `R G B` triple (via the `hex_to_rgb` Liquid filter in `_plugins/theme_filters.rb`) and emits them as CSS custom properties (`--c-primary`, `--c-line-strong`, `--c-warn`, …) that Tailwind's `rgb(var(--c-x) / <alpha>)` utility classes read — so changing a hex value here re-themes the whole site on the next build, no CSS edits required. Keep text/background pairs at WCAG AA contrast (4.5:1 for body text); the setup wizards warn if `on_dark` on `primary_dark` falls under 4.5:1, and `npm run validate` fails if `ink`, `muted` or `primary` fall under 4.5:1 on `surface_tint`.
 
-Headings default to the bundled serif (Source Serif 4) over an Inter body. For an all-sans site set `fonts.heading: "Source Sans 3"` — the wizard's Look step offers all three bundled families.
+Headings default to the bundled PHCT Serif over an Inter body. For an all-sans site set
+`fonts.heading: "PHCT Sans"` — the wizard's Look step offers all three bundled families. PHCT
+Serif and PHCT Sans are renamed, modified OFL subsets of Adobe's Source families; see
+[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md). The renderer accepts the legacy values
+`Source Serif 4` and `Source Sans 3` so an older protected `theme.yml` keeps the same appearance,
+but new configuration should use the PHCT family names.
 
 Each color has one job, and the templates rely on that (see [`docs/design-brief.md`](design-brief.md)):
 

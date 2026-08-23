@@ -64,7 +64,7 @@ same six files:
 |---|---|---|
 | Browser | Open `/setup/` on your deployed site | No terminal. Copy each generated file into GitHub's editor at the end. |
 | Browser → pull request | Open `/setup/`, then paste its files into an **Apply setup** issue | No terminal, and no hand-editing files: the answer comes back as a reviewable pull request. |
-| Terminal | `npm install && npm run setup` | Anyone with a checkout. Writes the files directly; `npm run setup -- --preset <id> --yes` skips every prompt. |
+| Terminal | `npm ci && npm run setup` | Anyone with a checkout. Writes the files directly; `npm run setup -- --preset <id> --yes` skips every prompt. |
 
 Both write `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`,
 `_config.yml` and `.github/ISSUE_TEMPLATE/new-entry.yml`. Four starting presets ship: AI use case

@@ -21,11 +21,11 @@ colors:
   warn: "#B45309"           # caution only: sensitive-data indicators, validation errors
 
 fonts:
-  # Bundled options: "Source Serif 4", "Source Sans 3", "Inter". Any other family
+  # Bundled options: "PHCT Serif", "PHCT Sans", "Inter". Any other family
   # name works if you also set google_fonts_url (a Google Fonts <link> href) below.
   # The shipped pairing is a serif for headings over a sans for everything else;
-  # set heading to "Source Sans 3" for an all-sans site.
-  heading: "Source Serif 4"
+  # set heading to "PHCT Sans" for an all-sans site.
+  heading: "PHCT Serif"
   body: "Inter"
   google_fonts_url: ""
 
