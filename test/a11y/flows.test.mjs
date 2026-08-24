@@ -463,13 +463,14 @@ describe('assistive-technology flows', { skip: SKIP, concurrency: false }, () =>
     // read twice if it is. Same decision as the setup wizard's summary.
     assert.deepEqual(await liveness(page, '[data-error-summary]'), { role: null, live: null });
 
-    // Tabbed to, not clicked, and by role rather than by label: the button says
-    // "Check your answers" here, and every deployment relabels it.
-    const submit = await tabUntil(page, (stop) => stop.submits, {
-      what: 'the submit button',
+    // With more than one section the form opens as steps, so the way forward
+    // is the first step's Next button — the submit control waits on the last
+    // step. Tabbed to, not clicked.
+    const next = await tabUntil(page, (stop) => stop.tag === 'button' && stop.text === 'Next section', {
+      what: 'the Next button',
       max: 150,
     });
-    assertUsableStops(submit.trail, 'submit');
+    assertUsableStops(next.trail, 'submit');
 
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => !document.querySelector('[data-error-summary]').hidden);
@@ -551,16 +552,49 @@ describe('assistive-technology flows', { skip: SKIP, concurrency: false }, () =>
       `the inline error "${marked[0].summary}" stayed after the field was answered`
     );
 
-    // Tabbing on from the first answer reaches the second section without a
-    // single unusable stop in between — how many stops that takes is the
-    // schema's business.
-    const here = (await focusStop(page)).within.find((id) => id.startsWith('section-'));
-    const onward = await tabUntil(
-      page,
-      (stop) => stop.within.some((id) => id.startsWith('section-') && id !== here),
-      { what: `a section after ${here}`, max: 60 }
-    );
+    // Answer the rest of the step the way the schema wrote each control, then
+    // move on. A clean step's Next is a step change, and a step change is a
+    // page change to a reader: the new section's heading takes focus and the
+    // rail marks exactly one step as current — the same contract as the setup
+    // wizard below.
+    await page.evaluate(() => {
+      const fire = (node, type) => node.dispatchEvent(new Event(type, { bubbles: true }));
+      const section = document.querySelector('[data-section]:not([hidden])');
+      section.querySelectorAll('[data-field][data-required="true"]').forEach((wrap) => {
+        const select = wrap.querySelector('select');
+        const boxes = wrap.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+        const text = wrap.querySelector('input:not([type="radio"]):not([type="checkbox"]), textarea');
+        if (select) {
+          const option = [...select.options].find((item) => item.value !== '');
+          if (option) select.value = option.value;
+          fire(select, 'change');
+        } else if (boxes.length > 0) {
+          const box = [...boxes].find((item) => item.value && !item.hasAttribute('data-clear'));
+          if (box && !box.checked) {
+            box.checked = true;
+            fire(box, 'change');
+          }
+        } else if (text && !text.value) {
+          text.value = 'A keyboard-only walkthrough';
+          fire(text, 'input');
+        }
+      });
+    });
+    const here = await page.evaluate(() => document.querySelector('[data-section]:not([hidden]) h2').id);
+    const onward = await tabUntil(page, (stop) => stop.tag === 'button' && stop.text === 'Next section', {
+      what: 'the Next button again',
+      max: 60,
+    });
     assertUsableStops(onward.trail, 'submit');
+    await page.keyboard.press('Enter');
+    const arrived = await focusStop(page);
+    assert.match(arrived.id ?? '', /^heading-/, `Next put focus on ${describeStop(arrived)}`);
+    assert.notEqual(arrived.id, here, 'Next left focus on the step it came from');
+    assert.equal(
+      await page.evaluate(() => document.querySelectorAll('.progress-link[aria-current="step"]').length),
+      1,
+      'exactly one rail link claims to be the current step'
+    );
 
     await page.close();
   });
