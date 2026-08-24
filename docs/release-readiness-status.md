@@ -1,19 +1,21 @@
 # PHCT and BCHC release-readiness status
 
-- Evidence date: 2026-08-22
+- Evidence date: 2026-08-24
 - PHCT starting baseline: `c9fcb223826f2fc8c945d894420c16a2b8ff5da0`
-- PHCT candidate: [`v1.9.0-rc.2`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.2)
-  is published at immutable commit `bb2e44714969d261ce77860ddd27af8c5d9626d0` with its
-  326-component SBOM. Protected maintenance [PR #17](https://github.com/crypticpy/phct/pull/17)
-  and generated-status [PR #20](https://github.com/crypticpy/phct/pull/20) subsequently merged;
-  protected `main` is verified through `4d53b11b23b184724490bdc2bd979b0192e0fa59`.
-- BCHC protected `main` is `169e17698659bb4d57944bd91f424558a1511c86`. The
+- PHCT candidate: `v1.9.0-rc.3`, cut from protected `main` at the merge of the stepped
+  submission form ([PR #30](https://github.com/crypticpy/phct/pull/30), all seven
+  ruleset-required contexts plus scale, audit, and CodeQL green at the merged head) and this
+  release pull request. It supersedes
+  [`v1.9.0-rc.2`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.2), published at
+  immutable commit `bb2e44714969d261ce77860ddd27af8c5d9626d0` with its 326-component SBOM,
+  whose exact-head evidence below remains the last full-matrix record.
+- BCHC consumed rc.2: the
   [real rc.2 updater run](https://github.com/crypticpy/bchc-ai-use-case-catalog/actions/runs/32599759546)
   resolved the immutable tag and full SHA, preserved all 116 protected paths byte-for-byte,
   regenerated the deployment, and opened green candidate
   [PR #4](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/4) at
-  `2017cda8b731ae52103c6b44232496d2c2fc8662`. It remains intentionally unmerged while parent
-  polish continues and will be superseded by the final candidate or stable update.
+  `2017cda8b731ae52103c6b44232496d2c2fc8662`, which has since merged; the published BCHC demo
+  is locked to `v1.9.0-rc.2` pending the rc.3 update.
 - Automated code baseline: **green**
 - Wider-demo candidate: **no-go until parent interface polish and the remaining manual/live demo gates pass**
 - Stable release and BCHC handoff: **no-go until the human and live-repository gates below pass**
