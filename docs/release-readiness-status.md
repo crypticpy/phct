@@ -1,19 +1,21 @@
 # PHCT and BCHC release-readiness status
 
-- Evidence date: 2026-08-22
+- Evidence date: 2026-08-24
 - PHCT starting baseline: `c9fcb223826f2fc8c945d894420c16a2b8ff5da0`
-- PHCT candidate: [`v1.9.0-rc.2`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.2)
-  is published at immutable commit `bb2e44714969d261ce77860ddd27af8c5d9626d0` with its
-  326-component SBOM. Protected maintenance [PR #17](https://github.com/crypticpy/phct/pull/17)
-  and generated-status [PR #20](https://github.com/crypticpy/phct/pull/20) subsequently merged;
-  protected `main` is verified through `4d53b11b23b184724490bdc2bd979b0192e0fa59`.
-- BCHC protected `main` is `169e17698659bb4d57944bd91f424558a1511c86`. The
+- PHCT candidate: `v1.9.0-rc.3`, cut from protected `main` at the merge of the stepped
+  submission form ([PR #30](https://github.com/crypticpy/phct/pull/30), all seven
+  ruleset-required contexts plus scale, audit, and CodeQL green at the merged head) and this
+  release pull request. It supersedes
+  [`v1.9.0-rc.2`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.2), published at
+  immutable commit `bb2e44714969d261ce77860ddd27af8c5d9626d0` with its 326-component SBOM,
+  whose exact-head evidence below remains the last full-matrix record.
+- BCHC consumed rc.2: the
   [real rc.2 updater run](https://github.com/crypticpy/bchc-ai-use-case-catalog/actions/runs/32599759546)
   resolved the immutable tag and full SHA, preserved all 116 protected paths byte-for-byte,
   regenerated the deployment, and opened green candidate
   [PR #4](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/4) at
-  `2017cda8b731ae52103c6b44232496d2c2fc8662`. It remains intentionally unmerged while parent
-  polish continues and will be superseded by the final candidate or stable update.
+  `2017cda8b731ae52103c6b44232496d2c2fc8662`, which has since merged; the published BCHC demo
+  is locked to `v1.9.0-rc.2` pending the rc.3 update.
 - Automated code baseline: **green**
 - Wider-demo candidate: **no-go until parent interface polish and the remaining manual/live demo gates pass**
 - Stable release and BCHC handoff: **no-go until the human and live-repository gates below pass**
@@ -42,7 +44,7 @@ that updater succeeds.
 | Live pull-request CI | Pass at reviewed heads | The rc.2 implementation retained the full Validate, coverage, preset matrix, scale/Chrome, supply-chain, CodeQL, workflow-lint, pa11y, assistive-flow, and desktop/mobile Lighthouse gates. PHCT PRs #17/#20 passed protected CI and review. The generated metrics head `9a486f6` then passed all seven ruleset-required contexts plus browser quality through trusted dispatches before PR #19 was intentionally closed unmerged. Every check on BCHC rc.2 update head `2017cda` is green. |
 | PHCT release verification | Pass | `npm run verify` completed at `8518694`: 598 Node tests across 601 TAP items including 3 suites, 203 Ruby tests with 509 assertions, 98 build-matrix tests, coverage, generated-file checks, preset/module/showcase builds, CSS, Jekyll, license, security-exception, SBOM, image, and internal-link gates. |
 | Code coverage | Pass locally and in exact-head CI | Pinned runtime coverage passed reviewed regression floors: complete loaded Node production code 84.81% lines / 75.94% branches / 80.07% functions; focused security parsers 90.54% / 80.55% / 93.59%; updater and release-lock logic 72.79% / 77.39% / 87.76%; loaded Ruby production code 93.29% lines / 85.13% branches / 77.69% methods. Six Ruby CLI sources exercised by subprocess or integration gates are explicitly inventoried, and any new unrepresented Ruby source fails the gate. Validate retains JSON and raw TAP artifacts even when a floor fails. |
-| Exact BCHC update rehearsal | Pass for rc.2 | The real rc.2 updater run resolved `v1.9.0-rc.2` to full SHA `bb2e44714969d261ce77860ddd27af8c5d9626d0`, kept all 116 protected files byte-identical, regenerated BCHC-owned deployment output, and opened candidate PR #4 at `2017cda8b731ae52103c6b44232496d2c2fc8662`. The complete downstream required-check set is green and GitHub reports the PR clean and mergeable. It is intentionally unmerged while parent polish continues. |
+| Exact BCHC update rehearsal | Pass for rc.2 | The real rc.2 updater run resolved `v1.9.0-rc.2` to full SHA `bb2e44714969d261ce77860ddd27af8c5d9626d0`, kept all 116 protected files byte-identical, regenerated BCHC-owned deployment output, and opened candidate PR #4 at `2017cda8b731ae52103c6b44232496d2c2fc8662`. The complete downstream required-check set was green, and the PR has since merged, locking the published BCHC demo to `v1.9.0-rc.2`. Repeat the same rehearsal and checksum gate for the rc.3 update. |
 | Dependency vulnerabilities | Pass | The exact-head Supply chain job passed parsed npm and Bundler audits with zero active exceptions; critical or unidentified findings cannot be waived, and stale/expired/unused exceptions fail closed. |
 | Software bill of materials | Pass | The current lockfiles produce 326 CycloneDX components and 327 globally unique references including the application. Repeated npm package/version rows retain every lock path, Ruby platforms have qualified PURLs, and duplicate references fail generation. |
 | Secret scanning | Pass | Gitleaks v8.30.1 found no leaks in either working tree or the complete history of either repository. |

@@ -8,8 +8,17 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.9.0-rc.3] — 2026-08-24
+
 ### Added
 
+- The submission form now walks one schema group at a time: Next validates the step it leaves,
+  Back and completed rail sections move freely, and the section heading takes focus on every move
+  so screen readers hear where they landed. A "Hide the optional questions" toggle trims the form
+  to required fields only — answered optional questions stay visible, all-optional sections are
+  skipped and dimmed on the rail — and the saved draft remembers both the step and the toggle, so
+  reopening the page resumes exactly where the submitter left off. A single-group schema and the
+  no-JavaScript fallback keep the flat one-page form.
 - `THIRD_PARTY_NOTICES.md` now records the version, provenance, modification history, copyright,
   and complete license text for every copied JavaScript, generated icon, and bundled font asset.
   `quality/vendored-assets.json` pins those files by SHA-256, and the license gate fails closed on

@@ -51,8 +51,8 @@ These rules apply throughout the work:
   intentional migration and receives human approval.
 - Generated downstream files may change only after regeneration from BCHC's preserved settings.
 - Bots may create or update pull requests but may not merge them.
-- The current BCHC rc.2 update PR remains an evidence point; it will be superseded, not merged, if
-  the final polish changes require rc.3.
+- The BCHC rc.2 update PR merged and locked the demo to `v1.9.0-rc.2`; it remains an evidence
+  point, and later candidates advance that lock through a fresh updater run and reviewed PR.
 
 ## Current verified position
 
@@ -62,8 +62,8 @@ The following work is complete or already has durable evidence:
   `bb2e44714969d261ce77860ddd27af8c5d9626d0` with a 326-component SBOM.
 - BCHC's real rc.2 updater run succeeded and opened
   [PR #4](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/4).
-- That update preserved 116 protected BCHC files byte-for-byte, passed downstream CI, and has
-  visual and rollback evidence. It is intentionally unmerged while parent work continues.
+- That update preserved 116 protected BCHC files byte-for-byte, passed downstream CI, has visual
+  and rollback evidence, and has since merged, locking the demo to `v1.9.0-rc.2`.
 - Both repositories now protect `main` with pull requests, strict required checks, stale-review
   dismissal, resolved-thread enforcement, deletion protection, and force-push protection.
 - PHCT version tags are immutable; future GitHub releases are immutable.
@@ -269,8 +269,8 @@ Exit: one immutable parent candidate contains all intended reusable polish and c
 
 1. Run BCHC's updater against the exact final candidate tag.
 2. Let the updater open one new update PR; do not hand-copy the parent tree.
-3. Mark BCHC PR #4 as superseded only after the new candidate PR exists and its provenance is
-   verified. Keep the old PR and run links as audit history.
+3. The new candidate PR advances the lock from the merged rc.2 update (BCHC PR #4); verify its
+   provenance before merging. Keep the old PR and run links as audit history.
 4. Verify the new branch lock names the exact tag and full parent commit.
 5. Review the ownership classification and require all protected BCHC files to remain byte-identical.
 6. Confirm BCHC's name, colours, contacts, repository identity, schema, search vocabulary,
