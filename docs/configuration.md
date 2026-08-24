@@ -117,6 +117,13 @@ The "Email it instead" button only renders when there is an address to send to:
 `submit.fallback_email`, or `organization.contact_email` when that is blank.
 Clear both to drop the button and send everyone through GitHub.
 
+The shape of the form follows the schema, with nothing to configure here: when
+`schema.groups` has more than one group the form opens as one step per group
+(Back/Next, with the progress rail jumping between steps), and a "Hide the
+optional questions" toggle offers a required-only short form whenever the
+schema has optional fields. See
+[content-model.md → Groups](content-model.md#groups).
+
 ### Footer
 
 ```yaml
