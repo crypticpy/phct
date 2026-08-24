@@ -23,11 +23,18 @@
   /* A numbered form step. */
   /* first-of-type, not first: the error summary <div> precedes the first <section>. */
   .form-section { @apply scroll-mt-28 border-t border-brand-line pt-8 first-of-type:border-0 first-of-type:pt-0; }
+  /* Stepping (assets/js/submit/steps.js) shows one section at a time, so the
+     divider between stacked sections has nothing left to divide. */
+  [data-stepped="true"] .form-section { @apply border-t-0 pt-0; }
 
   /* Sticky section navigation (>= lg). E2 is allowed here: it floats. */
   .progress-rail { @apply panel p-4; }
   .progress-link { @apply flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm text-brand-muted transition-colors duration-120 hover:bg-brand-primary/5 hover:text-brand-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card; }
-  .progress-link[aria-current="true"] { @apply bg-brand-primary/5 font-semibold text-brand-primary-dark; }
+  /* "true" is the scroll-tracking flat form, "step" the stepper's current step. */
+  .progress-link[aria-current="true"],
+  .progress-link[aria-current="step"] { @apply bg-brand-primary/5 font-semibold text-brand-primary-dark; }
+  /* A section the short form skipped: every question in it is hidden. */
+  .progress-link[data-skipped="true"] { @apply opacity-60; }
   .progress-dot { @apply mt-1.5 h-2 w-2 shrink-0 rounded-full border border-brand-line-strong bg-surface-card; }
   .progress-link[data-done="true"] .progress-dot { @apply border-brand-primary bg-brand-primary; }
   /* Half-filled dot: something answered, a required field still blank. */
