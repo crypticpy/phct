@@ -433,12 +433,13 @@ scripts:
       {%- comment -%}
         Only the submit controls wait for the last step. The live regions, the
         draft buttons and the fallback stay outside [data-step-finish]: hiding
-        a role="status" region silences it, and autosave feedback and the
-        length warning belong to every step, not just the send-off.
+        a role="status" region silences it, and autosave feedback, the length
+        warning and the submit status (which the fallback's copy button also
+        writes to, from any step) belong to every step, not just the send-off.
       {%- endcomment -%}
-      <div class="space-y-4" data-step-finish>
-        <div class="rounded-lg border border-brand-line bg-surface-base p-4 text-sm text-brand-muted" role="status" data-submit-status hidden></div>
+      <div class="rounded-lg border border-brand-line bg-surface-base p-4 text-sm text-brand-muted" role="status" data-submit-status hidden></div>
 
+      <div class="space-y-4" data-step-finish>
         <div class="flex flex-wrap items-center gap-3">
           {%- comment -%}With no repository this button only leads to the review panel, which
           is a scripting feature — so without scripts it leads nowhere and ships hidden, like

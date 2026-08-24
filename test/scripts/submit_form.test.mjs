@@ -855,10 +855,14 @@ test('the draft controls and status regions live on every step, not the last', a
   const ctx = await boot();
   // Hiding a role="status" region silences it, so none of these may sit in
   // the [data-step-finish] block the stepper hides until the last step.
-  ['[data-draft-status]', '[data-length-note]', '[data-draft-action="save"]'].forEach((selector) => {
-    const node = ctx.form.querySelector(selector);
-    assert.equal(node.parentElement.closest('[hidden]'), null, selector + ' is inside a hidden block');
-  });
+  // [data-submit-status] is here too: the copy-out fallback stays visible on
+  // every step once shown, and its Copy button writes its feedback there.
+  ['[data-draft-status]', '[data-length-note]', '[data-submit-status]', '[data-draft-action="save"]'].forEach(
+    (selector) => {
+      const node = ctx.form.querySelector(selector);
+      assert.equal(node.parentElement.closest('[hidden]'), null, selector + ' is inside a hidden block');
+    }
+  );
   // ...while the submit controls do wait for the last step.
   const submit = ctx.form.querySelector('button[type="submit"]');
   assert.ok(submit.closest('[data-step-finish]'), 'the submit button waits with the finish block');
