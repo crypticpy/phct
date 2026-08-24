@@ -169,8 +169,7 @@
     // More than one section and the stepper takes over: one section at a
     // time, Next/Back, the rail as step navigation. A single-group schema
     // keeps the flat form (initSteps also returns null for it).
-    const stepping =
-      typeof ns.initSteps === 'function' && form.querySelectorAll('[data-section]').length > 1;
+    const stepping = typeof ns.initSteps === 'function' && form.querySelectorAll('[data-section]').length > 1;
     let stepper = null;
     let shortform = null;
     // True while revealField is steering the stepper (see onMove below).

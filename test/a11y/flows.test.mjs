@@ -581,11 +581,10 @@ describe('assistive-technology flows', { skip: SKIP, concurrency: false }, () =>
       });
     });
     const here = await page.evaluate(() => document.querySelector('[data-section]:not([hidden]) h2').id);
-    const onward = await tabUntil(
-      page,
-      (stop) => stop.tag === 'button' && stop.text === 'Next section',
-      { what: 'the Next button again', max: 60 }
-    );
+    const onward = await tabUntil(page, (stop) => stop.tag === 'button' && stop.text === 'Next section', {
+      what: 'the Next button again',
+      max: 60,
+    });
     assertUsableStops(onward.trail, 'submit');
     await page.keyboard.press('Enter');
     const arrived = await focusStop(page);
