@@ -157,14 +157,14 @@ scripts:
   <nav class="hidden lg:col-start-1 lg:row-start-1 lg:block" aria-label="Form sections" data-form-chrome>
     <div class="progress-rail lg:sticky lg:top-24">
       <p class="progress-count" data-progress-count>0 of {{ form_groups.size }} sections complete</p>
-      <ul class="mt-3 space-y-0.5">
+      <ul class="mt-3">
         {%- for g in form_groups %}
-        <li>
+        <li class="progress-step">
           <a class="progress-link" href="#section-{{ g.key }}" data-progress-link="{{ g.key }}" data-done="false">
-            <span class="progress-dot" aria-hidden="true"></span>
-            <span>{{ g.title }}<span class="sr-only" data-progress-state> — not started</span></span>
+            <span class="progress-dot" aria-hidden="true"><span class="progress-num">{{ forloop.index }}</span>{% include icon.html name='check' size='xs' class='progress-check' %}</span>
+            <span class="pt-0.5">{{ g.title }}<span class="sr-only" data-progress-state> — not started</span></span>
             {%- comment -%}Filled in by assets/js/submit.js when a submit attempt finds problems in this section.{%- endcomment -%}
-            <span class="ml-auto shrink-0 text-xs font-semibold text-brand-accent" data-progress-errors hidden></span>
+            <span class="ml-auto shrink-0 pt-0.5 text-xs font-semibold text-brand-accent" data-progress-errors hidden></span>
           </a>
         </li>
         {%- endfor %}

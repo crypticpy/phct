@@ -29,16 +29,31 @@
 
   /* Sticky section navigation (>= lg). E2 is allowed here: it floats. */
   .progress-rail { @apply panel p-4; }
+  /* Each step draws a full-height track segment behind its circle; the circle's
+     opaque background masks the crossing, and the first/last steps trim the
+     overshoot so the line runs circle-center to circle-center. 1.25rem is the
+     link's px-2 plus the circle's 0.75rem radius. */
+  .progress-step { @apply relative; }
+  .progress-step::before { @apply absolute bottom-0 top-0 w-0.5 bg-brand-line content-['']; left: calc(1.25rem - 1px); }
+  .progress-step:first-child::before { top: 1.125rem; }
+  .progress-step:last-child::before { bottom: calc(100% - 1.125rem); }
   .progress-link { @apply flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm text-brand-muted transition-colors duration-120 hover:bg-brand-primary/5 hover:text-brand-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-card; }
   /* "true" is the scroll-tracking flat form, "step" the stepper's current step. */
   .progress-link[aria-current="true"],
   .progress-link[aria-current="step"] { @apply bg-brand-primary/5 font-semibold text-brand-primary-dark; }
+  .progress-link[aria-current="true"] .progress-dot,
+  .progress-link[aria-current="step"] .progress-dot { @apply border-brand-primary text-brand-primary-dark ring-2 ring-brand-primary/20; }
   /* A section the short form skipped: every question in it is hidden. */
   .progress-link[data-skipped="true"] { @apply opacity-60; }
-  .progress-dot { @apply mt-1.5 h-2 w-2 shrink-0 rounded-full border border-brand-line-strong bg-surface-card; }
-  .progress-link[data-done="true"] .progress-dot { @apply border-brand-primary bg-brand-primary; }
-  /* Half-filled dot: something answered, a required field still blank. */
-  .progress-link[data-done="partial"] .progress-dot { @apply border-brand-primary; background: linear-gradient(90deg, rgb(var(--c-primary)) 50%, transparent 50%); }
+  .progress-link[data-skipped="true"] .progress-dot { @apply border-dashed; }
+  /* Numbered circle; `relative` keeps it above the step's track segment. */
+  .progress-dot { @apply relative grid h-6 w-6 shrink-0 place-items-center rounded-full border border-brand-line-strong bg-surface-card text-[0.6875rem] font-semibold leading-none text-brand-muted; }
+  .progress-check { @apply hidden; stroke-width: 2.5; }
+  .progress-link[data-done="true"] .progress-dot { @apply border-brand-primary bg-brand-primary text-white; }
+  .progress-link[data-done="true"] .progress-num { @apply hidden; }
+  .progress-link[data-done="true"] .progress-check { @apply block; }
+  /* Something answered, a required field still blank. */
+  .progress-link[data-done="partial"] .progress-dot { @apply border-brand-primary bg-brand-primary/10 text-brand-primary-dark; }
   .progress-count { @apply text-xs font-medium text-brand-muted tabular; }
 
   /* Error summary shown after a failed submit. */
