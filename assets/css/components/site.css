@@ -125,6 +125,11 @@
   /* Last line of a paragraph never left as a single short word. Progressive: ignored
      where unsupported, and it never changes the measure. */
   .prose-body p { text-wrap: pretty; }
+  /* Optional page-header illustration band (module pages): a wide strip clipped to
+     the card radius. Height is capped, not fixed, so a shorter image never letterboxes
+     and the strip stays a header accent rather than a hero. */
+  .page-art { @apply overflow-hidden rounded-card shadow-e0; }
+  .page-art-img { @apply max-h-72 w-full object-cover; }
   /* The display measure: headings and lead copy read wider than 16px body text. */
   .measure-display { max-width: var(--measure-display); }
   .sr-only-focusable:not(:focus):not(:active) { @apply sr-only; }

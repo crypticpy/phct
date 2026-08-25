@@ -7,6 +7,8 @@ permalink: /about/
 ---
 {% assign cfg = site.data.site %}
 {% assign schema = site.data.schema %}
+{%- assign ab_art = cfg.about.image | default: '' -%}
+{% if ab_art != '' %}<div class="page-art mb-6 sm:float-right sm:ml-8 sm:w-72" aria-hidden="true">{% include picture.html src=ab_art alt='' sizes="288px" class="h-auto w-full" %}</div>{% endif %}
 
 This site is maintained by **{{ cfg.organization.name }}**. It is a shared, public catalog of {{ schema.entry.plural | downcase }} contributed by members and reviewed by maintainers before publication.
 

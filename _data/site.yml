@@ -95,10 +95,31 @@ home:
 
 # Submission form settings (module: submit)
 submit:
+  # Set `accepting: false` to pause intake without removing the page: the form
+  # is replaced by a notice (using `closed_message` and `closed_image` when
+  # set) and the email route stays offered. `image` is an optional illustration
+  # beside the form's introduction.
+  accepting: true
+  image: ""
+  closed_image: ""
+  closed_message: ""
   intro: "Share an AI use case, tool or project with the community. Submissions open a GitHub issue for the maintainers to review; nothing is published until it is approved."
   turnaround: "Intake checks it within about five business days and the Governance Committee reviews it within about ten more; you keep ownership of anything you share."   # the last step of "what happens next" — make it a promise you can keep
   review_note: "Please do not include protected health information, credentials or non-public data. Link out to repositories and documents rather than pasting sensitive content."
   fallback_email: "catalog@example.org"   # "Email it instead" button; leave blank (and clear organization.contact_email) to drop the button
+
+# Events page (module: events). `image` is an optional wide banner (about 20:7)
+# shown under the page header; leave blank for a text-only header.
+events:
+  image: ""
+
+# Resources page (module: resources). Same optional banner as the events page.
+resources:
+  image: ""
+
+# About page. `image` is an optional illustration shown beside the opening copy.
+about:
+  image: ""
 
 # Catalog behaviour (module: catalog)
 catalog:

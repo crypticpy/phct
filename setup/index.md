@@ -67,6 +67,15 @@ robots: noindex
 
 </section>
 
+{%- comment -%} Completion illustration for the Review step. Rendered here so Jekyll
+resolves the baseurl and confirms the file exists — steps/review.js clones this
+template when present and shows a text-only banner when it is not. {%- endcomment -%}
+{%- assign su_done_art = '/assets/images/illustrations/wizard-complete.png' -%}
+{%- assign su_done_found = su_done_art | static_file -%}
+{%- if su_done_found -%}
+<template id="wizard-complete-art"><img src="{{ su_done_art | relative_url }}" alt="" width="160" height="160" loading="lazy" decoding="async" class="h-full w-full object-contain"></template>
+{%- endif -%}
+
 <script id="current-config" type="application/json">{{ site.data.site | jsonify }}</script>
 <script id="current-theme" type="application/json">{{ site.data.theme | jsonify }}</script>
 <script id="current-schema" type="application/json">{{ site.data.schema | jsonify }}</script>

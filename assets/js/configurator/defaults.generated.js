@@ -84,10 +84,23 @@ export const SITE = {
     ]
   },
   "submit": {
+    "accepting": true,
+    "image": "",
+    "closed_image": "",
+    "closed_message": "",
     "intro": "Share an AI use case, tool or project with the community. Submissions open a GitHub issue for the maintainers to review; nothing is published until it is approved.",
     "turnaround": "Intake checks it within about five business days and the Governance Committee reviews it within about ten more; you keep ownership of anything you share.",
     "review_note": "Please do not include protected health information, credentials or non-public data. Link out to repositories and documents rather than pasting sensitive content.",
     "fallback_email": "catalog@example.org"
+  },
+  "events": {
+    "image": ""
+  },
+  "resources": {
+    "image": ""
+  },
+  "about": {
+    "image": ""
   },
   "catalog": {
     "verify_after_days": 365

@@ -9,9 +9,13 @@ permalink: /events/
 {%- assign past = all | where: 'past', true | reverse -%}
 <section class="mb-10 max-w-3xl">
   <span class="eyebrow">Calendar</span>
-  <h1 class="mt-2 font-heading text-4xl font-semibold text-brand-primary-dark sm:text-5xl">Events</h1>
+  <h1 class="page-title mt-2">Events</h1>
   <p class="mt-4 text-lg text-brand-muted">Meetings, webinars, deadlines and program milestones. {% if site.data.site.modules.cohorts %}Cohort events link to their detail pages when available.{% endif %}</p>
 </section>
+{%- assign ev_art = site.data.site.events.image | default: '' -%}
+{%- if ev_art != '' -%}
+<div class="page-art mb-10" aria-hidden="true">{% include picture.html src=ev_art alt='' sizes="(min-width: 1280px) 1216px, 95vw" class="page-art-img" eager=true %}</div>
+{%- endif -%}
 
 <div class="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
   <section class="min-w-0" aria-labelledby="upcoming-heading">
