@@ -202,6 +202,12 @@ test('a repository still naming the template is refused on another deployment', 
   assert.equal($('#step-heading').textContent, 'Names & contact');
   assert.match($('#wizard-error-summary').textContent, /still points at the template/u);
 
+  // Repository identities are case-insensitive on GitHub; so is the refusal.
+  type('#field-repository', shipped.site.github.repository.toUpperCase());
+  press('Continue');
+  assert.equal($('#step-heading').textContent, 'Names & contact');
+  assert.match($('#wizard-error-summary').textContent, /still points at the template/u);
+
   type('#field-repository', 'bigcities/ai-catalog');
   press('Continue');
   assert.equal($('#step-heading').textContent, 'Colors & type');

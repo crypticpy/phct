@@ -21,6 +21,11 @@ import { detectedRepository, enabledFields, schemaFields, state, STEPS } from '.
 /** The template's own `owner/repo` — no deployment's answers should still point here. */
 const TEMPLATE_REPOSITORY = defaultConfig().site.github.repository;
 
+/** GitHub repository identities are case-insensitive; compare them that way. */
+function sameRepository(left, right) {
+  return String(left).trim().toLowerCase() === String(right).trim().toLowerCase();
+}
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -72,9 +77,9 @@ function basicsProblems() {
       target: answerFieldId('repository'),
     });
   } else if (
-    answers.repository === TEMPLATE_REPOSITORY &&
+    sameRepository(answers.repository, TEMPLATE_REPOSITORY) &&
     detectedRepository &&
-    detectedRepository !== TEMPLATE_REPOSITORY
+    !sameRepository(detectedRepository, TEMPLATE_REPOSITORY)
   ) {
     // The template's own identity survives into copies that skipped this
     // field; every submission and edit link would then point at the template.
