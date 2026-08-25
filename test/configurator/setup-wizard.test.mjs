@@ -627,6 +627,8 @@ test('repositoryFromLocation names the repository a github.io address serves', a
   assert.equal(repositoryFromLocation('bigcities.github.io', '/setup/'), 'bigcities/bigcities.github.io');
   // A project repository literally named `setup` serves the page at /setup/setup/.
   assert.equal(repositoryFromLocation('bigcities.github.io', '/setup/setup/'), 'bigcities/setup');
+  // The canonical file URL on a root site is still the page's own route.
+  assert.equal(repositoryFromLocation('bigcities.github.io', '/setup/index.html'), 'bigcities/bigcities.github.io');
   // A custom domain names neither owner nor repository.
   assert.equal(repositoryFromLocation('catalog.example.org', '/setup/'), null);
   assert.equal(repositoryFromLocation('github.io', '/setup/'), null);

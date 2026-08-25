@@ -64,10 +64,11 @@ export function repositoryFromLocation(hostname, pathname) {
   const segments = String(pathname || '')
     .split('/')
     .filter(Boolean);
-  const [first] = segments;
-  // A lone `setup` segment is the page's own route on a root site; with more
-  // segments after it, it is a project repository literally named `setup`.
-  return first && (first !== 'setup' || segments.length > 1) ? `${owner}/${first}` : `${owner}/${host}`;
+  const [first, second] = segments;
+  // A leading `setup` segment is the page's own route on a root site (`/setup/`,
+  // `/setup/index.html`) unless it is followed by another `setup` — then it is a
+  // project repository literally named `setup` serving its own `/setup/` route.
+  return first && (first !== 'setup' || second === 'setup') ? `${owner}/${first}` : `${owner}/${host}`;
 }
 
 /**
