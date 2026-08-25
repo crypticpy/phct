@@ -1,21 +1,24 @@
 # PHCT and BCHC release-readiness status
 
-- Evidence date: 2026-08-24
+- Evidence date: 2026-08-25
 - PHCT starting baseline: `c9fcb223826f2fc8c945d894420c16a2b8ff5da0`
-- PHCT candidate: `v1.9.0-rc.3`, cut from protected `main` at the merge of the stepped
-  submission form ([PR #30](https://github.com/crypticpy/phct/pull/30), all seven
-  ruleset-required contexts plus scale, audit, and CodeQL green at the merged head) and this
+- PHCT candidate: `v1.9.0-rc.4`, cut from protected `main` at the merge of the
+  non-coder workflow audit remediation ([PR #32](https://github.com/crypticpy/phct/pull/32),
+  all seven ruleset-required contexts plus scale and audit green at merged head
+  `f22c67b277cc6005d8217410b4ab7aa56827b846`; the seven open CodeQL annotations are
+  documented false positives awaiting maintainer dismissal on the PR record) and this
   release pull request. It supersedes
+  [`v1.9.0-rc.3`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.3), published at
+  immutable commit `a9741c9845e0928ec6b6654e6e04b6ebe71c2233`, which itself superseded
   [`v1.9.0-rc.2`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.2), published at
   immutable commit `bb2e44714969d261ce77860ddd27af8c5d9626d0` with its 326-component SBOM,
   whose exact-head evidence below remains the last full-matrix record.
-- BCHC consumed rc.2: the
-  [real rc.2 updater run](https://github.com/crypticpy/bchc-ai-use-case-catalog/actions/runs/32599759546)
-  resolved the immutable tag and full SHA, preserved all 116 protected paths byte-for-byte,
-  regenerated the deployment, and opened green candidate
-  [PR #4](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/4) at
-  `2017cda8b731ae52103c6b44232496d2c2fc8662`, which has since merged; the published BCHC demo
-  is locked to `v1.9.0-rc.2` pending the rc.3 update.
+- BCHC consumed rc.3 via
+  [PR #6](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/6) (same updater
+  discipline as the recorded
+  [rc.2 run](https://github.com/crypticpy/bchc-ai-use-case-catalog/actions/runs/32599759546):
+  immutable tag and full SHA resolved, protected paths preserved byte-for-byte); the
+  published BCHC demo is locked to `v1.9.0-rc.3` pending the rc.4 update.
 - Automated code baseline: **green**
 - Wider-demo candidate: **no-go until parent interface polish and the remaining manual/live demo gates pass**
 - Stable release and BCHC handoff: **no-go until the human and live-repository gates below pass**
