@@ -317,7 +317,13 @@ async function main(argv) {
   try {
     activity = await fetchActivity(repository, since, { token: process.env.GITHUB_TOKEN ?? '' });
   } catch (error) {
-    console.error(String(error.message ?? error));
+    const message = String(error.message ?? error);
+    console.error(message);
+    // The workflow's failure step says what a red run means; this adds the one
+    // detail only the script knows, so nobody has to open the raw log for it.
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `GitHub answered: \`${message}\`\n`);
+    }
     setOutput('changed', 'false');
     return 1;
   }
