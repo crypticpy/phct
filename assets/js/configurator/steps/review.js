@@ -170,7 +170,9 @@ export function renderReview() {
   // without the artwork gets the text banner alone.
   const doneArt = document.getElementById('wizard-complete-art');
   const banner = el('div', { class: 'card flex items-center gap-5 px-6 py-5' }, [
-    ...(doneArt ? [el('div', { class: 'h-24 w-24 shrink-0', 'aria-hidden': 'true' }, [doneArt.content.cloneNode(true)])] : []),
+    ...(doneArt
+      ? [el('div', { class: 'h-24 w-24 shrink-0', 'aria-hidden': 'true' }, [doneArt.content.cloneNode(true)])]
+      : []),
     el('div', { class: 'min-w-0' }, [
       el('p', { class: 'card-title', text: 'Your configuration is ready' }),
       el('p', {
