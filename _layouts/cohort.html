@@ -50,8 +50,8 @@ include_search: true
       <div class="grid gap-6 sm:grid-cols-2" data-entry-grid>
         {% for coh_entry in coh_entries %}{% include entry-card.html entry=coh_entry %}{% endfor %}
       </div>
-      <div class="hidden" data-empty-state>{% include empty-state.html icon='search' title='No matches' body='Nothing matches the current filters. Try clearing a filter or searching for a different term.' %}</div>
-      {% if coh_count == 0 %}{% include empty-state.html icon='sparkles' title='Projects coming soon' body='Entries for this cohort will appear here once they are published.' %}{% endif %}
+      <div class="hidden" data-empty-state>{% include empty-state.html icon='search' image=site.data.site.images.empty_search title='No matches' body='Nothing matches the current filters. Try clearing a filter or searching for a different term.' %}</div>
+      {% if coh_count == 0 %}{% include empty-state.html icon='sparkles' image=site.data.site.images.empty_catalog title='Projects coming soon' body='Entries for this cohort will appear here once they are published.' %}{% endif %}
     </section>
   </div>
 

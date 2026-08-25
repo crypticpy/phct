@@ -29,7 +29,7 @@ permalink: /events/
         {% if forloop.last %}</div></div>{% endif %}
       {% endfor %}
     {% else %}
-      {% include empty-state.html icon='calendar' title='No upcoming events' body='Nothing is scheduled right now. Check back soon.' %}
+      {% include empty-state.html icon='calendar' image=site.data.site.images.empty_events title='No upcoming events' body='Nothing is scheduled right now. Check back soon.' %}
     {% endif %}
   </section>
   <aside class="space-y-6">

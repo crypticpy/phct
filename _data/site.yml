@@ -20,6 +20,23 @@ logo:
   image: ""
   text: "CAI"
 
+# Optional illustrations. Each key is a site-relative image path (put files under
+# assets/images/illustrations/); leave blank to keep the default treatment — the
+# site is fully functional with every key empty. All are decorative: nearby copy
+# carries the meaning, so they render with empty alt text.
+images:
+  empty_catalog: ""   # "nothing published yet" panels (home + catalog)
+  empty_search: ""    # the catalog's zero-results-for-these-filters panel
+  empty_events: ""    # the events page when nothing is scheduled
+  not_found: ""       # the 404 page
+
+# Social sharing. `og_image` is the preview image chat apps and social sites show
+# when someone shares a link to this site (1200x630 works everywhere). It needs
+# `url:` set in _config.yml to resolve to an absolute address; a page can override
+# it with `image:` in its front matter.
+social:
+  og_image: ""
+
 # GitHub repository that hosts this site, as "owner/repo".
 # Used to build the "Submit" form links, "Edit this page" links, and issue URLs.
 github:
@@ -47,8 +64,11 @@ modules:
   resources: false   # Curated resource library from _data/resources.yml
   governance: true   # The governance & policies page (/governance/) from _data/governance.yml
 
-# Home page copy
+# Home page copy. `image` (optional) is a wide illustration layered into the
+# hero's dark ground — it fades in toward the right so the headline stays on a
+# calm surface; leave blank for the built-in gradient-and-dot-grid treatment.
 hero:
+  image: ""
   eyebrow: "Civic AI Community of Practice · Shared catalog"
   title: "What public-sector teams are building with AI"
   lead: "Browse real solutions from teams across the community — source code, cloud deployments, vendor implementations and write-ups — and share your own so others can learn, reuse and adapt."

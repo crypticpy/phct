@@ -23,6 +23,15 @@ export const SITE = {
     "image": "",
     "text": "CAI"
   },
+  "images": {
+    "empty_catalog": "",
+    "empty_search": "",
+    "empty_events": "",
+    "not_found": ""
+  },
+  "social": {
+    "og_image": ""
+  },
   "github": {
     "repository": "crypticpy/phct",
     "branch": "main"
@@ -40,6 +49,7 @@ export const SITE = {
     "governance": true
   },
   "hero": {
+    "image": "",
     "eyebrow": "Civic AI Community of Practice · Shared catalog",
     "title": "What public-sector teams are building with AI",
     "lead": "Browse real solutions from teams across the community — source code, cloud deployments, vendor implementations and write-ups — and share your own so others can learn, reuse and adapt.",
@@ -137,6 +147,7 @@ export const THEME = {
     "measure_display": "44rem"
   },
   "radius": "soft",
+  "texture": "",
   "motion": {
     "fast": "120ms",
     "base": "180ms",

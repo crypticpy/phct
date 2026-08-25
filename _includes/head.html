@@ -82,5 +82,16 @@
   {% if hd_cfg.analytics.plausible_domain and hd_cfg.analytics.plausible_domain != '' %}
   <script defer data-domain="{{ hd_cfg.analytics.plausible_domain }}" src="https://plausible.io/js/script.js"></script>
   {% endif %}
+  {%- comment -%} Social preview image. jekyll-seo-tag only emits og:image when the
+  page sets `image:` in front matter, so a site-wide default is added here — and
+  skipped when the page brings its own, so the two never both emit. OG scrapers
+  require absolute URLs; with `url:` unset in _config.yml this degrades to a
+  site-relative path that scrapers ignore, which is no worse than today. {%- endcomment -%}
+  {%- assign hd_og = hd_cfg.social.og_image | default: '' -%}
+  {%- if hd_og != '' and page.image == nil %}
+  <meta property="og:image" content="{{ hd_og | absolute_url }}">
+  <meta name="twitter:image" content="{{ hd_og | absolute_url }}">
+  <meta name="twitter:card" content="summary_large_image">
+  {%- endif %}
   {% seo title=false %}
 </head>

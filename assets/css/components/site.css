@@ -11,8 +11,10 @@
   .card-hover { @apply transition-[box-shadow,transform] duration-base ease-brand hover:-translate-y-px hover:shadow-e1 focus-within:shadow-e1; }
   .card-header { @apply border-b border-brand-line px-6 py-4; }
   .card-title { @apply font-heading text-lg font-semibold text-brand-primary-dark; }
-  /* A full-bleed tinted section (the caller supplies the container inside). */
-  .band { @apply bg-surface-tint; }
+  /* A full-bleed tinted section (the caller supplies the container inside).
+     --pattern-url is an optional texture tile from theme.yml (`texture:`); unset,
+     the fallback keeps the band flat. The tile carries its own near-transparency. */
+  .band { @apply bg-surface-tint; background-image: var(--pattern-url, none); background-size: 480px auto; }
   /* A tinted panel: sidebar cards, the fact strip, the home CTA. */
   .panel { @apply rounded-card bg-surface-tint; }
   .eyebrow { @apply text-[11px] font-semibold uppercase leading-4 tracking-[0.12em] text-brand-primary; }
@@ -54,6 +56,16 @@
     background-size: 22px 22px;
     -webkit-mask-image: linear-gradient(112deg, transparent 38%, #000 100%);
     mask-image: linear-gradient(112deg, transparent 38%, #000 100%);
+  }
+  /* Optional hero illustration (site.yml `hero.image`): same stacking level as the
+     dot grid but later in the tree, so it paints over the dots and under the copy.
+     The same 112° mask keeps the left half a calm ground for the headline, and the
+     dimmed image stays a texture, not a subject fighting the copy for attention. */
+  .hero-art { @apply pointer-events-none absolute inset-0 -z-10; }
+  .hero-art-img {
+    @apply h-full w-full object-cover object-right opacity-70;
+    -webkit-mask-image: linear-gradient(112deg, transparent 32%, #000 88%);
+    mask-image: linear-gradient(112deg, transparent 32%, #000 88%);
   }
   /* The footer is the hero's ground mirrored — glow bottom-left, no dot grid — so the
      page closes the way it opened. */
@@ -101,7 +113,8 @@
      hues meet, and quiet enough that the button stays the loudest thing in it. */
   .cta-panel {
     @apply panel relative overflow-hidden ring-1 ring-inset ring-brand-primary/10;
-    background-image: linear-gradient(112deg, rgb(var(--c-primary) / 0.07), transparent 55%, rgb(var(--c-secondary) / 0.07));
+    background-image: var(--pattern-url, none), linear-gradient(112deg, rgb(var(--c-primary) / 0.07), transparent 55%, rgb(var(--c-secondary) / 0.07));
+    background-size: 480px auto, auto;
   }
   /* No `prose-slate` and no `max-w-prose`: both set properties `prose` already sets, and
      @apply emits in stylesheet order rather than in the order written, so slate's
