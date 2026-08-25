@@ -71,9 +71,16 @@ function basicsProblems() {
       message: 'GitHub repository must be in the form owner/repo.',
       target: answerFieldId('repository'),
     });
-  } else if (answers.repository === TEMPLATE_REPOSITORY && detectedRepository !== TEMPLATE_REPOSITORY) {
+  } else if (
+    answers.repository === TEMPLATE_REPOSITORY &&
+    detectedRepository &&
+    detectedRepository !== TEMPLATE_REPOSITORY
+  ) {
     // The template's own identity survives into copies that skipped this
     // field; every submission and edit link would then point at the template.
+    // Only a *positive* detection of a different repository counts: on a local
+    // preview or a custom domain nothing distinguishes the template itself
+    // from a copy, and the template's own site must stay configurable.
     problems.push({
       message: `GitHub repository still points at the template (${TEMPLATE_REPOSITORY}). Enter your own copy's owner/repo — submission links, edit links and the Apply setup issue all go to the repository named here.`,
       target: answerFieldId('repository'),
