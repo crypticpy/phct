@@ -21,6 +21,8 @@ module CatalogTemplate
   end
 end
 
-Jekyll::Hooks.register :site, :post_read, priority: :low do |site|
+# :pre_render rather than :post_read — generators (facet pages, showcase
+# copies) append pages after :post_read fires, and they need the default too.
+Jekyll::Hooks.register :site, :pre_render do |site, _payload|
   CatalogTemplate::SocialImage.apply_default(site)
 end
