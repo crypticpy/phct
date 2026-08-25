@@ -321,8 +321,11 @@ async function main(argv) {
     console.error(message);
     // The workflow's failure step says what a red run means; this adds the one
     // detail only the script knows, so nobody has to open the raw log for it.
+    // The message quotes an HTTP response, so it is flattened to one line and
+    // stripped of backticks before it may style the summary's markdown.
     if (process.env.GITHUB_STEP_SUMMARY) {
-      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `GitHub answered: \`${message}\`\n`);
+      const quotable = message.replace(/[`\r\n]+/gu, ' ').slice(0, 300);
+      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `GitHub answered: \`${quotable}\`\n`);
     }
     setOutput('changed', 'false');
     return 1;

@@ -395,7 +395,7 @@ test('a rejected release tag explains itself without echoing a forged workflow c
   assert.match(malformed.summary, /## That is not a PHCT release tag/u);
   assert.match(malformed.summary, /Nothing was changed\./u);
   assert.match(malformed.summary, /You entered `release-1\.9`/u);
-  assert.match(malformed.summary, /https:\/\/github\.com\/crypticpy\/phct\/releases/u);
+  assert.ok(malformed.summary.includes('https://github.com/crypticpy/phct/releases'));
 
   const forged = runReleaseStep({ release: '`v1.9.0`\n::error::forged' });
   assert.equal(forged.status, 2);
@@ -421,8 +421,8 @@ test('a bootstrap run whose reported version was never released says what to do 
   assert.match(result.stdout, /::error title=This copy reports a template version that has no release/u);
   assert.match(result.summary, /This copy reports template version `v1\.10\.0`, but no such release exists/u);
   assert.match(result.summary, /created between releases/u);
-  assert.match(result.summary, /https:\/\/github\.com\/crypticpy\/phct\/releases/u);
-  assert.match(result.summary, /https:\/\/github\.com\/crypticpy\/phct\/issues/u);
+  assert.ok(result.summary.includes('https://github.com/crypticpy/phct/releases'));
+  assert.ok(result.summary.includes('https://github.com/crypticpy/phct/issues'));
   assert.match(result.summary, /Nothing was changed\./u);
 });
 
@@ -435,7 +435,7 @@ test('a recorded starting release that disappeared is reported to the maintainer
   });
   assert.equal(result.status, 2);
   assert.match(result.summary, /## The release this deployment records has disappeared/u);
-  assert.match(result.summary, /https:\/\/github\.com\/crypticpy\/phct\/issues/u);
+  assert.ok(result.summary.includes('https://github.com/crypticpy/phct/issues'));
 });
 
 test('an unknown target release names the tag and points at the releases page', () => {
@@ -447,7 +447,7 @@ test('an unknown target release names the tag and points at the releases page', 
   assert.equal(result.status, 2);
   assert.match(result.summary, /## There is no PHCT release named `v9\.9\.9`/u);
   assert.match(result.summary, /Nothing was changed\./u);
-  assert.match(result.summary, /https:\/\/github\.com\/crypticpy\/phct\/releases/u);
+  assert.ok(result.summary.includes('https://github.com/crypticpy/phct/releases'));
 });
 
 test('a moved tag is still refused, now with both commits and who to tell', () => {
@@ -463,7 +463,7 @@ test('a moved tag is still refused, now with both commits and who to tell', () =
   assert.match(result.summary, new RegExp(LOCKED_COMMIT, 'u'));
   assert.match(result.summary, new RegExp(MOVED_COMMIT, 'u'));
   assert.match(result.summary, /Do not merge any template update/u);
-  assert.match(result.summary, /https:\/\/github\.com\/crypticpy\/phct\/issues/u);
+  assert.ok(result.summary.includes('https://github.com/crypticpy/phct/issues'));
 });
 
 test('a consistent lock resolves both immutable tags and reports nothing to the owner', () => {

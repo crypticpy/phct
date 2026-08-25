@@ -95,13 +95,19 @@ const relPath = `${relative}/index.md`;
 // A cohort event that only lives in _data/cohorts/<year>.yml gets its page
 // generated at build time, so there is no file here to attach anything to.
 // The "Add event details" form writes that file; this one only edits it.
-if (!fs.existsSync(absPath)) {
+// Read-then-catch rather than exists-then-read, so there is no window between
+// the check and the use.
+let raw;
+try {
+  raw = fs.readFileSync(absPath, 'utf8');
+} catch (readError) {
+  if (readError.code !== 'ENOENT') throw readError;
   noChange(
     `There is no event page at \`${relPath}\` yet, so there is nothing to attach materials to. Use the **Add event details** form to create the page for this event first, then come back to this one.`
   );
 }
 
-const content = fs.readFileSync(absPath, 'utf8').replace(/\r\n/g, '\n');
+const content = raw.replace(/\r\n/g, '\n');
 const match = content.match(/^---\n(.*?)\n---\n?(.*)$/s);
 if (!match)
   noChange(
