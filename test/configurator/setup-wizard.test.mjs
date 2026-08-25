@@ -73,7 +73,9 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 /** Click the numbered step pill, the way an admin jumps between steps. */
 function goToStep(oneBased) {
-  const pill = $$('#wizard-steps button').find((button) => button.textContent.startsWith(`${oneBased}.`));
+  const pill = $$('#wizard-steps button').find(
+    (button) => button.querySelector('.wizard-step-index').textContent === String(oneBased)
+  );
   assert.ok(pill, `no step pill ${oneBased}`);
   pill.click();
 }
@@ -126,8 +128,12 @@ test('the wizard boots on step 1 with one pill per step, each naming its step id
     ['start', 'basics', 'look', 'words', 'modules', 'fields', 'review']
   );
   assert.deepEqual(
-    $$('#wizard-steps button').map((button) => button.textContent),
-    ['1. Start', '2. Basics', '3. Look', '4. Words', '5. Modules', '6. Entry model', '7. Review']
+    $$('#wizard-steps button').map((button) => button.querySelector('.wizard-step-index').textContent),
+    ['1', '2', '3', '4', '5', '6', '7']
+  );
+  assert.deepEqual(
+    $$('#wizard-steps button').map((button) => button.querySelector('.wizard-step-label').textContent),
+    ['Start', 'Basics', 'Look', 'Words', 'Modules', 'Entry model', 'Review']
   );
   assert.equal($('#step-heading').textContent, 'Choose a starting point');
   assert.deepEqual(errors, []);
