@@ -619,6 +619,8 @@ test('repositoryFromLocation names the repository a github.io address serves', a
   assert.equal(repositoryFromLocation('bigcities.github.io', '/ai-catalog/setup/'), 'bigcities/ai-catalog');
   // A user/organization site serves from the root of a repo named after the host.
   assert.equal(repositoryFromLocation('bigcities.github.io', '/setup/'), 'bigcities/bigcities.github.io');
+  // A project repository literally named `setup` serves the page at /setup/setup/.
+  assert.equal(repositoryFromLocation('bigcities.github.io', '/setup/setup/'), 'bigcities/setup');
   // A custom domain names neither owner nor repository.
   assert.equal(repositoryFromLocation('catalog.example.org', '/setup/'), null);
   assert.equal(repositoryFromLocation('github.io', '/setup/'), null);

@@ -61,10 +61,13 @@ export function repositoryFromLocation(hostname, pathname) {
   if (!host.endsWith('.github.io')) return null;
   const owner = host.slice(0, -'.github.io'.length);
   if (!owner || owner.includes('.')) return null;
-  const [first] = String(pathname || '')
+  const segments = String(pathname || '')
     .split('/')
     .filter(Boolean);
-  return first && first !== 'setup' ? `${owner}/${first}` : `${owner}/${host}`;
+  const [first] = segments;
+  // A lone `setup` segment is the page's own route on a root site; with more
+  // segments after it, it is a project repository literally named `setup`.
+  return first && (first !== 'setup' || segments.length > 1) ? `${owner}/${first}` : `${owner}/${host}`;
 }
 
 /**
