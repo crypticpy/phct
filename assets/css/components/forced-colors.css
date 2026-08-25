@@ -61,6 +61,11 @@
   /* The connecting track is a background-color box: Canvas on Canvas. */
   .progress-step::before { background: CanvasText; }
 
+  /* Review-step numbers and the confirmation check sit on tint fills that
+     forcing drops; an edge keeps them reading as discs. */
+  .review-step-num,
+  .confirm-check { border: 1px solid CanvasText; }
+
   /* Search suggestions: the 15% tint disappears and the 4px left rule resolves to
      CanvasText on every row, active or not. */
   .search-option.is-active,

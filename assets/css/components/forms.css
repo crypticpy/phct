@@ -56,6 +56,17 @@
   .progress-link[data-done="partial"] .progress-dot { @apply border-brand-primary bg-brand-primary/10 text-brand-primary-dark; }
   .progress-count { @apply text-xs font-medium text-brand-muted tabular; }
 
+  /* "Check your answers" (assets/js/submit/review.js): each section card
+     restates its rail number, and the confirmation panel opens on a check that
+     draws itself in — decorative, so both are aria-hidden at the source. */
+  .review-step-num { @apply grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-primary/10 text-[0.6875rem] font-semibold leading-none text-brand-primary-dark; }
+  .confirm-check { @apply grid h-12 w-12 shrink-0 place-items-center rounded-full bg-brand-primary/10 text-brand-primary; }
+  .confirm-check svg { @apply h-6 w-6; stroke-width: 2.5; }
+  .confirm-check-path { stroke-dasharray: 26; stroke-dashoffset: 26; animation: confirm-draw 400ms ease-out 120ms forwards; }
+  @keyframes confirm-draw {
+    to { stroke-dashoffset: 0; }
+  }
+
   /* Error summary shown after a failed submit. */
   .error-summary { @apply rounded-2xl border border-brand-warn/40 bg-brand-warn/5 p-4; }
   .error-summary-title { @apply flex items-center gap-2 text-sm font-semibold text-brand-warn; }
