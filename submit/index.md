@@ -256,7 +256,7 @@ scripts:
       Shown instead of the draft bar when the browser refuses localStorage.
       Private browsing is the common cause; a full quota is the other.
     {%- endcomment -%}
-    <p class="draft-bar" data-draft-unavailable hidden>This browser will not save a draft — you may be in a private window. Copy your answers somewhere safe before you leave this page.</p>
+    <p class="draft-bar draft-bar--warn" data-draft-unavailable hidden>This browser will not save a draft — you may be in a private window. Copy your answers somewhere safe before you leave this page.</p>
 
     {%- comment -%}
       Small screens have no sticky rail, so this is the only place the

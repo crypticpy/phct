@@ -68,12 +68,15 @@
     mask-image: linear-gradient(112deg, transparent 32%, #000 88%);
   }
   /* The footer is the hero's ground mirrored — glow bottom-left, no dot grid — so the
-     page closes the way it opened. */
+     page closes the way it opened. The optional theme texture tiles over the
+     glow (subtlety is baked into the tile file, same contract as .band). */
   .site-footer {
     @apply bg-brand-primary-dark text-brand-on-dark;
     background-image:
+      var(--pattern-url, none),
       radial-gradient(48rem 24rem at 8% 120%, rgb(var(--c-primary) / 0.45), transparent 62%),
       linear-gradient(308deg, rgb(var(--c-primary-dark)) 0%, rgb(var(--c-primary-dark)) 50%, rgb(var(--c-primary) / 0.45) 140%);
+    background-size: 480px auto, auto, auto;
   }
   .hero-title { @apply font-heading font-semibold leading-[1.08] tracking-[-0.01em] text-white; font-size: clamp(2.25rem, 1.75rem + 2vw, 3rem); text-wrap: balance; }
   /* Home hero stat line: separators are decorative pseudo-elements, so they are
