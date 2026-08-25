@@ -4,11 +4,17 @@ title: "Resources"
 summary: "Curated guides, toolkits and links."
 permalink: /resources/
 ---
+{%- comment -%} Maintainers: the groups and items on this page come from
+_data/resources.yml; the optional banner is site.yml `resources.image`. {%- endcomment -%}
 <section class="mb-10 max-w-3xl">
   <span class="eyebrow">Library</span>
-  <h1 class="mt-2 font-heading text-4xl font-semibold text-brand-primary-dark sm:text-5xl">Resources</h1>
-  <p class="mt-4 text-lg text-brand-muted">Curated by the maintainers. Edit <code>_data/resources.yml</code> to add or change items.</p>
+  <h1 class="page-title mt-2">Resources</h1>
+  <p class="mt-4 text-lg text-brand-muted">Guides, toolkits and reference links, curated and reviewed by the maintainers.</p>
 </section>
+{%- assign rs_art = site.data.site.resources.image | default: '' -%}
+{%- if rs_art != '' -%}
+<div class="page-art mb-10" aria-hidden="true">{% include picture.html src=rs_art alt='' sizes="(min-width: 1280px) 1216px, 95vw" class="page-art-img" eager=true %}</div>
+{%- endif -%}
 {% if site.data.resources and site.data.resources.size > 0 %}
 <div class="grid gap-8 lg:grid-cols-2">
   {% for group in site.data.resources %}

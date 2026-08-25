@@ -18,6 +18,9 @@ eyebrow: "Governance"
 title: "How this catalog is governed"
 summary: "What may be published here, who checks it, how long that takes, and what happens to an entry after it goes live. Agreed by the community's data governance work group."
 
+# Optional illustration (a site-relative path) shown beside the intro copy.
+image: ""
+
 intro: |
   This catalog is a community asset, not an unmoderated list. Nothing is published automatically: every submission is checked for completeness, basic privacy hygiene and accuracy by people from member teams before it appears, and every published entry is revisited on a schedule so what you find here can be trusted to still be true. The rules on this page are the ones the reviewers apply; the contributor guide linked at the foot of the page walks through them from the submitter's side of the form.
 

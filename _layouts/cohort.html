@@ -20,7 +20,17 @@ include_search: true
 {%- endif -%}
 
 <section class="relative mb-10 overflow-hidden rounded-3xl bg-brand-primary-dark px-6 py-12 text-brand-on-dark shadow-card sm:px-10">
+  {%- comment -%} Optional journey illustration (cohort data `image`): fades in from
+  the right behind the copy, replacing the blurred-circle decoration. {%- endcomment -%}
+  {%- assign coh_art = coh_data.image | default: '' -%}
+  {%- if coh_art != '' -%}
+  {%- comment -%} !z-0, not the class's -z-10: this section is not `isolate`, and a
+  negative z-index would paint the art behind the section's own dark ground. The
+  copy wrapper below is `relative`, so it still paints above the art. {%- endcomment -%}
+  <div class="hero-art !z-0" aria-hidden="true">{% include picture.html src=coh_art alt='' sizes="80rem" class="hero-art-img" %}</div>
+  {%- else -%}
   <div class="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand-primary/40 blur-3xl" aria-hidden="true"></div>
+  {%- endif -%}
   <div class="relative space-y-5">
     {% capture coh_crumbs %}Cohorts|/cohorts/;;{{ page.title }}{% endcapture %}
     <div class="text-brand-on-dark/80 [&_a]:text-brand-on-dark [&_a]:hover:text-white [&_li[aria-current]]:text-white">{% include breadcrumbs.html items=coh_crumbs %}</div>
@@ -50,8 +60,8 @@ include_search: true
       <div class="grid gap-6 sm:grid-cols-2" data-entry-grid>
         {% for coh_entry in coh_entries %}{% include entry-card.html entry=coh_entry %}{% endfor %}
       </div>
-      <div class="hidden" data-empty-state>{% include empty-state.html icon='search' title='No matches' body='Nothing matches the current filters. Try clearing a filter or searching for a different term.' %}</div>
-      {% if coh_count == 0 %}{% include empty-state.html icon='sparkles' title='Projects coming soon' body='Entries for this cohort will appear here once they are published.' %}{% endif %}
+      <div class="hidden" data-empty-state>{% include empty-state.html icon='search' image=site.data.site.images.empty_search title='No matches' body='Nothing matches the current filters. Try clearing a filter or searching for a different term.' %}</div>
+      {% if coh_count == 0 %}{% include empty-state.html icon='sparkles' image=site.data.site.images.empty_catalog title='Projects coming soon' body='Entries for this cohort will appear here once they are published.' %}{% endif %}
     </section>
   </div>
 

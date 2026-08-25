@@ -1,4 +1,8 @@
 title: "AI Practice Cohort 2026"
+# Optional illustration layered into the cohort page's dark header band
+# (a wide image, about 20:7, fading in from the right). Leave blank for the
+# built-in decoration.
+image: ""
 events:
   - id: kickoff
     name: "Cohort kickoff"
