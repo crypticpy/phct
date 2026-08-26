@@ -27,7 +27,8 @@ export const SITE = {
     "empty_catalog": "",
     "empty_search": "",
     "empty_events": "",
-    "not_found": ""
+    "not_found": "",
+    "wizard_complete": ""
   },
   "social": {
     "og_image": ""

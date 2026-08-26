@@ -10,7 +10,7 @@ major version, and each entry says so when it happens.
 
 ### Added
 
-- A full visual pass over every surface (#34, #35, #37). Fourteen illustration slots —
+- A full visual pass over every surface (#34, #35, #37). Illustration slots —
   hero, social link-preview card, submit form and its paused state, about, events,
   resources, governance, cohort journey, four empty states, the 404 page, the wizard's
   success moment, and an optional background texture — are now available as `_data/*.yml`

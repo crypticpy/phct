@@ -29,6 +29,7 @@ images:
   empty_search: ""    # the catalog's zero-results-for-these-filters panel
   empty_events: ""    # the events page when nothing is scheduled
   not_found: ""       # the 404 page
+  wizard_complete: "" # the setup wizard's success moment on its Review step
 
 # Social sharing. `og_image` is the preview image chat apps and social sites show
 # when someone shares a link to this site (1200x630 works everywhere). It needs
