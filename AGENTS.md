@@ -97,6 +97,23 @@ first submission (details in `docs/launch.md` §2):
 4. Settings → Security → enable **Private vulnerability reporting** (or keep
    `organization.contact_email` current — `SECURITY.md` falls back to it).
 
+## If the account runs AI code-review bots
+
+Content pull requests — the ones the intake workflows scaffold from submission
+issues — are catalog data, not platform code, and the maintainers who merge them are
+often not coders. An AI code-review bot commenting on those PRs is noise at best; at
+worst its unresolved threads block the merge when the branch ruleset requires
+conversation resolution.
+
+Every scaffolded content PR carries a machine-readable label from the moment it is
+created: `content:new-entry` or `content:new-event`. The template ships a
+`.sourcery.yaml` that already exempts those labels for the **Sourcery** bot. If the
+organization has installed a *different* review bot (CodeRabbit, Copilot code review,
+Codex, Greptile, …), research that bot's skip mechanism — most support ignoring PRs
+by label; the title prefixes `Add entry:` / `Add event:` work as a fallback filter —
+and configure the same exemption. Leave the bots on for everything else: template
+update PRs and hand-written code changes are exactly what they are good at.
+
 ## Verifying your work
 
 - `npm run validate` — YAML parse + front-matter + file-size gate; the minimum bar.
