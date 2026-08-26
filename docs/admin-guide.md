@@ -181,11 +181,15 @@ not code, and a wall of automated review comments makes the merge step confusing
 branch rules require conversations to be resolved, an unanswered bot thread can block the merge
 button entirely. Every scaffolded content PR is labelled with its
 `content:*` type (`content:new-entry`, `content:new-event`, `content:new-year`,
-`content:schedule`, `content:event-attachments`) when it is created, and the template ships a
-`.sourcery.yaml` that tells the Sourcery bot to skip those labels. If you use a different review bot, configure its equivalent
-skip-by-label setting (or filter on the `Add entry:` / `Add event:` title prefixes) — and leave it
-on for everything else, especially template update PRs, which are real code changes worth a bot's
-opinion.
+`content:schedule`, `content:event-attachments`) when it is created, and its title always starts
+with one of five fixed prefixes: `Add entry:`, `Add event:`, `Scaffold cohort`, `Update cohort`,
+or `Update attachments for event`. For Sourcery, the setting that works is in its web dashboard,
+not the repository: app.sourcery.ai → Review Settings → **Ignore title keywords** — add the five
+prefixes there. (The template also ships a `.sourcery.yaml` with a skip-by-label rule, but that
+file only reaches Sourcery's older bot; the current review product ignores it.) If you use a
+different review bot, configure its equivalent skip setting — by label or by title prefix,
+whichever it supports — and leave it on for everything else, especially template update PRs,
+which are real code changes worth a bot's opinion.
 
 If you are working on the template itself rather than running a catalog,
 [maintaining.md](maintaining.md) describes a stricter release-engineering routine for the same
