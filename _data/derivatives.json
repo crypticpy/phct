@@ -1,4 +1,270 @@
 {
+  "/assets/images/illustrations/404-lost.png": {
+    "w": 800,
+    "h": 800,
+    "src_bytes": 367647,
+    "base": "/assets/images/illustrations/404-lost",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/about-mission.png": {
+    "w": 1600,
+    "h": 1000,
+    "src_bytes": 966443,
+    "base": "/assets/images/illustrations/about-mission",
+    "variants": {
+      "avif": [
+        400,
+        800,
+        1280
+      ],
+      "webp": [
+        400,
+        800,
+        1280
+      ]
+    }
+  },
+  "/assets/images/illustrations/cohort-journey.png": {
+    "w": 2000,
+    "h": 700,
+    "src_bytes": 661621,
+    "base": "/assets/images/illustrations/cohort-journey",
+    "variants": {
+      "avif": [
+        400,
+        800,
+        1280
+      ],
+      "webp": [
+        400,
+        800,
+        1280
+      ]
+    }
+  },
+  "/assets/images/illustrations/empty-catalog.png": {
+    "w": 800,
+    "h": 800,
+    "src_bytes": 387972,
+    "base": "/assets/images/illustrations/empty-catalog",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/empty-events.png": {
+    "w": 800,
+    "h": 800,
+    "src_bytes": 401774,
+    "base": "/assets/images/illustrations/empty-events",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/empty-search.png": {
+    "w": 800,
+    "h": 800,
+    "src_bytes": 404172,
+    "base": "/assets/images/illustrations/empty-search",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/events-gathering.png": {
+    "w": 2000,
+    "h": 700,
+    "src_bytes": 591798,
+    "base": "/assets/images/illustrations/events-gathering",
+    "variants": {
+      "avif": [
+        400,
+        800,
+        1280
+      ],
+      "webp": [
+        400,
+        800,
+        1280
+      ]
+    }
+  },
+  "/assets/images/illustrations/governance-stewardship.png": {
+    "w": 1200,
+    "h": 1000,
+    "src_bytes": 682472,
+    "base": "/assets/images/illustrations/governance-stewardship",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/hero-community.png": {
+    "w": 2400,
+    "h": 1200,
+    "src_bytes": 1033156,
+    "base": "/assets/images/illustrations/hero-community",
+    "variants": {
+      "avif": [
+        400,
+        800,
+        1280
+      ],
+      "webp": [
+        400,
+        800,
+        1280
+      ]
+    }
+  },
+  "/assets/images/illustrations/og-card.png": {
+    "w": 1200,
+    "h": 630,
+    "src_bytes": 351180,
+    "base": "/assets/images/illustrations/og-card",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/pattern-topo.png": {
+    "w": 960,
+    "h": 960,
+    "src_bytes": 1287906,
+    "base": "/assets/images/illustrations/pattern-topo",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/pattern-weave.png": {
+    "w": 960,
+    "h": 960,
+    "src_bytes": 1648248,
+    "base": "/assets/images/illustrations/pattern-weave",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/resources-library.png": {
+    "w": 2000,
+    "h": 700,
+    "src_bytes": 720013,
+    "base": "/assets/images/illustrations/resources-library",
+    "variants": {
+      "avif": [
+        400,
+        800,
+        1280
+      ],
+      "webp": [
+        400,
+        800,
+        1280
+      ]
+    }
+  },
+  "/assets/images/illustrations/submissions-closed.png": {
+    "w": 800,
+    "h": 800,
+    "src_bytes": 423379,
+    "base": "/assets/images/illustrations/submissions-closed",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/submit-welcome.png": {
+    "w": 1200,
+    "h": 1000,
+    "src_bytes": 475032,
+    "base": "/assets/images/illustrations/submit-welcome",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
+  "/assets/images/illustrations/wizard-complete.png": {
+    "w": 800,
+    "h": 800,
+    "src_bytes": 383264,
+    "base": "/assets/images/illustrations/wizard-complete",
+    "variants": {
+      "avif": [
+        400,
+        800
+      ],
+      "webp": [
+        400,
+        800
+      ]
+    }
+  },
   "/catalog/council-meeting-summaries/screenshots/01.png": {
     "w": 1280,
     "h": 800,

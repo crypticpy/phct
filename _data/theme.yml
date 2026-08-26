@@ -44,7 +44,7 @@ radius: "soft"
 # faintly over the tinted bands and the home closing panel. Bake the subtlety
 # into the file itself (a mostly-transparent PNG/WebP tile); leave blank for
 # flat tinted surfaces.
-texture: ""
+texture: "/assets/images/illustrations/pattern-weave.png"
 
 # Motion. Durations and easing for every transition on the site, emitted as
 # --motion-fast/base/slow and --ease-brand by _includes/theme.html. Each value has
