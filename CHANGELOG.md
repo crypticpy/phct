@@ -33,6 +33,8 @@ major version, and each entry says so when it happens.
 - Three grid layouts (resource groups, the cohort sidebar, materials lists) no longer
   overflow narrow phones: their truncated rows could force the grid wider than the
   320–414px viewports.
+- The showcase example switcher's open menu no longer slides underneath the sticky
+  site header — the popover moved to the overlay layer the filter sheet already uses.
 
 ## [1.9.0-rc.4] — 2026-08-25
 
