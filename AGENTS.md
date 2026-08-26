@@ -105,13 +105,23 @@ often not coders. An AI code-review bot commenting on those PRs is noise at best
 worst its unresolved threads block the merge when the branch ruleset requires
 conversation resolution.
 
-Every scaffolded content PR carries a machine-readable label from the moment it is
-created: `content:new-entry`, `content:new-event`, `content:new-year`,
-`content:schedule`, or `content:event-attachments`. The template ships a
-`.sourcery.yaml` that already exempts those labels for the **Sourcery** bot. If the
-organization has installed a *different* review bot (CodeRabbit, Copilot code review,
-Codex, Greptile, …), research that bot's skip mechanism — most support ignoring PRs
-by label; the title prefixes `Add entry:` / `Add event:` work as a fallback filter —
+Every scaffolded content PR carries two machine-readable markers from the moment it
+is created: a label (`content:new-entry`, `content:new-event`, `content:new-year`,
+`content:schedule`, or `content:event-attachments`) and a fixed title prefix
+(`Add entry:`, `Add event:`, `Scaffold cohort`, `Update cohort`, or
+`Update attachments for event`). Use whichever marker the installed bot's skip
+mechanism understands.
+
+For **Sourcery** specifically: its current review product is configured in the web
+dashboard, not in the repository — app.sourcery.ai → Review Settings → **Ignore
+title keywords**, where the five title prefixes above belong. The template also
+ships a `.sourcery.yaml` with `ignore_labels`, but that key belongs to Sourcery's
+legacy bot and the review product does not honor it (verified 2026-08: a labeled
+content PR with the file present was still reviewed). Keep the file — it is
+harmless and documents intent — but do not rely on it alone. If the organization
+has installed a *different* review bot (CodeRabbit, Copilot code review, Codex,
+Greptile, …), research that bot's skip mechanism — check whether it is an in-repo
+config file or a dashboard setting, and whether it filters by label or by title —
 and configure the same exemption. Leave the bots on for everything else: template
 update PRs and hand-written code changes are exactly what they are good at.
 

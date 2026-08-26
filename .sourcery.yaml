@@ -7,9 +7,14 @@
 #
 # The intake workflows label every scaffolded PR at creation time
 # (content:new-entry, content:new-event, content:new-year,
-# content:schedule, content:event-attachments), so Sourcery skips
-# exactly those PRs and still reviews real code changes, including
-# template update PRs. Inert in repositories that do not use Sourcery.
+# content:schedule, content:event-attachments). NOTE: this file only
+# reaches Sourcery's legacy bot — the current review product ignores it
+# (verified 2026-08: a labeled content PR was still reviewed). To make
+# the review bot skip content PRs, use the Sourcery dashboard instead:
+# app.sourcery.ai -> Review Settings -> "Ignore title keywords", adding
+# the scaffold title prefixes ("Add entry:", "Add event:",
+# "Scaffold cohort", "Update cohort", "Update attachments for event").
+# Kept as intent documentation and for the legacy bot; inert otherwise.
 github:
   ignore_labels:
     - sourcery-ignore
