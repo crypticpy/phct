@@ -1,0 +1,16 @@
+# Sourcery review settings, for deployments that install the Sourcery bot.
+#
+# Pull requests scaffolded from submission issues are catalog content
+# (an entry page plus its attachments), not changes to the platform code,
+# and the maintainers who merge them are often not coders. An automated
+# code review on those PRs is noise that makes the merge step confusing.
+#
+# The intake workflows label every scaffolded PR at creation time
+# (content:new-entry / content:new-event), so Sourcery skips exactly
+# those PRs and still reviews real code changes, including template
+# update PRs. Inert in repositories that do not use Sourcery.
+github:
+  ignore_labels:
+    - sourcery-ignore
+    - content:new-entry
+    - content:new-event
