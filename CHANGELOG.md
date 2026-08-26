@@ -8,6 +8,8 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.9.0-rc.5] — 2026-08-26
+
 ### Added
 
 - A full visual pass over every surface (#34, #35, #37). Illustration slots —
@@ -1078,7 +1080,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.4...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.5...HEAD
+[1.9.0-rc.5]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.4...v1.9.0-rc.5
 [1.9.0-rc.4]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.3...v1.9.0-rc.4
 [1.9.0-rc.3]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.2...v1.9.0-rc.3
 [1.9.0-rc.2]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.1...v1.9.0-rc.2
