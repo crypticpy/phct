@@ -18,7 +18,7 @@ _data/resources.yml; the optional banner is site.yml `resources.image`. {%- endc
 {% if site.data.resources and site.data.resources.size > 0 %}
 <div class="grid gap-8 lg:grid-cols-2">
   {% for group in site.data.resources %}
-    <section class="card" aria-labelledby="group-{{ forloop.index }}">
+    <section class="card min-w-0" aria-labelledby="group-{{ forloop.index }}">
       <div class="card-header"><h2 id="group-{{ forloop.index }}" class="card-title">{{ group.group }}</h2>{% if group.description %}<p class="text-sm text-brand-muted">{{ group.description }}</p>{% endif %}</div>
       <ul class="space-y-3 px-6 py-6">
         {% for item in group.items %}

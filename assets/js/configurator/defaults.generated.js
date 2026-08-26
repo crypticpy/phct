@@ -24,13 +24,13 @@ export const SITE = {
     "text": "CAI"
   },
   "images": {
-    "empty_catalog": "",
-    "empty_search": "",
-    "empty_events": "",
-    "not_found": ""
+    "empty_catalog": "/assets/images/illustrations/empty-catalog.png",
+    "empty_search": "/assets/images/illustrations/empty-search.png",
+    "empty_events": "/assets/images/illustrations/empty-events.png",
+    "not_found": "/assets/images/illustrations/404-lost.png"
   },
   "social": {
-    "og_image": ""
+    "og_image": "/assets/images/illustrations/og-card.png"
   },
   "github": {
     "repository": "crypticpy/phct",
@@ -49,7 +49,7 @@ export const SITE = {
     "governance": true
   },
   "hero": {
-    "image": "",
+    "image": "/assets/images/illustrations/hero-community.png",
     "eyebrow": "Civic AI Community of Practice · Shared catalog",
     "title": "What public-sector teams are building with AI",
     "lead": "Browse real solutions from teams across the community — source code, cloud deployments, vendor implementations and write-ups — and share your own so others can learn, reuse and adapt.",
@@ -85,8 +85,8 @@ export const SITE = {
   },
   "submit": {
     "accepting": true,
-    "image": "",
-    "closed_image": "",
+    "image": "/assets/images/illustrations/submit-welcome.png",
+    "closed_image": "/assets/images/illustrations/submissions-closed.png",
     "closed_message": "",
     "intro": "Share an AI use case, tool or project with the community. Submissions open a GitHub issue for the maintainers to review; nothing is published until it is approved.",
     "turnaround": "Intake checks it within about five business days and the Governance Committee reviews it within about ten more; you keep ownership of anything you share.",
@@ -94,13 +94,13 @@ export const SITE = {
     "fallback_email": "catalog@example.org"
   },
   "events": {
-    "image": ""
+    "image": "/assets/images/illustrations/events-gathering.png"
   },
   "resources": {
-    "image": ""
+    "image": "/assets/images/illustrations/resources-library.png"
   },
   "about": {
-    "image": ""
+    "image": "/assets/images/illustrations/about-mission.png"
   },
   "catalog": {
     "verify_after_days": 365
@@ -160,7 +160,7 @@ export const THEME = {
     "measure_display": "44rem"
   },
   "radius": "soft",
-  "texture": "",
+  "texture": "/assets/images/illustrations/pattern-weave-400.webp",
   "motion": {
     "fast": "120ms",
     "base": "180ms",

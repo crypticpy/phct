@@ -44,7 +44,11 @@ radius: "soft"
 # faintly over the tinted bands and the home closing panel. Bake the subtlety
 # into the file itself (a mostly-transparent PNG/WebP tile); leave blank for
 # flat tinted surfaces.
-texture: ""
+# The 400px WebP derivative, not the source PNG: the CSS serves this file as-is
+# (no <picture> fallback on a background-image), and at the tile's low opacity
+# the 12x weight saving beats the slight upscale to its 480px render width —
+# the full-size PNG alone blew the Lighthouse LCP budget on every page.
+texture: "/assets/images/illustrations/pattern-weave-400.webp"
 
 # Motion. Durations and easing for every transition on the site, emitted as
 # --motion-fast/base/slow and --ease-brand by _includes/theme.html. Each value has

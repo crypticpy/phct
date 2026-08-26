@@ -46,6 +46,10 @@ planning a larger catalog.
 Allow roughly 15 minutes of hands-on setup. GitHub's initial builds can bring elapsed time to about
 40 minutes; the detailed no-terminal tutorial includes every wait and recovery path.
 
+> **Setting this up with an AI coding agent?** Point it at [`AGENTS.md`](AGENTS.md) — the
+> setup runbook written for agents: what to ask you first, which files are yours to edit
+> versus template-owned, and the settings only a human can click.
+
 1. **Use this template** on GitHub (or clone it) to create your own repository.
 2. **Turn on the GitHub settings the automation needs.** They are a handful of clicks in Settings and the Actions tab, and nothing below works until they are on. [`docs/launch.md`](docs/launch.md#2-turn-on-the-four-github-settings) lists each one with its click path and what breaks without it; [`docs/admin-guide.md`](docs/admin-guide.md#repository-settings-at-a-glance) has the same settings as a reference table, alongside the optional variables and secrets.
 3. **Configure the site** — open `/setup/` on the deployed site for the browser wizard (no terminal), or run `npm ci && npm run setup` locally. Both write `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`, `_config.yml`, `.github/ISSUE_TEMPLATE/new-entry.yml` and `.github/ISSUE_TEMPLATE/config.yml`, from the same four presets. With no terminal, paste the wizard's three `_data/*.yml` files into the **Apply setup** issue form and the automation opens the pull request for you.

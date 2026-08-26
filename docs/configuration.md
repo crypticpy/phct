@@ -19,9 +19,10 @@ You can edit these files by hand, or use one of the two configurators described 
 
 ### Illustrations and social image
 
-Every key below is optional and ships blank — the site is fully functional, and keeps its
-built-in treatments, with all of them empty. Each takes a site-relative image path; put the
-files under `assets/images/illustrations/`. All are decorative: the copy beside each one
+Every key below is optional. The template ships with each one filled from its editorial
+illustration set under `assets/images/illustrations/`; blank a key and that surface falls
+back to its built-in flat treatment — the site is fully functional with all of them empty.
+Each takes a site-relative image path. All are decorative: the copy beside each one
 carries the meaning, so they render with empty alt text and never replace information.
 
 ```yaml
@@ -236,7 +237,10 @@ texture: ""                   # optional site-relative path to a tileable patter
 `texture` layers a repeating tile (at 480px wide) over the tinted bands, the home page's
 closing panel, the footer's dark ground and the slim keel on imageless catalog cards. Any
 subtlety — low opacity, low contrast — is baked into the tile file itself; the CSS applies it
-as-is. Blank (the default) keeps every one of those surfaces plain.
+as-is, so point it at a small compressed file (the shipped default is the 400px WebP
+derivative of the template's woven tile, not the megabyte source PNG — the tile is nearly
+transparent, so weight matters far more than resolution). Blank keeps every one of those
+surfaces plain.
 
 Colors are hex values. `_includes/theme.html` converts each one to an `R G B` triple (via the `hex_to_rgb` Liquid filter in `_plugins/theme_filters.rb`) and emits them as CSS custom properties (`--c-primary`, `--c-line-strong`, `--c-warn`, …) that Tailwind's `rgb(var(--c-x) / <alpha>)` utility classes read — so changing a hex value here re-themes the whole site on the next build, no CSS edits required. Keep text/background pairs at WCAG AA contrast (4.5:1 for body text); the setup wizards warn if `on_dark` on `primary_dark` falls under 4.5:1, and `npm run validate` fails if `ink`, `muted` or `primary` fall under 4.5:1 on `surface_tint`.
 

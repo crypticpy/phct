@@ -33,7 +33,7 @@ include_search: true
   {%- endif -%}
   <div class="relative space-y-5">
     {% capture coh_crumbs %}Cohorts|/cohorts/;;{{ page.title }}{% endcapture %}
-    <div class="text-brand-on-dark/80 [&_a]:text-brand-on-dark [&_a]:hover:text-white [&_li[aria-current]]:text-white">{% include breadcrumbs.html items=coh_crumbs %}</div>
+    <div class="text-brand-on-dark/80 [&_a]:text-brand-on-dark [&_a]:hover:text-white [&_li[aria-current]]:text-white [&_ol]:text-brand-on-dark/80">{% include breadcrumbs.html items=coh_crumbs %}</div>
     <div class="flex flex-wrap items-center gap-3">
       <span class="eyebrow !text-brand-on-dark/80">{{ coh_cfg.organization.name }}</span>
       {% assign coh_yl = page.year | append: '' %}{% include badge.html label=coh_yl tone='on-dark' size='md' %}
@@ -65,7 +65,7 @@ include_search: true
     </section>
   </div>
 
-  <aside class="order-1 space-y-6 lg:order-2">
+  <aside class="order-1 min-w-0 space-y-6 lg:order-2">
     {% if coh_next_event %}
       <section class="card border-l-4 !border-l-brand-accent" aria-labelledby="next-milestone">
         <div class="card-header flex items-center gap-2"><h2 id="next-milestone" class="card-title flex items-center gap-2">{% include icon.html name='calendar' size='sm' class='text-brand-accent' %} Next milestone</h2></div>
