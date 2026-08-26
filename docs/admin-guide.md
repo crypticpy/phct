@@ -179,9 +179,10 @@ green, merge. The first publishes the "How the catalog is doing" figures; the se
 code review, and the like), should stay off content pull requests: an entry PR is catalog data,
 not code, and a wall of automated review comments makes the merge step confusing — worse, if your
 branch rules require conversations to be resolved, an unanswered bot thread can block the merge
-button entirely. Every scaffolded content PR is labelled `content:new-entry` or
-`content:new-event` when it is created, and the template ships a `.sourcery.yaml` that tells the
-Sourcery bot to skip those labels. If you use a different review bot, configure its equivalent
+button entirely. Every scaffolded content PR is labelled with its
+`content:*` type (`content:new-entry`, `content:new-event`, `content:new-year`,
+`content:schedule`, `content:event-attachments`) when it is created, and the template ships a
+`.sourcery.yaml` that tells the Sourcery bot to skip those labels. If you use a different review bot, configure its equivalent
 skip-by-label setting (or filter on the `Add entry:` / `Add event:` title prefixes) — and leave it
 on for everything else, especially template update PRs, which are real code changes worth a bot's
 opinion.

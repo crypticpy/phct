@@ -106,7 +106,8 @@ worst its unresolved threads block the merge when the branch ruleset requires
 conversation resolution.
 
 Every scaffolded content PR carries a machine-readable label from the moment it is
-created: `content:new-entry` or `content:new-event`. The template ships a
+created: `content:new-entry`, `content:new-event`, `content:new-year`,
+`content:schedule`, or `content:event-attachments`. The template ships a
 `.sourcery.yaml` that already exempts those labels for the **Sourcery** bot. If the
 organization has installed a *different* review bot (CodeRabbit, Copilot code review,
 Codex, Greptile, …), research that bot's skip mechanism — most support ignoring PRs

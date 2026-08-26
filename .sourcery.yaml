@@ -6,11 +6,15 @@
 # code review on those PRs is noise that makes the merge step confusing.
 #
 # The intake workflows label every scaffolded PR at creation time
-# (content:new-entry / content:new-event), so Sourcery skips exactly
-# those PRs and still reviews real code changes, including template
-# update PRs. Inert in repositories that do not use Sourcery.
+# (content:new-entry, content:new-event, content:new-year,
+# content:schedule, content:event-attachments), so Sourcery skips
+# exactly those PRs and still reviews real code changes, including
+# template update PRs. Inert in repositories that do not use Sourcery.
 github:
   ignore_labels:
     - sourcery-ignore
     - content:new-entry
     - content:new-event
+    - content:new-year
+    - content:schedule
+    - content:event-attachments
