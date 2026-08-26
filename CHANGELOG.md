@@ -10,14 +10,15 @@ major version, and each entry says so when it happens.
 
 ### Added
 
-- A full visual pass over every surface (#34, #35). Fourteen illustration slots —
+- A full visual pass over every surface (#34, #35, #37). Illustration slots —
   hero, social link-preview card, submit form and its paused state, about, events,
   resources, governance, cohort journey, four empty states, the 404 page, the wizard's
-  success moment, and an optional background texture — now ship filled with a
-  consistent editorial illustration set (with AVIF/WebP derivatives); blanking any key
-  in `_data/*.yml` returns that surface to its previous flat treatment. The submit
-  progress rail and the setup wizard's step pills became real steppers, review and
-  confirmation panels gained hierarchy and a drawn-check success moment, and
+  success moment, and an optional background texture — are now available as `_data/*.yml`
+  keys for a deployment to fill with its own artwork (`npm run images` builds AVIF/WebP
+  derivatives). The keys ship blank apart from the subtle background texture: every
+  surface renders a polished flat treatment out of the box. The submit progress rail
+  and the setup wizard's step pills became real steppers, review and confirmation
+  panels gained hierarchy and a drawn-check success moment, and
   `submit.accepting: false` can pause intake without removing the page.
 - `AGENTS.md`: a setup runbook for AI coding agents handed a copy of this template —
   what to ask before configuring, which files the copy owns versus the template, the

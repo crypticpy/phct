@@ -25,17 +25,18 @@ logo:
 # site is fully functional with every key empty. All are decorative: nearby copy
 # carries the meaning, so they render with empty alt text.
 images:
-  empty_catalog: "/assets/images/illustrations/empty-catalog.png"   # "nothing published yet" panels (home + catalog)
-  empty_search: "/assets/images/illustrations/empty-search.png"    # the catalog's zero-results-for-these-filters panel
-  empty_events: "/assets/images/illustrations/empty-events.png"    # the events page when nothing is scheduled
-  not_found: "/assets/images/illustrations/404-lost.png"       # the 404 page
+  empty_catalog: ""   # "nothing published yet" panels (home + catalog)
+  empty_search: ""    # the catalog's zero-results-for-these-filters panel
+  empty_events: ""    # the events page when nothing is scheduled
+  not_found: ""       # the 404 page
+  wizard_complete: "" # the setup wizard's success moment on its Review step
 
 # Social sharing. `og_image` is the preview image chat apps and social sites show
 # when someone shares a link to this site (1200x630 works everywhere). It needs
 # `url:` set in _config.yml to resolve to an absolute address; a page can override
 # it with `image:` in its front matter.
 social:
-  og_image: "/assets/images/illustrations/og-card.png"
+  og_image: ""
 
 # GitHub repository that hosts this site, as "owner/repo".
 # Used to build the "Submit" form links, "Edit this page" links, and issue URLs.
@@ -68,7 +69,7 @@ modules:
 # hero's dark ground — it fades in toward the right so the headline stays on a
 # calm surface; leave blank for the built-in gradient-and-dot-grid treatment.
 hero:
-  image: "/assets/images/illustrations/hero-community.png"
+  image: ""
   eyebrow: "Civic AI Community of Practice · Shared catalog"
   title: "What public-sector teams are building with AI"
   lead: "Browse real solutions from teams across the community — source code, cloud deployments, vendor implementations and write-ups — and share your own so others can learn, reuse and adapt."
@@ -100,8 +101,8 @@ submit:
   # set) and the email route stays offered. `image` is an optional illustration
   # beside the form's introduction.
   accepting: true
-  image: "/assets/images/illustrations/submit-welcome.png"
-  closed_image: "/assets/images/illustrations/submissions-closed.png"
+  image: ""
+  closed_image: ""
   closed_message: ""
   intro: "Share an AI use case, tool or project with the community. Submissions open a GitHub issue for the maintainers to review; nothing is published until it is approved."
   turnaround: "Intake checks it within about five business days and the Governance Committee reviews it within about ten more; you keep ownership of anything you share."   # the last step of "what happens next" — make it a promise you can keep
@@ -111,15 +112,15 @@ submit:
 # Events page (module: events). `image` is an optional wide banner (about 20:7)
 # shown under the page header; leave blank for a text-only header.
 events:
-  image: "/assets/images/illustrations/events-gathering.png"
+  image: ""
 
 # Resources page (module: resources). Same optional banner as the events page.
 resources:
-  image: "/assets/images/illustrations/resources-library.png"
+  image: ""
 
 # About page. `image` is an optional illustration shown beside the opening copy.
 about:
-  image: "/assets/images/illustrations/about-mission.png"
+  image: ""
 
 # Catalog behaviour (module: catalog)
 catalog:
