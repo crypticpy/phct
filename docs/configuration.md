@@ -19,11 +19,12 @@ You can edit these files by hand, or use one of the two configurators described 
 
 ### Illustrations and social image
 
-Every key below is optional. The template ships with each one filled from its editorial
-illustration set under `assets/images/illustrations/`; blank a key and that surface falls
-back to its built-in flat treatment — the site is fully functional with all of them empty.
-Each takes a site-relative image path. All are decorative: the copy beside each one
-carries the meaning, so they render with empty alt text and never replace information.
+Every key below is optional and ships blank: each surface renders its built-in flat
+treatment until you point the key at artwork of your own (put files under
+`assets/images/illustrations/` and run `npm run images` for responsive derivatives) —
+the site is fully functional with all of them empty. Each takes a site-relative image
+path. All are decorative: the copy beside each one carries the meaning, so they render
+with empty alt text and never replace information.
 
 ```yaml
 images:
