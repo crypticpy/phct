@@ -34,7 +34,7 @@ This repository is shipped configured as an **AI Use Case Catalog**, where publi
 - **Modules.** Turn catalog, submit, carousel, stats, events, cohorts, resources and governance on or off independently; navigation and the home page adapt automatically, and pages under a disabled module are dropped from the build.
 - **Theming.** Colors, fonts and corner rounding live in [`_data/theme.yml`](_data/theme.yml) and become CSS variables consumed by Tailwind — no CSS editing required for a rebrand. Every colour has one semantic job, so a re-skin cannot quietly break contrast.
 - **Accessibility as a build rule, not a pass.** Nothing is signalled by colour or icon alone, every control has a visible focus ring and a ≥3:1 border, filter changes are announced once, and the whole catalog still works with JavaScript disabled.
-- **CI content pipeline.** Front-matter and file-size validation on every pull request, automatic thumbnail generation from uploaded PDFs, and workflows that scaffold cohort years, events and schedule updates from issues.
+- **CI content pipeline.** Front-matter and file-size validation on every pull request, automatic thumbnail generation from uploaded PDFs, and workflows that scaffold cohort years, events and schedule updates from issues. Scaffolded content pull requests are labelled at creation, and a shipped `.sourcery.yaml` keeps AI code-review bots off them — entries are data, not code.
 
 **Supported scale:** releases enforce the complete build, payload, DOM, and interaction budgets
 through 100 published entries. The deterministic release matrix also characterizes 500 entries as
@@ -60,7 +60,7 @@ Each of those steps has a detail you will want on the day: **[`docs/launch.md`](
 
 ## How content gets in
 
-1. A contributor fills out the **Submit** form (`/submit/`) — one page, with a live preview of the card their entry will produce — or opens the **Submit a use case** GitHub issue form directly.
+1. A contributor fills out the **Submit** form (`/submit/`) — a stepped form that walks the schema's field groups one section at a time, with a short form that hides every optional question and a live preview of the card their entry will produce — or opens the **Submit a use case** GitHub issue form directly.
 2. The form data becomes a GitHub issue labelled `content:new-entry`. Screenshots are dragged onto the issue at this point.
 3. The `New entry from issue` workflow runs `scripts/new_entry_from_issue.mjs`, which reads `_data/schema.yml`, downloads any attached images into `catalog/<slug>/screenshots/` (up to 8 files, 15 MB total, PNG/JPEG/GIF/WebP), and opens a pull request containing `catalog/<slug>/index.md`. The pull request body carries the maintainer checklist — the review criteria from `_data/governance.yml`, the mechanics, the review-status flip — and, when an answer matches a field's `escalate_on` list in the schema (an unticked PII/PHI attestation, PHI under *Data it touches*, a public-facing audience), a **Closer review** block and the `review:data-governance` label.
 4. Larger attachments — a `deck.pdf` — are added to the entry folder directly in that pull request. Any `file` field flagged `thumbnail: true` gets a `thumb.jpg` rendered from its first page automatically by the `Generate entry thumbnails` workflow.
@@ -104,7 +104,7 @@ A fork is a copy, not a subscription: template releases do not reach you on thei
 ```bash
 git remote add template https://github.com/crypticpy/phct.git
 git fetch template --tags
-npm run upgrade:check -- --to v1.9.0 # read-only: what this exact release changes, in two lists
+npm run upgrade:check -- --to v1.9.0-rc.5 # read-only: what this exact release changes, in two lists
 ```
 
 The whole protected-update and manual-recovery recipe: [`docs/upgrading.md`](docs/upgrading.md).
