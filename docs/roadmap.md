@@ -21,12 +21,14 @@ shipped as v1.5.0 and wave 4 as v1.6.0 (phases 11 and 12 below).
 Found while operating the rc.3–rc.5 deployment; to be resolved (or explicitly deferred)
 before stable v1.9.0. The full rc shakedown ledger is still owed to this file.
 
-- **`_data/derivatives.json` is a merge-conflict magnet.** Every content PR's media
-  workflow writes derivative entries into one shared manifest, so any two content PRs
-  open at the same time conflict on it — the second merge needs a by-hand union of the
-  JSON (observed 2026-08-26 with three entry PRs queued). Fix candidates: per-entry
-  manifest fragments merged at build time, or a custom merge driver shipped in
-  `.gitattributes`.
+- **`_data/derivatives.json` is a merge-conflict magnet.** The thumbnails workflow
+  writes derivative entries into one shared manifest, so any two open content PRs that
+  add media (deck PDFs, screenshots) conflict on it — the second merge needs a by-hand
+  union of the JSON (observed 2026-08-26 with three entry PRs queued, each carrying a
+  deck). Media-less content PRs (schedule updates, cohort scaffolds) are unaffected.
+  Fix candidates: per-entry manifest fragments merged at build time (the stronger fix),
+  or a documented union merge driver — noting `.gitattributes` only selects a driver,
+  so each clone would still need the `git config merge.<name>.driver` line.
 - **Sourcery's review product ignores the shipped `.sourcery.yaml`.** The
   `github: ignore_labels` key only reaches the legacy bot; a labeled content PR was
   still reviewed with the file on the default branch (2026-08-26). The working control
