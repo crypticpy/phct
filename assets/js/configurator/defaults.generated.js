@@ -160,7 +160,7 @@ export const THEME = {
     "measure_display": "44rem"
   },
   "radius": "soft",
-  "texture": "/assets/images/illustrations/pattern-weave.png",
+  "texture": "/assets/images/illustrations/pattern-weave-400.webp",
   "motion": {
     "fast": "120ms",
     "base": "180ms",

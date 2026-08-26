@@ -8,6 +8,32 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- A full visual pass over every surface (#34, #35). Fourteen illustration slots —
+  hero, social link-preview card, submit form and its paused state, about, events,
+  resources, governance, cohort journey, four empty states, the 404 page, the wizard's
+  success moment, and an optional background texture — now ship filled with a
+  consistent editorial illustration set (with AVIF/WebP derivatives); blanking any key
+  in `_data/*.yml` returns that surface to its previous flat treatment. The submit
+  progress rail and the setup wizard's step pills became real steppers, review and
+  confirmation panels gained hierarchy and a drawn-check success moment, and
+  `submit.accepting: false` can pause intake without removing the page.
+- `AGENTS.md`: a setup runbook for AI coding agents handed a copy of this template —
+  what to ask before configuring, which files the copy owns versus the template, the
+  configure → generate → validate loop, and the GitHub settings only a human can click.
+- The accessibility gate now also audits `/compare/`, the A–Z directory and the 404
+  page on every pull request.
+
+### Fixed
+
+- Past event rows kept WCAG AA text contrast (they now recede via grayscale, which
+  preserves luminance, instead of opacity, which does not), and the cohort hero's
+  breadcrumb separators no longer sat at 2.2:1 on the dark ground.
+- Three grid layouts (resource groups, the cohort sidebar, materials lists) no longer
+  overflow narrow phones: their truncated rows could force the grid wider than the
+  320–414px viewports.
+
 ## [1.9.0-rc.4] — 2026-08-25
 
 ### Added
