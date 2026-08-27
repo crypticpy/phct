@@ -7,7 +7,9 @@
  * Output:      rewrites <entry path>/<slug>/index.md on the "still accurate" path
  *              $GITHUB_OUTPUT: outcome, and per outcome —
  *                confirmed → slug, file, branch, title, date
- *                changes   → slug, changes
+ *                changes   → slug, changes, branch — the same branch name a
+ *                            prior "yes" answer on this same issue would have
+ *                            used, so the workflow can find and close it
  *                none      → reason (a whole sentence the workflow quotes back)
  *              error, when the slug is not a usable path segment.
  *
@@ -195,6 +197,10 @@ function main() {
     setOutput('slug', form.slug);
     setOutput('file', relative);
     setOutput('changes', form.changes);
+    // Same branch name a "yes" answer on this issue would have used, so a
+    // submitter who answers "yes" and then edits the issue to "no" leaves the
+    // workflow a name to find and close that stale confirmation with.
+    setOutput('branch', `refresh/${form.slug}-${suffix}`);
     console.log(`Routing described changes for ${relative} to the maintainers.`);
     return;
   }

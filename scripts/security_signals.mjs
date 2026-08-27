@@ -253,23 +253,35 @@ export function capDocument(doc, maxBytes = MAX_BYTES) {
  * Whether a previously written file carries the same observations — the dates
  * this run stamped on them are allowed to differ, so a month in which nothing
  * moved does not open a pull request that changes nothing but a date.
+ *
+ * Compares the whole document — including top-level cap metadata such as
+ * `truncated` — with only the two timestamp fields (`generated_at` at the top,
+ * `fetched` on each record) stripped first. Comparing just `entries` used to
+ * miss the case where a catalog is big enough for `capDocument` to shed
+ * records: the retained entries can be byte-for-byte identical between two
+ * runs while a slug was added or removed at the trimmed end, changing
+ * `truncated` without changing a single kept record — and that must still
+ * count as changed.
  * @param {string} previousText the file as written before
- * @param {object} doc the freshly built document
+ * @param {object} doc the freshly built (and, if applicable, capped) document
  * @returns {boolean}
  */
 export function sameSignals(previousText, doc) {
-  const observations = (value) => {
-    const entries = value?.entries ?? {};
-    const stripped = {};
+  const withoutTimestamps = (value) => {
+    const rest = { ...(value ?? {}) };
+    delete rest.generated_at;
+    const entries = rest.entries ?? {};
+    const strippedEntries = {};
     for (const key of Object.keys(entries).sort()) {
-      const rest = { ...(entries[key] ?? {}) };
-      delete rest.fetched;
-      stripped[key] = rest;
+      const record = { ...(entries[key] ?? {}) };
+      delete record.fetched;
+      strippedEntries[key] = record;
     }
-    return JSON.stringify(sortKeys(stripped));
+    rest.entries = strippedEntries;
+    return JSON.stringify(sortKeys(rest));
   };
   try {
-    return observations(JSON.parse(previousText)) === observations(doc);
+    return withoutTimestamps(JSON.parse(previousText)) === withoutTimestamps(doc);
   } catch {
     return false;
   }

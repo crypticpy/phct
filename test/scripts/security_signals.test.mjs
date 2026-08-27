@@ -415,6 +415,52 @@ test('a catalog big enough to be capped still reports "unchanged" when nothing m
   );
 });
 
+test('sameSignals catches a truncation count changing even when every retained entry is identical', () => {
+  // A catalog big enough for capDocument to shed records: a slug added or
+  // removed at the trimmed end can leave every RETAINED entry byte-for-byte
+  // identical while only the top-level `truncated` count moves. That must
+  // still count as a change, or a shift in what got shed never reaches the
+  // committed file.
+  const doc = buildDocument({
+    today: '2026-09-03',
+    records: [
+      {
+        slug: 'a',
+        record: shapeObservation({
+          url: 'https://github.com/o/a',
+          target: repoTarget('https://github.com/o/a'),
+          fetched: '2026-09-03',
+          observed: { exists: true, archived: false, license: 'MIT', errors: [] },
+        }),
+      },
+    ],
+  });
+  doc.truncated = 3;
+
+  const previousText = JSON.stringify({
+    generated_at: '2026-08-03',
+    entries: { a: { ...doc.entries.a, fetched: '2026-08-03' } },
+    truncated: 2,
+  });
+
+  assert.equal(
+    sameSignals(previousText, doc),
+    false,
+    'the retained entry is identical but the shed count changed, so this must count as a change'
+  );
+
+  const sameTruncation = JSON.stringify({
+    generated_at: '2026-08-03',
+    entries: { a: { ...doc.entries.a, fetched: '2026-08-03' } },
+    truncated: 3,
+  });
+  assert.equal(
+    sameSignals(sameTruncation, doc),
+    true,
+    'same retained entry and same shed count is genuinely unchanged'
+  );
+});
+
 /* --------------------------------------------------- shipped sample data */
 
 test('the shipped sample observations leave with the rest of the demo content', () => {

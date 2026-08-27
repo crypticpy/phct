@@ -181,6 +181,28 @@ jobs:
               core.warning(`Could not add the review:refresh-changes label (${error.status}). Run Bootstrap labels once from the Actions tab.`);
             }
 
+      # A submitter can answer "yes" — opening the confirmation pull request
+      # below — then edit this same issue to answer "no" instead. Without
+      # this, that pull request stays open and mergeable, and merging it
+      # would stamp `verified:` after the submitter retracted the answer.
+      # `BRANCH` here is the same name a "yes" answer on this issue would
+      # have used (scripts/refresh_entry_from_issue.mjs), so it finds exactly
+      # that pull request and nothing another issue opened.
+      - name: Close a stale confirmation pull request
+        if: steps.refresh.outcome == 'success' && steps.refresh.outputs.outcome == 'changes'
+        env:
+          GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.refresh.outputs.branch }}
+        run: |
+          set -euo pipefail
+          # `--state open` matters: a closed or merged pull request must never
+          # be reopened by a later issue edit.
+          pr_number="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr_number" ]; then
+            gh pr close "$pr_number" \
+              --comment "The submitter's answer on this issue changed to \"something changed\"; closing this stale confirmation."
+          fi
+
       - name: Commit the confirmation on a new branch
         id: commit
         if: steps.refresh.outputs.outcome == 'confirmed'

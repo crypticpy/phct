@@ -611,6 +611,71 @@ test('the refresh loop keeps issue text out of the shell and touches one file', 
   assert.match(openStep, /gh pr list --head "\$BRANCH" --state open/u);
 });
 
+/**
+ * Run a workflow's shell step through bash with a fake `gh` on PATH that
+ * records every invocation to `log` and, for `gh pr list`, prints
+ * `prNumber` (or nothing) as the whole of its stdout — enough for the
+ * step's own `--jq` filtering to be irrelevant, since the step only ever
+ * captures the fake command's stdout wholesale.
+ */
+function runWithFakeGh(script, { env = {}, prNumber = '' } = {}) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'phct-gh-fake-'));
+  const bin = path.join(directory, 'bin');
+  const log = path.join(directory, 'gh-calls.log');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(log, '');
+  fs.writeFileSync(
+    path.join(bin, 'gh'),
+    `#!/bin/sh
+echo "$@" >> "$GH_CALL_LOG"
+if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
+  printf '%s\\n' "$FAKE_PR_NUMBER"
+fi
+`
+  );
+  fs.chmodSync(path.join(bin, 'gh'), 0o755);
+
+  const result = spawnSync('bash', ['-c', script], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      GH_CALL_LOG: log,
+      FAKE_PR_NUMBER: prNumber,
+      ...env,
+    },
+  });
+
+  const calls = fs.readFileSync(log, 'utf8').split('\n').filter(Boolean);
+  fs.rmSync(directory, { force: true, recursive: true });
+  return { ...result, calls };
+}
+
+// A submitter can answer "yes" — opening the deterministic confirmation pull
+// request — then edit the same issue to answer "no". Without this step, that
+// pull request stays open and mergeable after the submitter retracted it.
+test('answering "no" after "yes" closes the stale confirmation pull request on that exact branch', () => {
+  const script = workflowStepScript(
+    'refresh-entry.yml',
+    'refresh',
+    'Close a stale confirmation pull request'
+  );
+  assert.match(script, /gh pr list --head "\$BRANCH" --state open/u, 'must scope the search to this branch');
+  assert.doesNotMatch(script, /\$\{\{/u, 'issue text must reach this step only through env');
+
+  const open = runWithFakeGh(script, { env: { BRANCH: 'refresh/thing-42' }, prNumber: '17' });
+  assert.equal(open.status, 0, open.stderr);
+  assert.equal(open.calls.length, 2, `expected a list then a close, got: ${open.calls.join(' | ')}`);
+  assert.match(open.calls[0], /^pr list --head refresh\/thing-42 --state open/u);
+  assert.match(open.calls[1], /^pr close 17 --comment/u);
+
+  // No open pull request on that branch: nothing to close, and the step
+  // still exits clean.
+  const none = runWithFakeGh(script, { env: { BRANCH: 'refresh/thing-42' }, prNumber: '' });
+  assert.equal(none.status, 0, none.stderr);
+  assert.equal(none.calls.length, 1, `expected only the list call, got: ${none.calls.join(' | ')}`);
+});
+
 // The other loop that writes to an entry from an issue anybody may open, and
 // the only one that publishes a stranger's name, link and email address on
 // somebody else's page. Same shapes: no issue text in a shell, one file in the
@@ -751,6 +816,28 @@ test('the monthly sweeps stay off each other’s schedule and can each be switch
   assert.match(workflow('security-signals.yml'), /does not host or audit/u);
 });
 
+// A run can open the rolling `automation/security-signals` pull request, and a
+// LATER run's observations can revert to what is already committed before a
+// maintainer merges it. `changed` then comes back false and every step that
+// depends on it is skipped — but the stale pull request from the earlier run
+// is still open and still mergeable, and would publish observations nobody
+// asked to publish. This closes it instead of leaving it stale.
+test('an unchanged security-signals run closes a stale rolling pull request rather than leaving it open', () => {
+  const script = workflowStepScript('security-signals.yml', 'signals', 'Close a stale signals pull request');
+  assert.match(script, /gh pr list --head automation\/security-signals --state open/u);
+  assert.doesNotMatch(script, /\$\{\{/u, 'issue text must reach this step only through env');
+
+  const open = runWithFakeGh(script, { prNumber: '9' });
+  assert.equal(open.status, 0, open.stderr);
+  assert.equal(open.calls.length, 2, `expected a list then a close, got: ${open.calls.join(' | ')}`);
+  assert.match(open.calls[0], /^pr list --head automation\/security-signals --state open/u);
+  assert.match(open.calls[1], /^pr close 9 --comment/u);
+
+  const none = runWithFakeGh(script, { prNumber: '' });
+  assert.equal(none.status, 0, none.stderr);
+  assert.equal(none.calls.length, 1, `expected only the list call, got: ${none.calls.join(' | ')}`);
+});
+
 test('every npm dependency install selects the exact package manager after setup-node', () => {
   const directory = path.join(ROOT, '.github', 'workflows');
   for (const name of fs.readdirSync(directory).filter((file) => file.endsWith('.yml'))) {
@@ -807,6 +894,11 @@ test('every issue-driven content workflow answers on the issue, in success and i
   assert.match(missing, /types:\n\s+- opened/u);
   assert.match(missing, /Bootstrap labels/u);
   assert.match(missing, /issues: write/u);
+  // Every content workflow triggers on `opened`/`edited`, never `labeled` —
+  // adding the label a maintainer is told to add here does not by itself
+  // start anything, so the rescue instruction has to say what does.
+  assert.match(missing, /will not start anything/u);
+  assert.match(missing, /make any small edit to the issue afterward/u);
 });
 
 test('protected-main automation stays reviewable and generated PRs can satisfy required checks', () => {

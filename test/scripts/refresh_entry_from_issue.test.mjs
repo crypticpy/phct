@@ -239,7 +239,10 @@ test('"no" with notes routes them to the maintainers and writes nothing', () => 
   assert.equal(result.outputs.get('outcome'), 'changes');
   assert.equal(result.outputs.get('changes'), 'The pilot went to production in March.');
   assert.equal(result.outputs.get('file'), 'catalog/service-request-routing/index.md');
-  assert.equal(result.outputs.has('branch'), false, '"no" must never open a pull request');
+  // The "no" path never opens a pull request itself, but it reports the same
+  // branch name a prior "yes" on this issue would have used, so the workflow
+  // can find and close a stale confirmation left open by a retracted answer.
+  assert.equal(result.outputs.get('branch'), 'refresh/service-request-routing-42');
   assert.equal(read('catalog/service-request-routing/index.md'), before);
 });
 

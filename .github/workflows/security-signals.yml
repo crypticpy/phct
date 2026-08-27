@@ -181,6 +181,23 @@ jobs:
         if: steps.signals.outputs.changed != 'true' && steps.signals.outputs.configured == 'true' && inputs.dry_run != true
         run: echo "Nothing has changed about the repositories the catalog links to since the last run. Nothing to commit." >> "$GITHUB_STEP_SUMMARY"
 
+      # An earlier run can open the pull request above; a later run's
+      # observations can then revert to what is already committed before a
+      # maintainer merges it, so `changed` comes back false here and every
+      # step above is skipped — but that earlier pull request is still open
+      # and still mergeable. Close it rather than leave it stale. The branch
+      # itself is left alone: the next real change force-with-leases over it.
+      - name: Close a stale signals pull request
+        if: steps.signals.outputs.changed != 'true' && steps.signals.outputs.configured == 'true' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          pr_number="$(gh pr list --head automation/security-signals --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr_number" ]; then
+            gh pr close "$pr_number" --comment "This month's observations match what is already committed; closing this stale pull request."
+          fi
+
       # A red monthly run with nothing but a stack trace in it tells a
       # non-coder maintainer nothing. Whatever failed, this says what it means.
       - name: Explain a failed run
