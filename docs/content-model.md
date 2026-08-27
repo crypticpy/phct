@@ -30,6 +30,7 @@ entry:
   contributor_key: organization  # optional — the field the monthly metrics count distinct "contributing organizations" from
   submitter_key: submitter_github  # optional — the text field holding the submitter's GitHub username, for refresh reminders
   deployments_key: also_deployed_by  # optional — the `links` field the "Also deployed by" form appends organizations to
+  repo_key: repo_url       # optional — the `url` field holding the project's repository link
 
 groups:                    # ordered; group filters and submit-form sections
   - key: about
@@ -49,6 +50,8 @@ fields:
 The three `status_*` keys are optional pointers, in the same spirit as `verified`: they name a field rather than hardcoding one, so a schema without a review status simply leaves them out and nothing downstream looks for it. See [Review status and deprecation](#review-status-and-deprecation).
 
 `deployments_key` is a pointer of the same shape, naming the `links` field that lists the other organizations running an entry — see [Also deployed by](#also-deployed-by).
+
+`repo_key` is a pointer of the same shape, naming the `url` field that holds a project's repository link — see [Security signals](#security-signals).
 
 `submitter_key` is a pointer of the same shape. It names an ordinary optional `text` field — `submitter_github` in the shipped schema — where a submitter may leave their GitHub username, so the [monthly verification sweep](admin-guide.md#the-monthly-verification-sweep) can @mention the person who wrote the entry rather than only the maintainers. A leading `@` is fine, the value is only ever read as a handle (never as an address or a login), `check_front_matter.rb` warns rather than fails when it does not look like a username, and leaving the key out of the schema removes both the question and the mention.
 
@@ -124,6 +127,21 @@ The single most useful fact about a use case is that somebody else has already r
 | The automation | `.github/workflows/also-deployed-by.yml` runs `scripts/add_deployment_from_issue.mjs`, which appends the organization (or updates the row that is already theirs) and opens a pull request. Nothing is published until a maintainer merges it: "we deployed this" is not self-verifying, and an address about to go on a public page needs a person to have looked at it. |
 
 The field is **not in the search index** yet: an item is a mapping, and `_plugins/search_index.rb` flattens scalars and string lists only. Set `search: true` on it once structured values are flattened there.
+
+### Security signals
+
+A catalog that lists code somebody else wrote is one click away from a reader deploying it. **This catalog links to that code; it does not host, run or audit it**, and the entry page says exactly that, in one sentence, on every entry with a repository link. Around that sentence sit two things, and the schema keeps them apart on purpose: automated *observations* about how a repository is packaged, and one maintainer-set *status* recording how much a person has looked.
+
+`entry.repo_key` is a pointer of the same shape as `status_key`, `submitter_key` and `deployments_key`. It names the `url` field holding the repository link — `repo_url` in the shipped schema.
+
+| Piece | Where |
+|---|---|
+| The pointer | `entry.repo_key` in `_data/schema.yml`. It must name a field this schema declares as `type: url`; anything else is treated as absent. Absent → the sweep reports that the feature is not configured and writes nothing, and neither the card nor the disclaimer renders on any entry. |
+| The disclaimer | One quiet sentence in `_includes/security-signals.html`, rendered on every entry whose `repo_key` field has a value. Plain Liquid, server-rendered, so it is there with JavaScript off. |
+| The observations | `_data/security_signals.json`, written monthly by `scripts/security_signals.mjs` via `.github/workflows/security-signals.yml`: last push, archived, license, security policy, and the public [OpenSSF Scorecard](https://scorecard.dev) score where there is one. Only `https://github.com/<owner>/<repo>` links are looked at; anything else is recorded as `applicable: false`. Shape and flags: [configuration.md](configuration.md#_datasecurity_signalsjson). |
+| The status | `security_review` — an ordinary `select` carrying `form: false` (maintainer-only), `facet: true`, `card: fact` and `group: data`, with the three values **Coalition security-reviewed · Automated checks only · Not reviewed**. It renders generically, like any other field: a fact in the entry's fact strip, a filter in the panel. What each value claims, and what a maintainer should check before granting the first: [admin-guide.md](admin-guide.md#security-review). |
+
+None of it is a safety judgement, and none of the wording anywhere implies one. Removing `entry.repo_key` removes the whole feature; removing the `security_review` field removes the human status and leaves the observations and the disclaimer.
 
 ## Field spec
 
@@ -285,7 +303,7 @@ Deliberately not on the card: platform, tools, vendor, data sources, contact, li
 
 ## Shipped fields (AI use case catalog)
 
-41 fields in eight groups, listed in group order and then by weight — the order the submit wizard asks them in. `body` is the page body; everything else is front matter. `review_status` is maintainer-only (`form: false`).
+44 fields in eight groups, listed in group order and then by weight — the order the submit wizard asks them in. `body` is the page body; everything else is front matter. `review_status`, `security_review` and `also_deployed_by` are maintainer-only (`form: false`) and never appear in a submission form.
 
 | Key | Type | Group | Req | Facet | Card | Weight |
 |---|---|---|:--:|:--:|---|:--:|
@@ -311,6 +329,7 @@ Deliberately not on the card: platform, tools, vendor, data sources, contact, li
 | `resources` | links | reuse | | | | 6 |
 | `screenshots` | images | reuse | | | (card image) | 7 |
 | `deck_pdf` | file (`deck.pdf`) | reuse | | | | 8 |
+| `also_deployed_by` | links | reuse | | | | 9 |
 | `license` | select | sharing | yes | yes | fact | 1 |
 | `access_terms` | textarea | sharing | | | | 2 |
 | `portability` | select | sharing | yes | yes | fact | 3 |
@@ -326,9 +345,11 @@ Deliberately not on the card: platform, tools, vendor, data sources, contact, li
 | `data_sources` | list | data | | | | 3 |
 | `audience` | select | data | yes | yes | icon | 4 |
 | `data_governance_notes` | textarea | data | | | | 5 |
+| `security_review` | select | data | | yes | fact | 6 |
 | `contact_name` | text | contact | yes | | | 1 |
 | `contact_title` | text | contact | | | | 2 |
 | `contact_email` | email | contact | yes | | | 3 |
+| `submitter_github` | text | contact | | | | 4 |
 | `body` | markdown | story | yes | | | 1 |
 
 `organization` is last in **About** on purpose: it is a disambiguator, not an entry point. At weight 2 the filter rail opened with a column of one-off organization names and pushed "Area of work" below the fold.

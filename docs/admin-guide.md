@@ -18,6 +18,7 @@ page, or in the reference it links to.
 | `SUBMISSIONS_OPEN` (variable) | Settings → Secrets and variables → Actions → **Variables** | Unset — anyone may submit | Set it to `false` to accept issue-driven work only from the owner, organization members and collaborators. Delete it to reopen. |
 | `VERIFICATION_SWEEP` (variable) | Same path | Unset — the sweep runs | Set it to `false` to stop the monthly [verification sweep](#the-monthly-verification-sweep) reminders. A manual run still works, and the refresh form on an entry page is unaffected. |
 | `CATALOG_METRICS` (variable) | Same path | Unset — metrics run | Set it to `false` to stop the monthly [catalog metrics](#the-monthly-catalog-metrics) schedule. A manual run still works. |
+| `SECURITY_SIGNALS` (variable) | Same path | Unset — the sweep runs | Set it to `false` to stop the monthly [security signals](#security-review) sweep. A manual run still works, the observations already published stay on the entry pages, and the `security_review` status you set by hand is unaffected. |
 | `CATALOG_SHOWCASE` (variable) | Same path | Unset — no showcase | Leave it unset. Set to `true` only if you want your copy to publish the template's landing page and example sites instead of your own catalog (see [the showcase](configuration.md#the-showcase)). |
 | `CONTENT_BOT_TOKEN` (secret, optional) | Settings → Secrets and variables → Actions → **Secrets** | Unset | Without it, generated pull requests report their results as **(dispatch)** statuses instead of ordinary checks. Nothing breaks — see [Checks on a generated pull request](#checks-on-a-generated-pull-request). |
 | `PHCT_UPDATE_TOKEN` (secret, needed only when an update changes workflows) | Same path | Unset | A template release that touches `.github/workflows/` stops with an actionable run summary before it opens a branch. Releases that do not touch workflows are unaffected. See [PHCT updates use a separate token](#phct-updates-use-a-separate-token). |
@@ -281,6 +282,54 @@ The script writes `_data/metrics.json` only when the figures differ from the com
 The workflow asks for `contents: write` and `pull-requests: write` only for its maintenance branch and PR, plus `actions: write` to dispatch required checks when it uses the built-in token. It never pushes directly to the protected default branch.
 
 **Turning it off.** Set the repository variable `CATALOG_METRICS` to `false` ([where](#repository-settings-at-a-glance)) to stop the schedule — a manual run still works — or delete the workflow file. Deleting `_data/metrics.json` removes the block from the page. To change the sentence above the figures, set `metrics_intro` in `_data/governance.yml`.
+
+## Security review
+
+Some entries link to code, and a peer who finds one is a step away from running somebody else's software inside their own organization. **This catalog links to that code; it does not host it, run it, or audit it, and nothing on the site should ever be read as saying that it does.** Every entry with a repository link carries one plain sentence saying so, and no status, score or badge anywhere on the site overrides it.
+
+Around that sentence there are two layers, and it matters which is which.
+
+### The three review statuses
+
+`security_review` is an ordinary maintainer-set field — `form: false`, so no submission form asks for it, exactly like `review_status`. It appears in the entry's fact strip and in the catalog's filter panel. It says how much a *person* has looked, and nothing more:
+
+| Value | What it claims | What it does not claim |
+|---|---|---|
+| **Coalition security-reviewed** | A coalition maintainer read this project's security practices — its policy, its dependencies, how it handles data — on the day the pull request records. | That the code was audited, that it has no vulnerabilities, or that it is still true today. It is a point-in-time reading of practices. |
+| **Automated checks only** | Nobody has reviewed it. All that exists is what the monthly sweep could observe from the outside. | Anything at all about what the code does. |
+| **Not reviewed** | Nobody has looked at this project on the catalog's behalf. | — the honest default, and the right value whenever you are not sure. |
+
+Leaving the field off an entry reads the same way as **Not reviewed**: nothing appears in the fact strip. Set it in the entry's pull request, the same place you set `review_status`.
+
+### What the automated sweep observes
+
+`.github/workflows/security-signals.yml` runs at 08:00 UTC on the 3rd of each month (and on demand from the Actions tab). For each live entry whose repository link is a public `https://github.com/<owner>/<repo>` URL, `scripts/security_signals.mjs` records into `_data/security_signals.json`:
+
+- whether the repository still resolves, and whether it is **archived**;
+- the day it was **last pushed to**, and whether the owner is an organization or a personal account;
+- the **license** GitHub identified, and whether a **security policy** is published;
+- the public [**OpenSSF Scorecard**](https://scorecard.dev) score and date, with a few notable checks (code review, known vulnerabilities, pinned dependencies, static analysis).
+
+These are facts about how a project is *packaged*. Not one of them inspects what the code does. A repository with a perfect Scorecard can still be malicious, and a repository with no score at all — the normal case for a small public-sector project nobody has crawled — is not thereby suspect. The entry page presents them under "Automated observations" with the date they were taken, and says the same thing in a line underneath.
+
+The workflow never edits an entry and never touches `security_review`. It opens or updates one `automation/security-signals` pull request when something moved; skim the diff for anything worth acting on — a repository that has gone missing, a project that has been archived since, a score that fell — and merge it to publish. Unchanged observations open nothing. A failed call records `"unavailable"` rather than failing the run, so a rate limit does not turn the monthly job red.
+
+### Before you grant "Coalition security-reviewed"
+
+There is no automated gate on this value; it is a claim your coalition makes in public, under its own name. What is worth looking at before you make it:
+
+- [ ] **The link is the project it says it is** — the organization's own repository or a fork they maintain, not a mirror, a vendor's marketing page, or a similarly named project.
+- [ ] **Somebody is still there.** The last push, the open-issue response, whether it is archived. An unmaintained dependency is the most common way a reused project becomes a liability.
+- [ ] **A license that permits reuse**, and one your organization can actually accept.
+- [ ] **A security policy, or a way to report a problem privately.** A project with nowhere to send a vulnerability report has not thought about receiving one.
+- [ ] **The Scorecard, read as a prompt and not as a grade.** A low *Code-Review* score on a two-person team is a fact about the team; a low *Vulnerabilities* score is a thing to go and look at.
+- [ ] **Whatever the entry itself claims about data handling** still matches what the repository does.
+
+**None of this is a safety guarantee, and the site never says it is.** The status records that a named group looked, on a date, at the things above. A reusing organization still has to run its own security review before deploying — which is precisely what the sentence on every entry page tells them to do.
+
+> **Not settled yet.** Whether "Coalition security-reviewed" expires, how often it is renewed, and who on the coalition may grant it are governance decisions this template does not make for you. Until your community decides, treat the status as a record of one reading by one maintainer and write the date and the reviewer into the pull request that sets it.
+
+**Turning it off.** Set the repository variable `SECURITY_SIGNALS` to `false` ([where](#repository-settings-at-a-glance)) to stop the schedule — a manual run still works — or delete the workflow file. Deleting `_data/security_signals.json` removes the observations card from every entry page; the disclaimer sentence and the `security_review` status stay. Removing `entry.repo_key` from `_data/schema.yml` turns the whole feature off: the sweep reports that it is not configured and writes nothing, and neither the card nor the disclaimer renders. See [content-model.md](content-model.md#security-signals) and [configuration.md](configuration.md#_datasecurity_signalsjson).
 
 ## Screenshots and images
 
