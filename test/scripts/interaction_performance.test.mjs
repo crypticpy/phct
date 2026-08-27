@@ -9,7 +9,9 @@ import {
   interactionBudgetFindings,
   measurableTiers,
   mergeInteractionEvidence,
+  mergeProbeFailure,
   percentile,
+  probeTimeoutMs,
   tierInteractionBudgets,
   timingSummary,
 } from '../../scripts/interaction_performance.mjs';
@@ -106,6 +108,57 @@ test('a missing supported ceiling is an error, not a skipped tier', (t) => {
   fs.writeFileSync(path.join(site, '500', 'entries.json'), '{}');
 
   assert.throws(() => measurableTiers(site, scaleConfig), /supported ceiling of 100 entries/);
+});
+
+// Puppeteer's 15s default was measured on a laptop; a thousand entries under a
+// 4x throttle on a CI runner needs longer just to reach the load event.
+test('the probe deadline grows with the fixture it is driving', () => {
+  assert.equal(probeTimeoutMs(100), 30000);
+  assert.equal(probeTimeoutMs(500), 30000);
+  assert.equal(probeTimeoutMs(1000), 60000);
+  assert.equal(probeTimeoutMs(0), 30000);
+});
+
+test('a tier whose probe never finished is a finding, not a lost run', () => {
+  const report = {
+    supported_entries: 100,
+    runs: [
+      {
+        entries: 1000,
+        findings: [
+          { name: 'build_ms', actual: 1, maximum: 0 },
+          { name: 'search_response_p95_ms', actual: 9, maximum: 8 },
+        ],
+      },
+    ],
+  };
+  const finding = mergeProbeFailure(report, 1000, new Error('Navigation timeout of 60000 ms exceeded'));
+
+  assert.deepEqual(finding, {
+    name: 'interaction_probe',
+    actual: 'Navigation timeout of 60000 ms exceeded',
+    maximum: 'a completed probe',
+  });
+  assert.deepEqual(report.runs[0].interaction, {
+    status: 'error',
+    error: 'Navigation timeout of 60000 ms exceeded',
+  });
+  // The payload finding survives; the stale browser one is replaced.
+  assert.deepEqual(report.runs[0].findings, [{ name: 'build_ms', actual: 1, maximum: 0 }, finding]);
+  assert.throws(() => mergeProbeFailure(report, 500, new Error('nope')), /has no 500-entry run/);
+});
+
+test('a later measurement clears the failure that came before it', () => {
+  const report = { supported_entries: 100, runs: [{ entries: 100, findings: [] }] };
+  mergeProbeFailure(report, 100, new Error('browser would not launch'));
+  mergeInteractionEvidence(
+    report,
+    { filter: { p95_ms: 10 }, search: { warm: { p95_ms: 20 }, cold_initialization_ms: 30 } },
+    scaleConfig,
+    100
+  );
+
+  assert.deepEqual(report.runs[0].findings, []);
 });
 
 test('interaction evidence replaces prior browser findings on the run it measured', () => {

@@ -15,19 +15,19 @@
   },
   "interaction_budgets": {
     "filter_response_p95_ms": 100,
-    "search_response_p95_ms": 250
+    "search_response_p95_ms": 500
   },
   "interaction_entries": [100, 500, 1000],
   "scale_budgets": {
     "500": {
       "search_json_gzip_bytes": 512000,
-      "search_response_p95_ms": 800,
-      "search_cold_response_ms": 1500
+      "search_response_p95_ms": 3000,
+      "search_cold_response_ms": 3500
     },
     "1000": {
       "search_json_gzip_bytes": 512000,
-      "search_response_p95_ms": 2000,
-      "search_cold_response_ms": 3500
+      "search_response_p95_ms": 7500,
+      "search_cold_response_ms": 8500
     }
   }
 }

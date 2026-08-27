@@ -140,7 +140,10 @@ catalogs at 0/1/10/100/500/1000 entries and `scripts/interaction_performance.mjs
 retained one in real Chrome at a 4× CPU slowdown on a 390×844 viewport, recording cold
 time-to-first-result and warm keystroke p95. Which sizes get a browser fixture is
 `interaction_entries` in `quality/performance-budgets.json`; what each size must hit is its
-`scale_budgets` block.
+`scale_budgets` block. Each tier's probe gets a deadline that grows with it — a thousand entries
+under the throttle takes longer than Puppeteer's default just to reach its load event — and a tier
+that still will not answer is recorded as a finding against that size rather than throwing away the
+sizes that did measure.
 
 Three things keep the client honest as the catalog grows, all in `assets/js/search.js`:
 
@@ -154,7 +157,7 @@ Three things keep the client honest as the catalog grows, all in `assets/js/sear
   with any hit already skips the approximate pass — so it was a full-corpus read duplicating what
   lunr's inverted index had already done.
 
-What the harness measured, in Chrome at a 4× CPU slowdown:
+What the harness measured on a developer laptop, in Chrome at a 4× CPU slowdown:
 
 | entries | `search.json` gzipped | cold time-to-first-result | warm keystroke p50 | warm keystroke p95 |
 | ------: | --------------------: | ------------------------: | -----------------: | -----------------: |
@@ -162,7 +165,21 @@ What the harness measured, in Chrome at a 4× CPU slowdown:
 |     500 |               83.3 KB |                   1107 ms |             327 ms |             731 ms |
 |    1000 |              170.6 KB |                   2682 ms |            1063 ms |            1838 ms |
 
-Read the warm column with its cause in mind. Instrumenting the 1000-entry fixture puts `query()`
+**Those are not the budgets.** The gate runs on a GitHub Actions runner, under the same emulation but
+on hardware roughly **2.8× slower** on the warm keystroke and **2.2× slower** on the cold load, and a
+budget is only worth having in the environment that enforces it. So the numbers in
+`quality/performance-budgets.json` are calibrated to the runner, with about 45% headroom for its
+variance, which puts every one of them well above the table above:
+
+| entries | CI cold | CI warm p95 | enforced cold | enforced warm p95 |
+| ------: | ------: | ----------: | ------------: | ----------------: |
+|     100 |  555 ms |      353 ms |             — |            500 ms |
+|     500 | 2292 ms |     2058 ms |       3500 ms |           3000 ms |
+|    1000 |       — |           — |       8500 ms |           7500 ms |
+
+The 1000-entry row is extrapolated from the 500-entry ratio rather than measured, and should be
+tightened to its real numbers once the tier has run green. Read the warm column with its cause in
+mind. Instrumenting the 1000-entry fixture puts `query()`
 itself at **3–9 ms** — the index is not what the reader waits for. The rest is the grid: publishing a
 result set re-renders the catalog page's cards synchronously, and after a query that matches nearly
 every entry the browser is still laying those cards out when the next keystroke arrives, which is

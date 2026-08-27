@@ -102,16 +102,55 @@ export function interactionBudgetFindings(interaction, config, entries = config.
     .filter(({ actual, maximum }) => actual > maximum);
 }
 
+/** The finding a tier gets when its probe never produced a measurement. */
+export const PROBE_FAILURE = 'interaction_probe';
+
+const stale = (finding) => SCALE_INTERACTION_BUDGETS.has(finding.name) || finding.name === PROBE_FAILURE;
+
 export function mergeInteractionEvidence(report, interaction, config, entries = report.supported_entries) {
   const run = report.runs?.find((candidate) => candidate.entries === entries);
   if (!run) throw new Error(`performance report has no ${entries}-entry run`);
   const findings = interactionBudgetFindings(interaction, config, entries);
   run.interaction = interaction;
-  run.findings = [
-    ...(run.findings || []).filter((finding) => !SCALE_INTERACTION_BUDGETS.has(finding.name)),
-    ...findings,
-  ];
+  run.findings = [...(run.findings || []).filter((finding) => !stale(finding)), ...findings];
   return findings;
+}
+
+/**
+ * A tier whose probe never finished — a navigation that timed out under the CPU
+ * throttle, a browser that would not launch.
+ *
+ * It is recorded as a finding rather than thrown, so one unmeasurable size
+ * cannot hide the sizes that did measure, and the run still fails: no evidence
+ * is a budget failure, not a pass.
+ *
+ * @param {object} report the performance report being amended.
+ * @param {number} entries the tier that failed.
+ * @param {Error|string} error what went wrong.
+ * @returns {{name: string, actual: string, maximum: string}} the finding.
+ */
+export function mergeProbeFailure(report, entries, error) {
+  const run = report.runs?.find((candidate) => candidate.entries === entries);
+  if (!run) throw new Error(`performance report has no ${entries}-entry run`);
+  const message = String((error && error.message) || error);
+  const finding = { name: PROBE_FAILURE, actual: message, maximum: 'a completed probe' };
+  run.interaction = { status: 'error', error: message };
+  run.findings = [...(run.findings || []).filter((candidate) => !stale(candidate)), finding];
+  return finding;
+}
+
+/**
+ * How long one tier may take before the probe calls it stuck.
+ *
+ * Puppeteer's 15s default is a local-hardware number: a thousand-entry catalog
+ * under a 4× CPU throttle on a CI runner does not reach its load event inside
+ * it, and the probe died on the navigation instead of measuring anything.
+ *
+ * @param {number} entries the fixture size.
+ * @returns {number} milliseconds.
+ */
+export function probeTimeoutMs(entries) {
+  return Math.max(30000, Math.ceil(Number(entries) || 0) * 60);
 }
 
 /**
@@ -181,8 +220,8 @@ function close(server) {
   return new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
 
-async function measurePage(page) {
-  return page.evaluate(async () => {
+async function measurePage(page, timeout) {
+  return page.evaluate(async (answerWithin) => {
     const input = document.querySelector('[data-filter="search"]');
     const sort = document.querySelector('[data-sort]');
     if (!input) throw new Error('catalog search input was not rendered');
@@ -198,8 +237,8 @@ async function measurePage(page) {
         const started = performance.now();
         const timeout = setTimeout(() => {
           document.removeEventListener('catalog:search', answered);
-          reject(new Error(`search did not answer ${JSON.stringify(query)} within five seconds`));
-        }, 5000);
+          reject(new Error(`search did not answer ${JSON.stringify(query)} within ${answerWithin}ms`));
+        }, answerWithin);
         function answered() {
           clearTimeout(timeout);
           resolve(performance.now() - started);
@@ -298,7 +337,7 @@ async function measurePage(page) {
       sortSamples,
       compareSamples,
     };
-  });
+  }, timeout);
 }
 
 async function runProbe(siteDirectory, supportedRun) {
@@ -317,13 +356,17 @@ async function runProbe(siteDirectory, supportedRun) {
 
     const puppeteer = await loadPuppeteer();
     const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH;
+    const timeout = probeTimeoutMs(contract.entries);
     browser = await puppeteer.launch({
       headless: true,
       ...(executablePath ? { executablePath } : {}),
       args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      // measurePage() drives every keystroke inside one evaluate() call, so the
+      // protocol has to outlast the whole tier, not one interaction.
+      protocolTimeout: timeout * 6,
     });
     const page = await browser.newPage();
-    page.setDefaultTimeout(15000);
+    page.setDefaultTimeout(timeout);
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     await page.evaluateOnNewDocument(() => {
@@ -334,18 +377,18 @@ async function runProbe(siteDirectory, supportedRun) {
     });
     const session = await page.createCDPSession();
     await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-    await page.goto(catalogUrl, { waitUntil: 'networkidle2' });
+    await page.goto(catalogUrl, { waitUntil: 'networkidle2', timeout });
     await page.waitForFunction(
       (entries) =>
         Boolean(window.__catalogFilters) &&
         document.querySelectorAll('[data-entry]').length === entries &&
         Boolean(document.querySelector('[data-compare-toggle]')),
-      {},
+      { timeout },
       contract.entries
     );
 
     const before = await page.metrics();
-    const measured = await measurePage(page);
+    const measured = await measurePage(page, timeout);
     const after = await page.metrics();
     const rounded = (value) => Math.round(value * 100) / 100;
     return {
@@ -390,26 +433,28 @@ async function main(argv) {
     console.log(`No ${entries}-entry browser fixture was retained; its interactions were not measured.`);
   }
 
-  let current = null;
-  try {
-    for (const entries of measurable) {
-      current = report.runs?.find((candidate) => candidate.entries === entries);
-      if (!current) throw new Error(`performance report has no ${entries}-entry run`);
-      const interaction = await runProbe(path.join(siteRoot, String(entries)), current);
-      const interactionFindings = mergeInteractionEvidence(report, interaction, config, entries);
+  for (const entries of measurable) {
+    const current = report.runs?.find((candidate) => candidate.entries === entries);
+    if (!current) throw new Error(`performance report has no ${entries}-entry run`);
+    let interaction;
+    try {
+      interaction = await runProbe(path.join(siteRoot, String(entries)), current);
+    } catch (error) {
+      // One size that will not answer is a finding against that size. Throwing
+      // here would throw away the sizes already measured and report nothing.
+      const finding = mergeProbeFailure(report, entries, error);
       writeReport(reportFile, report);
-      console.log(
-        `Low-end-mobile interactions at ${entries} entries: filter p95 ${interaction.filter.p95_ms}ms; ` +
-          `warm search p95 ${interaction.search.warm.p95_ms}ms; ` +
-          `cold search ${interaction.search.cold_initialization_ms}ms; ` +
-          `${interactionFindings.length} interaction findings.`
-      );
+      console.error(`Low-end-mobile interactions at ${entries} entries did not complete: ${finding.actual}`);
+      continue;
     }
-    current = null;
-  } catch (error) {
-    if (current) current.interaction = { status: 'error', error: error.message };
+    const interactionFindings = mergeInteractionEvidence(report, interaction, config, entries);
     writeReport(reportFile, report);
-    throw error;
+    console.log(
+      `Low-end-mobile interactions at ${entries} entries: filter p95 ${interaction.filter.p95_ms}ms; ` +
+        `warm search p95 ${interaction.search.warm.p95_ms}ms; ` +
+        `cold search ${interaction.search.cold_initialization_ms}ms; ` +
+        `${interactionFindings.length} interaction findings.`
+    );
   }
 
   const releaseFindings = report.runs.flatMap((run) =>
@@ -419,7 +464,12 @@ async function main(argv) {
   if (releaseFindings.length === 0) return 0;
   console.error('\nPerformance budgets failed:\n');
   for (const finding of releaseFindings) {
-    console.error(`  • ${finding.entries} entries: ${finding.name} ${finding.actual} > ${finding.maximum}`);
+    // A probe that never ran reports its reason, not a number over a number.
+    const detail =
+      typeof finding.actual === 'number'
+        ? `${finding.name} ${finding.actual} > ${finding.maximum}`
+        : `${finding.name}: ${finding.actual}`;
+    console.error(`  • ${finding.entries} entries: ${detail}`);
   }
   return 1;
 }
