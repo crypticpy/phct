@@ -31,7 +31,7 @@ quietly rather than failing loudly.
 Work down this list once, in order. [Repository settings at a glance](#repository-settings-at-a-glance) above is the same set as a table, with the optional variables and secrets alongside.
 
 - [ ] **Pages source**: Settings → Pages → Source → **GitHub Actions** (not "Deploy from a branch").
-- [ ] **Actions can open pull requests**: Settings → Actions → General → Workflow permissions → **Allow GitHub Actions to create and approve pull requests**. Without this, every workflow that opens a pull request — the content forms (`new-entry`, `new-year`, `new-event`, `refresh-entry`, `update-schedule`, `update-event-attachments`, `apply-setup`), the monthly metrics, the thumbnails, and the updated-date stamp — fails at its "Create pull request" step.
+- [ ] **Actions can open pull requests**: Settings → Actions → General → Workflow permissions → **Allow GitHub Actions to create and approve pull requests**. Without this, every workflow that opens a pull request — the content forms (`new-entry`, `new-year`, `new-event`, `refresh-entry`, `also-deployed-by`, `update-schedule`, `update-event-attachments`, `apply-setup`), the monthly metrics, the thumbnails, and the updated-date stamp — fails at its "Create pull request" step.
 - [ ] **Labels**: run the **Bootstrap labels** workflow once (Actions tab → *Bootstrap labels* → *Run workflow*), or create these by hand, exactly as named — the automation workflows filter on them:
   - `content:new-entry` — triggers `new-entry.yml`
   - `content:new-year` — triggers `new-year.yml`
@@ -40,6 +40,7 @@ Work down this list once, in order. [Repository settings at a glance](#repositor
   - `content:event-attachments` — triggers `update-event-attachments.yml`
   - `content:site-config` — triggers `apply-setup.yml` (maintainers only)
   - `content:refresh` — triggers `refresh-entry.yml` (answers to a refresh reminder)
+  - `content:also-deployed-by` — triggers `also-deployed-by.yml` (an organization saying they deployed an entry too)
   - `verification` — applied by `verification-sweep.yml` to the refresh issue it keeps per stale entry; nothing triggers on it
   - `review:refresh-changes` — applied by `refresh-entry.yml` when someone reports an entry out of date; nothing triggers on it
 
@@ -237,6 +238,32 @@ verified: "2026-08-17"
 `verified` is a reserved key like `updated`: optional, `YYYY-MM-DD`, validated by `check_front_matter.rb` when present. Setting it resets the entry's clock even if nothing else about the entry changed — which is the point, since "we checked and it is still accurate" is real information. The refresh flow never moves it backwards and never touches sample content; when it declines to act it says why on the issue rather than going quiet.
 
 **Turning it off.** Set the repository variable `VERIFICATION_SWEEP` to `false` ([where](#repository-settings-at-a-glance)), or delete the workflow file — the refresh form still works for anyone who follows the link on an entry page. To change the window instead of removing the reminder, edit `catalog.verify_after_days` in `_data/site.yml` — the site notices and the sweep both read it, so they can never disagree. Setting `SUBMISSIONS_OPEN` to `false` also stops outside answers becoming pull requests; the issue gets a comment saying a maintainer will apply it by hand.
+
+## "Also deployed by" submissions
+
+The most useful fact about a use case is that somebody else has already run it, and the organization that can say so is not the one that wrote the entry. The **Also deployed by** form (`.github/ISSUE_TEMPLATE/also-deployed-by.yml`, linked from the bottom of every entry page with the slug already filled in) collects four things — organization, link, and an optional contact address and note — and `.github/workflows/also-deployed-by.yml` turns them into a pull request that appends one item to the entry's `also_deployed_by` list. A resubmission of the same organization updates its own row rather than adding a second, so the submitter corrects a detail by editing their issue.
+
+The whole diff is one list in one entry's front matter. What to check before you merge:
+
+- [ ] **The organization is real**, and plausibly one the submitter belongs to. This is a claim about somebody else's page; the automation cannot verify it and neither can the diff.
+- [ ] **The link resolves and is theirs** — their deployment, their repository, their fork, or their organization's page. A link to the *original* project, or to a vendor's marketing page, is not evidence that this organization deployed anything.
+- [ ] **The email address, if there is one, was offered on purpose.** It goes on a public page as a `mailto:` link, which means it gets scraped. A shared team address is almost always the right answer; if a personal one arrived, ask on the issue before merging rather than publishing it and apologising afterwards.
+- [ ] **The note reads as information, not promotion.** One or two sentences about what they adapted, or would warn the next team about, is the point; a vendor pitch is not.
+- [ ] **The diff is that one list and nothing else.**
+
+Decline by closing the issue with a sentence about why — the submitter gets the notification, and nothing about the entry has changed. Nothing reaches the site until you merge. Setting `SUBMISSIONS_OPEN` to `false` stops outside submissions becoming pull requests at all; the issue gets a comment saying a maintainer will add it by hand.
+
+A maintainer can always do it by hand instead — the field is an ordinary [`links` list](content-model.md#links) whose items may carry the optional `email` and `note` keys:
+
+```yaml
+also_deployed_by:
+  - label: "Multnomah County Health Department"
+    url: "https://www.multco.us/health"
+    email: "digital-services@multco.us"
+    note: "Kept the classifier, retrained on their own call transcripts."
+```
+
+Which field the flow writes to is named by `entry.deployments_key` in `_data/schema.yml` ([content-model.md](content-model.md#also-deployed-by)); remove that pointer and the form reports that the feature is not configured and the entry pages stop offering the link.
 
 ## The monthly catalog metrics
 
