@@ -37,6 +37,57 @@ synonyms:
   procurement: ["contract", "purchasing", "rfp"]
 
 # ---------------------------------------------------------------------------
+# concepts   the same widening as `synonyms`, except nobody writes it: at build
+#            time _plugins/search_index.rb reads the catalog's own prose and
+#            works out which words keep turning up in the same entries without
+#            simply being common everywhere (normalised PMI over entry-level
+#            co-occurrence). "Redaction" then reaches the entries about PII even
+#            when nobody thought to pair the two words here.
+#
+#            It is recall, never ranking. A concept match is placed strictly
+#            BELOW the weakest hit the reader's own words earned, so it can
+#            never reorder — let alone outrank — a literal match. When a query
+#            finds nothing literal at all, the concept hits are the answer.
+#
+#            Every key below is a default; delete the block and you get exactly
+#            these. `enabled: false` switches the layer off and the payload
+#            ships no map at all.
+#
+#   enabled          false turns the whole layer off.
+#   min_entries      below this many entries the statistics are noise, not
+#                    signal, and no map is derived.
+#   min_df           a word fewer entries than this use relates to nothing.
+#   max_df_ratio     a word MORE than this share of entries use says nothing
+#                    about any of them. This is the stop-word list, derived: on
+#                    a health catalog "public" is noise, elsewhere it is signal.
+#   terms_per_entry  how many of an entry's most distinctive words (tf-idf) are
+#                    paired. The pairing pass is quadratic in this, so it is
+#                    what keeps a thousand-entry build bounded.
+#   min_pairs        how many entries must agree before a pair is a concept.
+#   min_score        normalised PMI, -1..1. Raise it for a tighter map.
+#   max_related      related words kept per word.
+#   max_terms        words kept in the map at all, most-used first — the cap on
+#                    what /search.json carries.
+#   weight           where a concept hit sits relative to the WEAKEST literal
+#                    hit: 0.9 is just below it, 0.2 is deep in the tail. Clamped
+#                    to at most 1 by assets/js/search.js, which is what makes
+#                    "never outranks a literal hit" a guarantee and not a hope.
+#   max_expansions   most concept words added to any one query.
+# ---------------------------------------------------------------------------
+concepts:
+  enabled: true
+  min_entries: 12
+  min_df: 2
+  max_df_ratio: 0.5
+  terms_per_entry: 40
+  min_pairs: 2
+  min_score: 0.35
+  max_related: 6
+  max_terms: 1500
+  weight: 0.9
+  max_expansions: 4
+
+# ---------------------------------------------------------------------------
 # aliases    <field key> -> <exact option value> -> the words a reader might
 #            type for it. When a query matches one, the search box offers the
 #            FILTER rather than a text hit — which is a better answer, because
