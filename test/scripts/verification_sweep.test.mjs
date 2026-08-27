@@ -250,7 +250,7 @@ test('refreshIssue degrades to a reply-here ask when the repository is unknown',
   });
   assert.match(issue.body, /\*\*A thing\*\*/);
   assert.match(issue.body, /Reply here to say it is still accurate/);
-  assert.ok(!issue.body.includes('github.com'));
+  assert.ok(!issue.body.includes('https://'), 'a degraded issue body renders no links at all');
 });
 
 test('every refresh issue stays far inside the size GitHub accepts', () => {
