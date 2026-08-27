@@ -114,7 +114,11 @@ mechanism understands.
 
 For **Sourcery** specifically: its current review product is configured in the web
 dashboard, not in the repository — app.sourcery.ai → Review Settings → **Ignore
-title keywords**, where the five title prefixes above belong. The template also
+title keywords**, where the five title prefixes above belong. Enter them
+**without the trailing colon** (`Add entry`, `Add event`, …): the field matches
+keywords as whole words, case-insensitively, and a keyword carrying punctuation
+does not match reliably (verified 2026-08: colon-less keywords skip the review,
+colon-suffixed ones were still reviewed). The template also
 ships a `.sourcery.yaml` with `ignore_labels`, but that key belongs to Sourcery's
 legacy bot and the review product does not honor it (verified 2026-08: a labeled
 content PR with the file present was still reviewed). Keep the file — it is
