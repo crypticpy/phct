@@ -187,7 +187,8 @@ export const SCHEMA = {
     "require_link": true,
     "contributor_key": "organization",
     "submitter_key": "submitter_github",
-    "deployments_key": "also_deployed_by"
+    "deployments_key": "also_deployed_by",
+    "repo_key": "repo_url"
   },
   "groups": [
     {
@@ -546,6 +547,40 @@ export const SCHEMA = {
         }
       },
       "description": "Set by the review committee, not the submitter."
+    },
+    {
+      "key": "security_review",
+      "label": "Security review",
+      "prompt": "How much has anybody looked at this code?",
+      "type": "select",
+      "form": false,
+      "group": "data",
+      "weight": 6,
+      "facet": true,
+      "card": "fact",
+      "icon": "shield-check",
+      "options": [
+        "Coalition security-reviewed",
+        "Automated checks only",
+        "Not reviewed"
+      ],
+      "option_meta": {
+        "Coalition security-reviewed": {
+          "short": "Sec-reviewed",
+          "tone": "primary",
+          "description": "A coalition maintainer read this project's security practices — its policy, its dependencies, how it handles data — on the date recorded in the pull request. It is a point-in-time reading of practices, not an audit of the code and not a guarantee that it is safe to run."
+        },
+        "Automated checks only": {
+          "short": "Auto checks",
+          "description": "Nobody has reviewed this project. All that is recorded is what the monthly sweep could observe from the outside — repository activity, license, security policy, public OpenSSF Scorecard — and none of that inspects what the code does."
+        },
+        "Not reviewed": {
+          "short": "Not reviewed",
+          "tone": "warn",
+          "description": "Nobody has looked at this project on the catalog's behalf. Treat the link as a starting point for your own review, not as a recommendation."
+        }
+      },
+      "description": "Set by maintainers, not the submitter. None of these values means the code is safe to run — run your own security review before deploying."
     },
     {
       "key": "ai_role",

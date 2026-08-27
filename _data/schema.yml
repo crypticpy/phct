@@ -110,6 +110,16 @@ entry:
   # `form: false`. Absent → the form reports that the feature is not configured
   # and the entry page shows no "add your organization" link.
   deployments_key: "also_deployed_by"
+  # Where the code is (optional). Names the `url` field holding the project's
+  # repository link. The monthly security-signals sweep
+  # (scripts/security_signals.mjs -> .github/workflows/security-signals.yml)
+  # reads it to know which repository to observe, and the entry page reads it to
+  # know when to say that this catalog links to code it does not audit. A
+  # pointer like `status_key` and `submitter_key`: nothing names the field
+  # directly. Absent → the sweep reports that the feature is not configured and
+  # writes nothing, and neither the "Security signals" card nor the
+  # run-your-own-review line renders on any entry.
+  repo_key: "repo_url"
 
 # Ordered groups: { key, title, description?, icon?, placement? }.
 # Filters show facet fields grouped this way; the submit wizard turns each group
@@ -365,6 +375,34 @@ fields:
       "Not yet reviewed": { short: "Unreviewed", tone: warn, description: "Listed before any review took place." }
       "Deprecated": { tone: warn, description: "No longer maintained or accurate — kept for the record." }
     description: "Set by the review committee, not the submitter."
+
+  # The security counterpart of `review_status`, and deliberately not part of
+  # it: one says where an entry is in the CONTENT review, the other says how
+  # much anybody has looked at the CODE it links to. Neither says the code is
+  # safe. Set by maintainers in the pull request (`form: false`), never by the
+  # submitter, and never by the automated sweep — the sweep records
+  # observations in `_data/security_signals.json`; a person decides what they
+  # add up to. The wording of every option is bounded on purpose: "reviewed"
+  # names what the coalition looked at and when, and stops there.
+  - key: security_review
+    label: "Security review"
+    prompt: "How much has anybody looked at this code?"
+    type: select
+    form: false                 # set by maintainers in the pull request, never by the submitter
+    group: data
+    weight: 6
+    facet: true
+    card: fact                  # the entry page's fact strip; a 288px card has no room for the caveat
+    icon: shield-check
+    options:
+      - "Coalition security-reviewed"
+      - "Automated checks only"
+      - "Not reviewed"
+    option_meta:
+      "Coalition security-reviewed": { short: "Sec-reviewed", tone: primary, description: "A coalition maintainer read this project's security practices — its policy, its dependencies, how it handles data — on the date recorded in the pull request. It is a point-in-time reading of practices, not an audit of the code and not a guarantee that it is safe to run." }
+      "Automated checks only": { short: "Auto checks", description: "Nobody has reviewed this project. All that is recorded is what the monthly sweep could observe from the outside — repository activity, license, security policy, public OpenSSF Scorecard — and none of that inspects what the code does." }
+      "Not reviewed": { short: "Not reviewed", tone: warn, description: "Nobody has looked at this project on the catalog's behalf. Treat the link as a starting point for your own review, not as a recommendation." }
+    description: "Set by maintainers, not the submitter. None of these values means the code is safe to run — run your own security review before deploying."
 
   - key: ai_role
     label: "How AI is involved"
