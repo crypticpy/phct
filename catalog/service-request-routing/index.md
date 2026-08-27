@@ -45,6 +45,13 @@ resources:
     url: "https://docs.example.org/document/d/9f8e7d6c/edit"
   - label: "Category rubric and urgency tiers (shared doc)"
     url: "https://docs.example.org/document/d/5r7y3u1i/edit"
+also_deployed_by:
+  - label: "Riverbend County Health District"
+    url: "https://health.example.gov/service-routing"
+    email: "digital-services@health.example.gov"
+    note: "Kept the routing rules, swapped the classifier for the one their vendor already licensed."
+  - label: "Northgate Township"
+    url: "https://www.example.org/northgate/311"
 screenshots:
   - src: /catalog/service-request-routing/screenshots/01.png
     alt: "Routing queue showing incoming service requests with the source language, translated text, assigned category, urgency tier and routing status."

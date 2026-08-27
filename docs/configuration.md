@@ -172,6 +172,34 @@ optional questions" toggle offers a required-only short form whenever the
 schema has optional fields. See
 [content-model.md → Groups](content-model.md#groups).
 
+### Catalog behaviour
+
+```yaml
+catalog:
+  verify_after_days: 365       # how long an entry may go unconfirmed before the page says so
+  refresh_mentions: []         # who every refresh reminder mentions, beside the entry's own submitter
+  refresh_max_new_issues: 20   # most refresh issues one monthly sweep may open
+```
+
+`verify_after_days` is the window an entry is trusted for. An entry is "confirmed"
+on the newest of its `verified`, `updated` and `published` dates, so a new catalog
+shows no notices at all; past the window the entry page carries a quiet note and a
+**Still accurate? Confirm it** link, and the monthly sweep opens a reminder issue.
+Raise it for a slow-moving catalog. The site and the sweep read the same number, so
+they cannot disagree.
+
+`refresh_mentions` is the standing audience for those reminders — usernames or
+teams, with or without the leading `@` (`["catalog-maintainers", "@org/data-governance"]`).
+The submitter is mentioned automatically when they left a GitHub username on the
+entry; this list is who hears about it when nobody answers. Empty is a fine
+answer: the issue is still opened and still labelled `verification`.
+
+`refresh_max_new_issues` caps how many *new* reminders one run may open, so a
+backlog does not arrive as one wall of notifications. Existing reminders are always
+refreshed and never counted against it; deferred entries are named in the run
+summary and picked up next month, oldest first. See
+[admin-guide.md](admin-guide.md#the-monthly-verification-sweep) for the whole loop.
+
 ### Footer
 
 ```yaml
@@ -368,6 +396,14 @@ It ships with an invented public-sector community of practice's text as a worked
 ## `_data/metrics.json`
 
 Written, not authored: `scripts/metrics.mjs` counts the last four calendar quarters of entry-form submissions (issues labelled `content:new-entry`), entry pull requests merged (branch `entry/…`), distinct contributing organizations (the field named by `entry.contributor_key` in `_data/schema.yml`, across live entries — no key, no figure) and review turnaround (issue opened → pull request merged, median and 90th percentile), from this repository's own issues and pull requests through two read-only REST calls. The **Catalog metrics** workflow (`.github/workflows/metrics.yml`) runs it on the 2nd of every month, commits the file when the figures changed and dispatches a deploy; the governance page renders it as "How the catalog is doing" and hides the block while the file is absent. Run it by hand with `GITHUB_TOKEN=$(gh auth token) node scripts/metrics.mjs` (`--dry-run` prints instead of writing; `--quarters N` widens the window). Stop the schedule with the repository variable `CATALOG_METRICS=false` (a manual run from the Actions tab still works, and its **Preview only** box shows the figures without committing). Keys: `generated`, `window` (`from`, `to`, `quarters`), `totals` (`submissions`, `published`, `organizations` — `null` without a `contributor_key` — `entries`, the live-entry count, and `turnaround_days` with `count`/`median`/`p90`), and `quarters`, oldest first, each with `quarter`, `from`, `submissions`, `published`, `organizations`. The template ships **sample figures** (marked `"sample": true`, consistent with the ten sample entries) so the demo shows the block; `npm run eject:samples` deletes the file, the file is `merge=ours` for a fork that keeps it, and your first monthly run writes yours.
+
+## `_data/security_signals.json`
+
+Written, not authored, and observations rather than verdicts. This catalog **links** to third-party code; it does not host, run or audit it, and nothing in this file says any project is safe to deploy. `scripts/security_signals.mjs` reads each live entry's repository link — the `url` field named by `entry.repo_key` in `_data/schema.yml`; no pointer, no sweep — keeps the ones matching `https://github.com/<owner>/<repo>`, and records per entry: whether the repository still resolves, whether it is `archived`, the day it was last pushed to, the owner's `type`, the SPDX `license` GitHub identified, whether a security policy is published, and the public [OpenSSF Scorecard](https://scorecard.dev) score, date and a few notable checks. A repository link on any other host is recorded as `applicable: false` with a reason rather than dropped in silence. Every individual call may fail without failing the run: a rate limit or a network blip records the string `"unavailable"`, and a Scorecard **404 records `scorecard: null`** — "no public score", which is the normal answer for a small public-sector repository nobody has crawled.
+
+The **Security signals** workflow (`.github/workflows/security-signals.yml`) runs it at 08:00 UTC on the 3rd of every month — after the verification sweep on the 1st and the metrics run on the 2nd — and opens or updates one `automation/security-signals` pull request when anything moved; unchanged observations open nothing. Run it by hand with `GITHUB_TOKEN=$(gh auth token) node scripts/security_signals.mjs` (`--dry-run` prints instead of writing; `--today YYYY-MM-DD` and `--out PATH` are the other flags). Stop the schedule with the repository variable `SECURITY_SIGNALS=false` (a manual run from the Actions tab still works, and its **Preview only** box shows the observations without committing).
+
+Keys: `generated_at`, and `entries` keyed by entry slug. Each record carries `applicable`, `fetched`, `repo` (`owner/name`) and `url`; an applicable one adds `exists`, `archived`, `pushed_at`, `owner_type`, `license`, `security_policy`, `scorecard` (`{score, date, checks: [{name, score}]}`, or `null` for no public score, or `"unavailable"`) and `errors`. Slugs and keys are sorted, so two runs that observed the same things produce the same bytes and the monthly pull request is never noise. The file is capped at 256 KiB: over that, Scorecard detail is shed before any repository is, and a run that still cannot fit adds `truncated` rather than quietly holding less than it claims. The template ships **sample observations** (marked `"sample": true`, describing the demo entries) so the demo shows the card; `npm run eject:samples` deletes the file, and your first monthly run writes yours. The entry page's "Security signals" card renders only where this file has an applicable record; the one-line "run your own security review" disclaimer renders on every entry with a repository link, with or without it. What the three values of the maintainer-set `security_review` field mean is in [admin-guide.md](admin-guide.md#security-review).
 
 ## Modules in detail
 

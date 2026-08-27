@@ -67,6 +67,7 @@ data_sources:
   - "Comment intake form metadata (channel, date)"
 audience: "Public-facing"
 data_governance_notes: "Comments submitted to a formal consultation are public records, and the theme report is published as part of the record. Submitter names and addresses are stripped before any text reaches a model and are never shown in the report, even though they are technically public — the report is a summary of what was said, not a directory of who said it. Comments are retained under the consultation's own schedule; the tool keeps no copy."
+security_review: "Not reviewed"
 contact_name: "Long range planning analyst"
 contact_title: "Planning Department"
 contact_email: "planning-analysis@example.org"

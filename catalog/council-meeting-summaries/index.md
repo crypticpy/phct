@@ -63,6 +63,7 @@ data_sources:
   - "Roll call vote records"
 audience: "Public-facing"
 data_governance_notes: "Only material that is already public goes in: the recording, the agenda and the vote record. Public comment speakers are described by role, never by name, even though the recording is public — a searchable name attached to a summary is a different thing from a name in a four-hour video. Closed-session portions are never processed."
+security_review: "Coalition security-reviewed"
 contact_name: "Deputy clerk, records and transparency"
 contact_title: "City Clerk's office"
 contact_email: "clerk-records@example.org"
