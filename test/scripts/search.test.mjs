@@ -456,6 +456,138 @@ test('a concept weight above 1 cannot lift a concept hit past a literal one', as
   assert.equal(page.window.__searchOrder[0], 'chatbot-pilot');
 });
 
+test('a concept-matched event never renders above the entries the reader’s words found', async () => {
+  // Non-entry hits lead the listbox, which is right for a literal event hit and
+  // wrong for a concept-derived one: it would put a row the reader never asked
+  // for above the entry that used their own word.
+  const page = await boot({
+    index: {
+      synonyms: {},
+      concepts: { weight: 0.9, max_expansions: 4, terms: { chatbot: ['assistant'] } },
+      docs: [
+        {
+          id: 'event:2026:clinic',
+          kind: 'event',
+          title: 'Assistant clinic',
+          summary: 'An assistant workshop for the assistant cohort.',
+          facets: '',
+          sections: [{ h: null, a: null, t: 'Every assistant question, answered by an assistant.' }],
+          url: '/events/2026/clinic/',
+        },
+        {
+          id: 'chatbot-pilot',
+          kind: 'entry',
+          title: 'Service pilot',
+          summary: '',
+          facets: '',
+          sections: [
+            { h: 'What it does', a: 'what-it-does', t: 'A note near the end mentions the chatbot.' },
+          ],
+          url: '/catalog/chatbot-pilot/',
+        },
+      ],
+    },
+  });
+  await page.type('chatbot');
+  const urls = page
+    .rows()
+    .map((li) => li.dataset.url)
+    .filter(Boolean);
+
+  assert.deepEqual(urls, ['/catalog/chatbot-pilot/#what-it-does', '/events/2026/clinic/']);
+});
+
+test('a snippet marks the word lunr matched, not a longer word that starts with it', async () => {
+  // "data" is a prefix of "database", which the stemmer keeps as a different
+  // term. Marking the earlier "database" would deep-link the reader to the
+  // wrong section, under a word the index never matched.
+  const page = await boot({
+    index: {
+      synonyms: {},
+      docs: [
+        {
+          id: 'records-cleanup',
+          kind: 'entry',
+          title: 'Records cleanup',
+          summary: 'A summary that stays clear of the query.',
+          facets: '',
+          sections: [
+            { h: 'Background', a: 'background', t: 'The database migration ran overnight without incident.' },
+            {
+              h: 'What it does',
+              a: 'what-it-does',
+              t: 'It improves data quality for every resident record.',
+            },
+          ],
+          url: '/catalog/records-cleanup/',
+        },
+      ],
+    },
+  });
+  await page.type('data');
+  const row = page.rows().find((li) => li.dataset.url && li.dataset.url.includes('records-cleanup'));
+
+  assert.ok(row, 'expected a row for the entry whose body matched');
+  assert.equal(row.dataset.url, '/catalog/records-cleanup/#what-it-does');
+  assert.equal(page.listbox.querySelector('mark').textContent, 'data');
+});
+
+test('the withheld offer says “related to” once a concept hit is behind it', async () => {
+  const index = {
+    synonyms: {},
+    concepts: { weight: 0.9, max_expansions: 4, terms: { chatbot: ['assistant'] } },
+    docs: [
+      {
+        id: 'chatbot-desk',
+        kind: 'entry',
+        title: 'Chatbot desk',
+        summary: 'The chatbot desk answers a chatbot question with a chatbot.',
+        facets: 'Chatbot',
+        sections: [{ h: 'What it does', a: 'what-it-does', t: 'A chatbot, front to back.' }],
+        url: '/catalog/chatbot-desk/',
+      },
+      {
+        id: 'permit-tracker',
+        kind: 'entry',
+        title: 'Permit tracker',
+        summary: 'Tracks permits from application to issue.',
+        facets: '',
+        sections: [
+          {
+            h: 'How to reuse',
+            a: 'how-to-reuse',
+            t:
+              'The tracker is a long write-up about permits, inspections, queues, notices, ' +
+              'letters, reviewers, records and residents, which in one aside mentions the chatbot ' +
+              'before returning to permits, inspections, queues, notices and reviewers again.',
+          },
+        ],
+        url: '/catalog/permit-tracker/',
+      },
+      {
+        id: 'assistant-desk',
+        kind: 'entry',
+        title: 'Assistant desk',
+        summary: '',
+        facets: '',
+        sections: [{ h: 'What it does', a: 'what-it-does', t: 'The assistant drafts an assistant reply.' }],
+        url: '/catalog/assistant-desk/',
+      },
+    ],
+  };
+
+  const page = await boot({ index });
+  await page.type('chatbot');
+  assert.equal(page.floor.hidden, false);
+  assert.match(page.more.textContent, /more related to “chatbot”/);
+
+  // The same withheld entry, with the layer off, does still mention it.
+  const off = await boot({ index: { ...index, concepts: { weight: 0.9, max_expansions: 0, terms: {} } } });
+  await off.type('chatbot');
+  assert.equal(off.floor.hidden, false);
+  assert.match(off.more.textContent, /more that mentions? “chatbot”/);
+});
+
 test('without lunr the box reports itself unavailable instead of throwing', async () => {
   const page = await boot({ noLunr: true });
 

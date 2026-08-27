@@ -418,6 +418,50 @@
 
   /* ------------------------------------------------------------- snippets */
 
+  const WORD_CHAR = /[\p{L}\p{N}]/u;
+
+  /**
+   * A body word as the index would have stored it, so it can be compared with
+   * the term lunr matched.
+   * @param {string} word one whole word from the body.
+   * @returns {string} its stem, or '' when the pipeline drops it.
+   */
+  function stemOf(word) {
+    try {
+      const tokens = idx.pipeline.runString(word.toLowerCase());
+      return tokens.length ? String(tokens[0]) : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /**
+   * Where in a body a lunr term really matched. The term is a stem, so it also
+   * sits inside words the index never matched — `data` is a prefix of
+   * `database`, and marking that sends the reader to the wrong section under a
+   * word nothing matched. Each candidate is widened to its whole word and kept
+   * only if that word stems to the term; the scan carries past the rest.
+   *
+   * @param {string} text the doc body.
+   * @param {string} lower the same text lowercased.
+   * @param {string} term the stemmed term from lunr's match metadata.
+   * @returns {[number, number]|null} [start, length] of the word, or null.
+   */
+  function locate(text, lower, term) {
+    const needle = term.toLowerCase();
+    if (!needle) return null;
+    let at = lower.indexOf(needle);
+    while (at > -1) {
+      let start = at;
+      while (start > 0 && WORD_CHAR.test(text[start - 1])) start -= 1;
+      let end = at + needle.length;
+      while (end < text.length && WORD_CHAR.test(text[end])) end += 1;
+      if (stemOf(text.slice(start, end)) === term) return [start, end - start];
+      at = lower.indexOf(needle, Math.max(end, at + 1));
+    }
+    return null;
+  }
+
   /**
    * The best body match for a hit: where in the write-up it landed, which
    * section that is, and enough surrounding words to read.
@@ -436,15 +480,9 @@
       let length;
       if (position) [start, length] = position;
       else {
-        const needle = term.toLowerCase();
-        start = lower.indexOf(needle);
-        while (start > 0 && /[\p{L}\p{N}]/u.test(text[start - 1])) {
-          start = lower.indexOf(needle, start + 1);
-        }
-        if (start < 0) return;
-        let end = start + needle.length;
-        while (end < text.length && /[\p{L}\p{N}]/u.test(text[end])) end += 1;
-        length = end - start;
+        const found = locate(text, lower, term);
+        if (!found) return;
+        [start, length] = found;
       }
       if (!best || start < best[0]) best = [start, length];
     });
@@ -672,7 +710,10 @@
     options = [];
     const others = results.filter((h) => h.doc.kind !== 'entry').slice(0, 5);
     const entries = results.filter((h) => h.doc.kind === 'entry').slice(0, 5);
-    const hits = others.concat(entries);
+    // Grouping by kind alone would lift a concept-matched event above the
+    // entries the reader's own words found. The sort is stable, so each group
+    // keeps its ranked order and only the concept rows move, to the end.
+    const hits = others.concat(entries).sort((a, b) => (a.concept ? 1 : 0) - (b.concept ? 1 : 0));
     const count = vocab.length + hits.length;
     if (!count) {
       close();
@@ -758,18 +799,22 @@
   function publish(entries, q) {
     const top = entries.length ? entries[0].score : 0;
     const all = lifted === q;
-    const strong = all ? entries : entries.filter((h) => h.score >= top * RELEVANCE_FLOOR);
-    const weak = entries.length - strong.length;
+    const strong = [];
+    const weak = [];
+    entries.forEach((h) => (all || h.score >= top * RELEVANCE_FLOOR ? strong : weak).push(h));
     const ids = strong.map((h) => h.doc.id);
     announce(new Set(ids), ids);
     queueCardAnnotations(strong);
 
     if (!floorEl || !moreBtn) return;
-    floorEl.hidden = weak === 0;
+    floorEl.hidden = weak.length === 0;
+    // A concept hit is held back precisely because it never says the word, so
+    // the offer says what is true of every entry behind it.
+    const held = weak.some((h) => h.concept)
+      ? [' more related to “', ' more related to “']
+      : [' more that mentions “', ' more that mention “'];
     moreBtn.textContent =
-      weak === 1
-        ? 'Show 1 more that mentions “' + q + '”'
-        : 'Show ' + weak + ' more that mention “' + q + '”';
+      weak.length === 1 ? 'Show 1' + held[0] + q + '”' : 'Show ' + weak.length + held[1] + q + '”';
     moreBtn.dataset.searchMore = q;
   }
 

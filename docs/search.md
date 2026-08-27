@@ -55,8 +55,9 @@ characters — so `dashbord` still finds the dashboard.
 
 **The relevance floor.** Because the whole write-up is indexed, a common word matches half the
 catalog on a passing mention. The grid keeps only hits scoring at least 25% of the top hit and
-offers the rest behind one **Show N more that mention "…"** button. That is deliberately not a
-tighter fuzzy radius: the noise is genuine body matches, not typos.
+offers the rest behind one **Show N more that mention "…"** button — **related to "…"** when a
+concept hit is among them, since those never say the word. That is deliberately not a tighter fuzzy
+radius: the noise is genuine body matches, not typos.
 
 **Each result explains itself.** A hit records where in the body it landed, so the card shows the
 section heading and the sentence that matched, and the suggestion row deep-links to that section's
@@ -65,7 +66,9 @@ anchor rather than the top of a long page.
 **Structured field values are indexed as words.** A field whose type holds structured values — a
 `links` field's `{label, url}` items, an `images` field's `{src, alt}` items, a future
 `{org, url, email, note}` — contributes its **values**, not its keys, and a value that is a URL, a
-`mailto:` or a site path contributes nothing. Nothing in `_plugins/search_index.rb` names a field or
+`mailto:` or a site path contributes nothing — a scheme counts only with its `//`, so prose that
+happens to carry a colon ("Guidance: redact PII first") is kept as the words it is. Nothing in
+`_plugins/search_index.rb` names a field or
 a type: the shape of the value decides, so a new structured field is indexed the day it is added. A
 plain scalar is indexed as it stands, so a `url` field marked `search: true` still matches its own
 URL — that is the reader asking for exactly that.
@@ -102,8 +105,10 @@ catalog: a word more than half the entries use cannot be about any one of them, 
 score untouched. Everything the concept map adds is placed strictly *below* the weakest literal hit
 — `weight` of it — so no expansion can reorder, let alone outrank, a match the reader earned by
 typing. `assets/js/search.js` clamps `weight` to at most 1, which is what makes that a guarantee
-rather than a hope. When a query finds nothing literal at all, the concept hits are the answer and
-keep their own scores; that is the case the layer exists for.
+rather than a hope. The suggestion listbox holds concept rows behind every literal row too, so its
+usual "events first, then entries" grouping cannot lift a concept-matched event over an entry the
+reader's own word found. When a query finds nothing literal at all, the concept hits are the answer
+and keep their own scores; that is the case the layer exists for.
 
 | Key | Default | What it is for |
 |---|---|---|
