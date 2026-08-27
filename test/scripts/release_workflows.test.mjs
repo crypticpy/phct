@@ -658,6 +658,65 @@ test('the sweep and the script agree on the marker that dedupes a refresh thread
   assert.doesNotMatch(sweep, /issue\.title === item\.title \?/u);
 });
 
+// Three unattended monthly jobs now run against this repository. They are the
+// automation a maintainer never watches, so the shapes that keep them quiet and
+// stoppable are held here rather than in anybody's memory: distinct schedules,
+// a kill switch that explains itself instead of showing a bare grey "skipped",
+// and — for the one that reaches out to third-party services — no write access
+// it does not need.
+test('the monthly sweeps stay off each other’s schedule and can each be switched off', () => {
+  const monthly = {
+    'verification-sweep.yml': 'VERIFICATION_SWEEP',
+    'metrics.yml': 'CATALOG_METRICS',
+    'security-signals.yml': 'SECURITY_SIGNALS',
+  };
+  const crons = new Set();
+  for (const [name, variable] of Object.entries(monthly)) {
+    const parsed = YAML.parse(workflow(name));
+    const schedule = parsed.on.schedule.map((item) => item.cron);
+    assert.equal(schedule.length, 1, `${name} should keep one monthly schedule`);
+    assert.ok(!crons.has(schedule[0]), `${name} shares a cron with another monthly sweep`);
+    crons.add(schedule[0]);
+    assert.deepEqual(parsed.permissions, {}, `${name} does not start from no permissions at all`);
+
+    // The kill switch and the job that exists only to say the switch is on.
+    const off = parsed.jobs['turned-off'];
+    assert.ok(off, `${name} has no self-explaining skipped job`);
+    assert.equal(
+      off.if,
+      `vars.${variable} == 'false' && github.event_name != 'workflow_dispatch'`,
+      `${name} keys its kill switch off the wrong variable`
+    );
+    assert.match(
+      String(off.steps[0].run),
+      new RegExp(`${variable}[\\s\\S]*Settings -> Secrets and variables -> Actions -> Variables`, 'u'),
+      `${name} does not tell the maintainer where the switch is`
+    );
+    // Whatever went wrong, a red monthly run has to say what it means.
+    const steps = Object.values(parsed.jobs).flatMap((job) => job.steps ?? []);
+    assert.ok(
+      steps.some((step) => String(step.if ?? '') === 'failure()'),
+      `${name} has no plain-English explanation of a failed run`
+    );
+  }
+
+  // The sweep that talks to GitHub's and OpenSSF's public read APIs. It writes
+  // one data file through a reviewed pull request and nothing else — in
+  // particular it never edits an entry and never opens an issue.
+  const signals = YAML.parse(workflow('security-signals.yml'));
+  assert.deepEqual(Object.keys(signals.jobs.signals.permissions).sort(), [
+    'actions',
+    'contents',
+    'pull-requests',
+  ]);
+  assert.equal(signals.jobs.signals.permissions.issues, undefined);
+  assert.match(workflow('security-signals.yml'), /add-paths: _data\/security_signals\.json/u);
+  assert.match(workflow('security-signals.yml'), /node scripts\/security_signals\.mjs/u);
+  // The catalog links to code it does not audit, and the pull request that
+  // publishes these observations has to say so where a reviewer reads it.
+  assert.match(workflow('security-signals.yml'), /does not host or audit/u);
+});
+
 test('every npm dependency install selects the exact package manager after setup-node', () => {
   const directory = path.join(ROOT, '.github', 'workflows');
   for (const name of fs.readdirSync(directory).filter((file) => file.endsWith('.yml'))) {
@@ -727,6 +786,7 @@ test('protected-main automation stays reviewable and generated PRs can satisfy r
     'update-event-attachments.yml',
     'update-schedule.yml',
     'metrics.yml',
+    'security-signals.yml',
     'pages.yml',
     'thumbnails.yml',
   ];
@@ -754,6 +814,12 @@ test('protected-main automation stays reviewable and generated PRs can satisfy r
   assert.match(metrics, /branch: automation\/catalog-metrics/u);
   assert.match(metrics, /pull-requests: write/u);
   assert.doesNotMatch(metrics, /git push/u);
+
+  const signals = workflow('security-signals.yml');
+  assert.match(signals, /uses: peter-evans\/create-pull-request@/u);
+  assert.match(signals, /branch: automation\/security-signals/u);
+  assert.match(signals, /pull-requests: write/u);
+  assert.doesNotMatch(signals, /git push/u);
 
   const pages = workflow('pages.yml');
   assert.match(pages, /uses: peter-evans\/create-pull-request@/u);
