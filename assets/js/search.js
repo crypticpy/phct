@@ -103,11 +103,9 @@
    * back to the heading it fell under.
    *
    * Returns a NEW doc rather than annotating the parsed one, so the write-up is
-   * held once. The joined body and the spans are everything the rest of this
-   * file reads; keeping `sections` beside them leaves a second copy of every
-   * write-up alive for the life of the page, which at a thousand entries is
-   * megabytes of a phone's heap spent on a string already held next to it.
-   * Dropping the parsed payload lets that copy be collected instead.
+   * held once: the joined body and the spans are all the rest of this file
+   * reads, and keeping `sections` beside them left a second copy of every
+   * write-up alive for the life of the page.
    * @param {object} doc a search.json doc.
    * @returns {object} the doc this file uses: no sections, plus body and spans.
    */
@@ -164,11 +162,10 @@
           this.field('summary', { boost: 4 });
           this.field('facets', { boost: 3 });
           this.field('body');
-          // No metadataWhitelist. `position` records every occurrence of every
-          // term in every field, which is the largest thing the index holds and
-          // the first thing a large catalog cannot afford — and snippetFor()
-          // already locates the term in the body itself, for the one hit it is
-          // about to render rather than for all of them in advance.
+          // No metadataWhitelist: `position` records every occurrence of every
+          // term in every field, the largest thing the index holds — and
+          // snippetFor() locates the term itself, for the one hit it is about
+          // to render rather than for all of them in advance.
           docs.forEach((d, i) =>
             this.add({
               i: String(i),
@@ -234,11 +231,10 @@
    * assistant".
    *
    * This is recall, never ranking. A doc the literal pass already found keeps
-   * its literal score untouched, and everything new is placed strictly BELOW
-   * the weakest literal hit (`concepts.weight` of it), so no expansion can
-   * reorder — let alone outrank — a match the reader earned with their own
-   * words. When the literal pass found nothing at all there is nothing to rank
-   * against and the concept hits are the answer, scored on their own terms.
+   * its literal score untouched, and everything new lands strictly BELOW the
+   * weakest literal hit (`concepts.weight` of it), so no expansion can reorder
+   * — let alone outrank — a match the reader earned with their own words. With
+   * no literal hits to rank against, concept hits keep their own scores.
    *
    * @param {string[]} related concept terms.
    * @param {object[]} literal the literal hits, best first.
