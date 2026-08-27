@@ -357,6 +357,105 @@ test('a common literal query keeps title relevance without expensive fuzzy expan
   assert.match(page.more.textContent, /Show 29 more/);
 });
 
+/**
+ * An index whose concept map pairs "chatbot" with "assistant" — the pairing
+ * _plugins/search_index.rb derives from prose, not one anybody wrote down.
+ * @param {{concepts?: object, literal?: boolean}} [options]
+ *   concepts overrides the payload's concept block; literal:false removes the
+ *   entry that carries the typed word, leaving concept hits as the only answer.
+ * @returns {object}
+ */
+function conceptIndex({ concepts, literal = true } = {}) {
+  const entry = (id, title, text) => ({
+    id,
+    kind: 'entry',
+    title,
+    summary: '',
+    facets: '',
+    sections: [{ h: 'What it does', a: 'what-it-does', t: text }],
+    url: `/catalog/${id}/`,
+  });
+  return {
+    synonyms: {},
+    concepts: concepts ?? { weight: 0.9, max_expansions: 4, terms: { chatbot: ['assistant'] } },
+    docs: [
+      // Says "assistant" everywhere and never says the typed word.
+      entry(
+        'chat-desk',
+        'Assistant desk',
+        'The assistant drafts an assistant reply for every assistant queue.'
+      ),
+      ...(literal
+        ? [
+            entry(
+              'chatbot-pilot',
+              'Service pilot',
+              'A note near the end of the write-up mentions the chatbot.'
+            ),
+          ]
+        : []),
+      entry('permit-queue', 'Permit queue', 'Nothing here is about conversation at all.'),
+    ],
+  };
+}
+
+test('the concept map reaches an entry that never uses the typed word', async () => {
+  const page = await boot({ index: conceptIndex() });
+  await page.type('chatbot');
+
+  assert.ok(page.window.__searchMatches.has('chat-desk'), 'expected the concept-only entry');
+  assert.ok(page.window.__searchMatches.has('chatbot-pilot'), 'expected the literal entry');
+});
+
+test('a concept match never outranks the entry that used the reader’s own word', async () => {
+  // chat-desk would win on score alone: it says "assistant" four times across
+  // title and body, against one passing mention of "chatbot".
+  const page = await boot({ index: conceptIndex() });
+  await page.type('chatbot');
+
+  assert.equal(page.window.__searchOrder[0], 'chatbot-pilot');
+  assert.equal(page.window.__searchOrder.at(-1), 'chat-desk');
+});
+
+test('with nothing literal to rank against, concept hits are the answer', async () => {
+  const page = await boot({ index: conceptIndex({ literal: false }) });
+  await page.type('chatbot');
+
+  assert.deepEqual([...page.window.__searchMatches], ['chat-desk']);
+});
+
+test('the concept layer can be switched off', async () => {
+  const off = await boot({
+    index: conceptIndex({ concepts: { weight: 0.9, max_expansions: 4, terms: {} } }),
+  });
+  await off.type('chatbot');
+  assert.deepEqual([...off.window.__searchMatches], ['chatbot-pilot']);
+
+  const capped = await boot({
+    index: conceptIndex({ concepts: { weight: 0.9, max_expansions: 0, terms: { chatbot: ['assistant'] } } }),
+  });
+  await capped.type('chatbot');
+  assert.deepEqual([...capped.window.__searchMatches], ['chatbot-pilot']);
+});
+
+test('a payload with no concept block at all behaves as it did before there was one', async () => {
+  const index = conceptIndex();
+  delete index.concepts;
+  const page = await boot({ index });
+  await page.type('chatbot');
+
+  assert.deepEqual([...page.window.__searchMatches], ['chatbot-pilot']);
+});
+
+test('a concept weight above 1 cannot lift a concept hit past a literal one', async () => {
+  const page = await boot({
+    index: conceptIndex({ concepts: { weight: 99, max_expansions: 4, terms: { chatbot: ['assistant'] } } }),
+  });
+  await page.type('chatbot');
+
+  assert.equal(page.window.__searchOrder[0], 'chatbot-pilot');
+});
+
 test('without lunr the box reports itself unavailable instead of throwing', async () => {
   const page = await boot({ noLunr: true });
 
