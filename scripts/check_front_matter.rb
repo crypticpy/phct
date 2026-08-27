@@ -178,6 +178,14 @@ module FrontMatterCheck
   end
 
   # Validate one `links` field value.
+  #
+  # An item is `{label, url}`, both required, and may also carry `email` (a
+  # contact address for that link) and `note` (one sentence about it). Both are
+  # optional, so an item written before they existed still validates; only their
+  # shape is checked, never their presence. Any further key is passed through
+  # untouched, which is the posture everywhere else in this file — nothing here
+  # rejects a mapping for carrying a key it does not read.
+  #
   # @param value [Object]
   # @param ctx [Hash] {key:, where:}
   # @param failures [Array<String>]
@@ -203,6 +211,16 @@ module FrontMatterCheck
         failures << "#{ctx[:where]}: `#{ctx[:key]}[#{index}]` has no `url`"
       elsif !http_url?(url) && !url.start_with?("mailto:")
         failures << "#{ctx[:where]}: `#{ctx[:key]}[#{index}]` must be an http(s) or mailto: URL (got #{url.inspect})"
+      end
+
+      # The same test an `email` FIELD gets: an address is published as a
+      # mailto link, and "@" is what separates one from a name someone typed.
+      email = raw["email"].to_s.strip
+      unless email.empty? || email.include?("@")
+        failures << "#{ctx[:where]}: `#{ctx[:key]}[#{index}].email` does not look like an email address (#{email.inspect})"
+      end
+      unless raw["note"].nil? || raw["note"].is_a?(String)
+        failures << "#{ctx[:where]}: `#{ctx[:key]}[#{index}].note` must be text, got #{raw['note'].class}"
       end
     end
   end

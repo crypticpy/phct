@@ -29,6 +29,7 @@ entry:
   require_link: true       # optional — an entry with no link anywhere fails validation instead of warning
   contributor_key: organization  # optional — the field the monthly metrics count distinct "contributing organizations" from
   submitter_key: submitter_github  # optional — the text field holding the submitter's GitHub username, for refresh reminders
+  deployments_key: also_deployed_by  # optional — the `links` field the "Also deployed by" form appends organizations to
 
 groups:                    # ordered; group filters and submit-form sections
   - key: about
@@ -46,6 +47,8 @@ fields:
 `entry.path` is also read by `_plugins/modules.rb` (to know which pages belong to the `catalog` module) and by every script that scaffolds or reads entries.
 
 The three `status_*` keys are optional pointers, in the same spirit as `verified`: they name a field rather than hardcoding one, so a schema without a review status simply leaves them out and nothing downstream looks for it. See [Review status and deprecation](#review-status-and-deprecation).
+
+`deployments_key` is a pointer of the same shape, naming the `links` field that lists the other organizations running an entry — see [Also deployed by](#also-deployed-by).
 
 `submitter_key` is a pointer of the same shape. It names an ordinary optional `text` field — `submitter_github` in the shipped schema — where a submitter may leave their GitHub username, so the [monthly verification sweep](admin-guide.md#the-monthly-verification-sweep) can @mention the person who wrote the entry rather than only the maintainers. A leading `@` is fine, the value is only ever read as a handle (never as an address or a login), `check_front_matter.rb` warns rather than fails when it does not look like a username, and leaving the key out of the schema removes both the question and the mention.
 
@@ -106,6 +109,21 @@ Three pointers make it schema-driven rather than a special case:
 | `entry.contributor_key` | The field whose distinct values `scripts/metrics.mjs` counts as **contributing organizations** in `_data/metrics.json` — the figure card and per-quarter column on the governance page's "How the catalog is doing" block. Live entries only, `sample: true` content excluded, values trimmed and blanks skipped. Absent → the figure, its card and its column are not published; everything else in the block still is. |
 
 The Liquid filters behind this are `deprecated_entry`, `live_entries` and `deprecated_entries` in `_plugins/schema_filters.rb`; every template goes through them rather than comparing strings. Deprecation supersedes staleness: a deprecated entry never also shows the "last confirmed" note, because "may no longer be current" already covers it. See [admin-guide.md](admin-guide.md#editing-or-removing-an-existing-entry) for when to deprecate versus delete.
+
+### Also deployed by
+
+The single most useful fact about a use case is that somebody else has already run it — and the organization that can say so is not the one that wrote the entry. Asking them to author a full second entry to say "we run this too" is how that fact never gets recorded, so it has its own four-box form instead.
+
+`entry.deployments_key` is a pointer of the same shape as `status_key` and `submitter_key`. It names a `links` field — `also_deployed_by` in the shipped schema — where each item is one organization: `label` is its name, `url` a link a reader can follow, and the optional [`email` and `note`](#links) a contact address and a sentence about what they adapted.
+
+| Piece | Where |
+|---|---|
+| The pointer | `entry.deployments_key` in `_data/schema.yml`. Absent → nothing below is offered, and the form reports that the feature is not configured rather than guessing a key. |
+| The field | An ordinary `links` field carrying `form: false`, so the public submission forms never ask for it. In the shipped schema it sits last in the **Reuse** rail card (`group: reuse`, `weight: 9`, `icon: users`). |
+| The form | `.github/ISSUE_TEMPLATE/also-deployed-by.yml` — slug, organization, link, and the two optional boxes. The entry page links to it with the slug already filled in. |
+| The automation | `.github/workflows/also-deployed-by.yml` runs `scripts/add_deployment_from_issue.mjs`, which appends the organization (or updates the row that is already theirs) and opens a pull request. Nothing is published until a maintainer merges it: "we deployed this" is not self-verifying, and an address about to go on a public page needs a person to have looked at it. |
+
+The field is **not in the search index** yet: an item is a mapping, and `_plugins/search_index.rb` flattens scalars and string lists only. Set `search: true` on it once structured values are flattened there.
 
 ## Field spec
 
@@ -195,6 +213,23 @@ resources:
 ```
 
 Use it for anything that does not deserve its own `url` field — shared drives, model cards, container images, vendor pages, recorded demos. The forms accept one per line as `Label | URL`; the scaffolder also tolerates `Label — URL`, `Label: URL`, and a bare URL (which gets the host as its label). Rendered on the entry page as a labelled row with a host chip (in the rail when its group has `placement: rail`). `mailto:` is allowed; everything else must be `http(s)`.
+
+An item may also carry two optional keys:
+
+```yaml
+also_deployed_by:
+  - label: "Multnomah County Health Department"
+    url: "https://www.multco.us/health"
+    email: "digital-services@multco.us"     # optional
+    note: "We kept the classifier but retrained it on our own call transcripts."  # optional
+```
+
+| Key | Meaning |
+|---|---|
+| `email` | A contact address for *that link*, published under it as a mailto link. Validated the way an `email` field is (it must contain `@`). Only ever written when somebody offered one on purpose — an address on a public page is an address that gets scraped. |
+| `note` | One or two sentences shown as a muted line under the row. Prose, not markup. |
+
+Both are additions to the row, never changes to it: an item written before they existed renders exactly as it always did, and a field whose items never carry them is untouched. The submission forms do not collect either — a `Label | URL` line still parses to `{label, url}` only — so they arrive from the dedicated flows that maintain a particular field, such as [Also deployed by](#also-deployed-by).
 
 ## Option metadata
 
