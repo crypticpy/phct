@@ -237,8 +237,10 @@ jobs:
           # An `issues: edited` re-run reuses the pull request that already
           # points at this branch instead of failing. The label is safe to pass
           # unconditionally: this job only runs for an issue that already
-          # carries `content:refresh`, so the label exists.
-          url="$(gh pr view "$BRANCH" --json url --jq .url 2>/dev/null || true)"
+          # carries `content:refresh`. `--state open` matters: a closed or
+          # merged pull request for this branch must not be resurrected and
+          # silently edited.
+          url="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url' 2>/dev/null || true)"
           if [ -n "$url" ]; then
             gh pr edit "$BRANCH" --title "$PR_TITLE" --body-file /tmp/pr-body.md \
               --add-label content:refresh

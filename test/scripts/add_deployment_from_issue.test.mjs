@@ -273,8 +273,36 @@ test('mergeDeployment recognises a resubmission by its link when the name was re
   assert.equal(items.length, 1);
 });
 
-test('mergeDeployment ignores junk already in the list rather than failing on it', () => {
-  const { items } = mergeDeployment(['a bare string', null], { label: 'County', url: 'https://x.gov' });
+test('mergeDeployment normalises a bare-string item instead of dropping it', () => {
+  // `check_front_matter.rb`'s `check_links` and `_includes/field-value.html`'s
+  // `fv_l.url | default: fv_l` both already accept a bare URL string as
+  // shorthand for `{label: url, url: url}` — mergeDeployment must not silently
+  // delete one just because it arrived as a string rather than a mapping.
+  const { items } = mergeDeployment(['https://city.example.gov/thing'], {
+    label: 'County',
+    url: 'https://x.gov',
+  });
+  assert.deepEqual(items, [
+    { label: 'https://city.example.gov/thing', url: 'https://city.example.gov/thing' },
+    { label: 'County', url: 'https://x.gov' },
+  ]);
+});
+
+test('a resubmission of a string item is recognised by its URL and updates it in place', () => {
+  const existing = ['https://city.example.gov/thing'];
+  const { items, action } = mergeDeployment(existing, {
+    label: 'City of Example',
+    url: 'https://city.example.gov/thing',
+    note: 'Now the canonical listing.',
+  });
+  assert.equal(action, 'updated');
+  assert.deepEqual(items, [
+    { label: 'City of Example', url: 'https://city.example.gov/thing', note: 'Now the canonical listing.' },
+  ]);
+});
+
+test('mergeDeployment ignores non-string, non-object junk already in the list', () => {
+  const { items } = mergeDeployment([null, 42, ['nested']], { label: 'County', url: 'https://x.gov' });
   assert.deepEqual(items, [{ label: 'County', url: 'https://x.gov' }]);
 });
 
@@ -293,6 +321,27 @@ test('spliceKey replaces only the target block and leaves every other line alone
   assert.match(out, /^published: 2024-05-02$/m);
   assert.doesNotMatch(out, /Old/);
   assert.match(out, /- label: New/);
+});
+
+test('spliceKey rewrites the block at the position it already occupied, not the end', () => {
+  const frontMatter = [
+    'title: "T"',
+    'also_deployed_by:',
+    '  - label: Old',
+    '    url: https://old.example.gov',
+    'summary: "One paragraph."',
+    'published: 2024-05-02',
+  ].join('\n');
+  const out = spliceKey(frontMatter, 'also_deployed_by', [{ label: 'New', url: 'https://new.example.gov' }]);
+  const lines = out.split('\n');
+  // A one-item addition must read as a small diff at the key's original spot —
+  // between `title` and `summary` — not a deletion at that spot plus an
+  // unrelated addition after `published`.
+  assert.equal(lines[0], 'title: "T"');
+  assert.equal(lines[1], 'also_deployed_by:');
+  assert.match(lines[2], /- label: New/);
+  assert.equal(lines.at(-2), 'summary: "One paragraph."');
+  assert.equal(lines.at(-1), 'published: 2024-05-02');
 });
 
 test('spliceKey appends the key when the front matter does not carry it yet', () => {
@@ -377,6 +426,36 @@ test('a corrected resubmission updates the same row instead of adding a second',
   const after = read('catalog/service-request-routing/index.md');
   assert.equal(after.match(/- label: "?Multnomah County Health Department/g).length, 1);
   assert.match(after, /note: "?We moved it into production in March\."?$/m);
+});
+
+test('a pre-existing bare-string item survives when the bot adds a new organization', () => {
+  const { root, write, read } = repo();
+  write(
+    'catalog/service-request-routing/index.md',
+    ENTRY.replace(
+      'featured: false',
+      'featured: false\nalso_deployed_by:\n  - "https://city.example.gov/thing"'
+    )
+  );
+  const result = run(root, form({ org: 'Elsewhere City', url: 'https://elsewhere.gov' }));
+  assert.equal(result.outputs.get('outcome'), 'added');
+  assert.equal(result.outputs.get('action'), 'added');
+  const after = read('catalog/service-request-routing/index.md');
+  // The string item is neither lost nor left as a bare string — normalised to
+  // the mapping shape the other items already use.
+  assert.match(
+    after,
+    /- label: "?https:\/\/city\.example\.gov\/thing"?\n\s+url: "?https:\/\/city\.example\.gov\/thing"?/
+  );
+  assert.match(after, /- label: "?Elsewhere City"?$/m);
+
+  // Resubmitting the same URL is recognised as the existing row, not a
+  // duplicate.
+  const again = run(root, form({ org: 'City of Example', url: 'https://city.example.gov/thing' }));
+  assert.equal(again.outputs.get('outcome'), 'added');
+  assert.equal(again.outputs.get('action'), 'updated');
+  const final = read('catalog/service-request-routing/index.md');
+  assert.equal((final.match(/url: "?https:\/\/city\.example\.gov\/thing"?/g) || []).length, 1);
 });
 
 test('a second organization is appended alongside the first', () => {

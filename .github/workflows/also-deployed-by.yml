@@ -173,9 +173,13 @@ jobs:
           GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.deployment.outputs.branch }}
           SLUG: ${{ steps.deployment.outputs.slug }}
+          ORG: ${{ steps.deployment.outputs.org }}
           ENTRY_FILE: ${{ steps.deployment.outputs.file }}
           PR_TITLE: ${{ steps.deployment.outputs.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          # A bot-computed enum ('added' | 'updated'), never issue text — safe
+          # to use in `run:` the same way it is already safe in `if:`.
+          DEPLOYMENT_ACTION: ${{ steps.deployment.outputs.action }}
         run: |
           set -euo pipefail
           # Everything between the braces is literal markdown; a backtick here is
@@ -183,26 +187,53 @@ jobs:
           # its link are deliberately absent — they are issue text, and the
           # reviewer reads them in the diff and on the issue, not here.
           # shellcheck disable=SC2016
-          {
-            printf 'An organization said on issue #%s that they have deployed this entry too.\n\n' "$ISSUE_NUMBER"
-            printf 'Closes #%s\n\n' "$ISSUE_NUMBER"
-            printf 'The whole change is one item added to the "also deployed by" list in `%s`.\n\n' "$ENTRY_FILE"
-            printf '### Maintainer checklist\n\n'
-            printf -- '- [ ] The organization is real, and plausibly the one that opened the issue\n'
-            printf -- '- [ ] The link resolves and is theirs\n'
-            printf -- '- [ ] Any email address was offered on purpose and is a fine one to publish\n'
-            printf -- '- [ ] The note, if there is one, reads as information rather than promotion\n'
-            printf -- '- [ ] The diff is that one list and nothing else\n'
-            printf -- '- [ ] **Validate Content** is green on the *latest* commit\n'
-          } > /tmp/pr-body.md
+          if [ "$DEPLOYMENT_ACTION" = "updated" ]; then
+            # A resubmission matched an existing row (by lowercased organization
+            # name or link) and REPLACED it wholesale — this is not an addition,
+            # and the title and body must say so plainly rather than reusing the
+            # "add" wording, which would read as a benign, additive change.
+            pr_title="Update the $ORG deployment listing on $SLUG"
+            {
+              printf 'An organization said on issue #%s that they have deployed this entry too — but the ' "$ISSUE_NUMBER"
+              printf 'organization name or link already matched a row on the list, so this **replaces** that\n'
+              printf 'listing rather than adding a new one.\n\n'
+              printf 'Closes #%s\n\n' "$ISSUE_NUMBER"
+              printf 'The whole change is one item **replaced** in the "also deployed by" list in `%s`.\n\n' "$ENTRY_FILE"
+              printf '### Maintainer checklist\n\n'
+              printf -- '- [ ] The organization is real, and plausibly the one that opened the issue\n'
+              printf -- '- [ ] The submitter plausibly represents the organization whose listing this replaces\n'
+              printf -- '- [ ] The link resolves and is theirs\n'
+              printf -- '- [ ] Any email address was offered on purpose and is a fine one to publish\n'
+              printf -- '- [ ] The note, if there is one, reads as information rather than promotion\n'
+              printf -- '- [ ] The diff is that one list and nothing else\n'
+              printf -- '- [ ] **Validate Content** is green on the *latest* commit\n'
+            } > /tmp/pr-body.md
+          else
+            pr_title="$PR_TITLE"
+            {
+              printf 'An organization said on issue #%s that they have deployed this entry too.\n\n' "$ISSUE_NUMBER"
+              printf 'Closes #%s\n\n' "$ISSUE_NUMBER"
+              printf 'The whole change is one item added to the "also deployed by" list in `%s`.\n\n' "$ENTRY_FILE"
+              printf '### Maintainer checklist\n\n'
+              printf -- '- [ ] The organization is real, and plausibly the one that opened the issue\n'
+              printf -- '- [ ] The link resolves and is theirs\n'
+              printf -- '- [ ] Any email address was offered on purpose and is a fine one to publish\n'
+              printf -- '- [ ] The note, if there is one, reads as information rather than promotion\n'
+              printf -- '- [ ] The diff is that one list and nothing else\n'
+              printf -- '- [ ] **Validate Content** is green on the *latest* commit\n'
+            } > /tmp/pr-body.md
+          fi
 
           # An `issues: edited` re-run reuses the pull request that already
           # points at this branch instead of failing. The label is safe to pass
           # unconditionally: this job only runs for an issue that already
-          # carries `content:also-deployed-by`, so the label exists.
-          url="$(gh pr view "$BRANCH" --json url --jq .url 2>/dev/null || true)"
+          # carries `content:also-deployed-by`. `--state open` matters: a
+          # closed or merged pull request for this branch must not be
+          # resurrected and silently edited (see refresh-entry.yml for the
+          # matching fix).
+          url="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url' 2>/dev/null || true)"
           if [ -n "$url" ]; then
-            gh pr edit "$BRANCH" --title "$PR_TITLE" --body-file /tmp/pr-body.md \
+            gh pr edit "$BRANCH" --title "$pr_title" --body-file /tmp/pr-body.md \
               --add-label content:also-deployed-by
             echo "url=$url" >> "$GITHUB_OUTPUT"
             echo "reused=true" >> "$GITHUB_OUTPUT"
@@ -210,7 +241,7 @@ jobs:
             url="$(gh pr create \
               --base "${GITHUB_REF_NAME}" \
               --head "$BRANCH" \
-              --title "$PR_TITLE" \
+              --title "$pr_title" \
               --label content:also-deployed-by \
               --body-file /tmp/pr-body.md)"
             echo "url=$url" >> "$GITHUB_OUTPUT"

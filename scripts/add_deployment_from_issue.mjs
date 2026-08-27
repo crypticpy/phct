@@ -177,8 +177,14 @@ export function checkAnswers(form) {
  * @returns {{items: Array<object>, action: 'added'|'updated'}}
  */
 export function mergeDeployment(existing, item) {
+  // A string item is the shorthand `check_front_matter.rb` and `field-value.html`
+  // both already accept (a bare URL, used as both label and href) — normalize it
+  // to the same shape a maintainer-written `{label, url}` row has, rather than
+  // filtering it out and silently deleting it.
   const list = Array.isArray(existing)
-    ? existing.filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
+    ? existing
+        .map((entry) => (typeof entry === 'string' ? { label: entry, url: entry } : entry))
+        .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
     : [];
   const key = (value) =>
     String(value ?? '')
@@ -205,11 +211,14 @@ export function mergeDeployment(existing, item) {
 }
 
 /**
- * Replace one top-level key's block in a front matter body, or append it.
+ * Replace one top-level key's block in a front matter body, in place, or
+ * append it when the key was not there to begin with.
  *
  * Line-wise on purpose: parsing the whole block and re-emitting it would drop
- * every comment and reorder every key. Only the target key's lines are dropped;
- * everything else is passed through exactly as written.
+ * every comment and reorder every key. Only the target key's lines are
+ * dropped and rebuilt; everything else is passed through exactly as written,
+ * at the position it already occupied — so a one-item addition reads as a
+ * small diff at the key's existing spot, not a delete-and-append at the end.
  *
  * @param {string} frontMatter the text between the `---` fences
  * @param {string} key the top-level key to re-emit
@@ -219,19 +228,27 @@ export function mergeDeployment(existing, item) {
 export function spliceKey(frontMatter, key, value) {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const keyLine = new RegExp(`^${escaped}\\s*:`);
-  const kept = [];
   const lines = frontMatter.split('\n');
+  const kept = [];
+  let insertAt = -1;
   for (let i = 0; i < lines.length; i += 1) {
     if (!keyLine.test(lines[i])) {
       kept.push(lines[i]);
       continue;
     }
+    // The block's new text lands where its first line used to be.
+    if (insertAt === -1) insertAt = kept.length;
     // Everything indented under the key (and any blank line inside the block)
     // belongs to it.
     while (i + 1 < lines.length && /^(\s+\S|\s*$)/.test(lines[i + 1])) i += 1;
   }
-  while (kept.length > 0 && kept[kept.length - 1].trim() === '') kept.pop();
-  return [...kept, pair(key, value)].join('\n');
+  const rebuilt = pair(key, value);
+  if (insertAt === -1) {
+    while (kept.length > 0 && kept[kept.length - 1].trim() === '') kept.pop();
+    return [...kept, rebuilt].join('\n');
+  }
+  kept.splice(insertAt, 0, rebuilt);
+  return kept.join('\n');
 }
 
 /* -------------------------------------------------------------------- main */

@@ -604,6 +604,11 @@ test('the refresh loop keeps issue text out of the shell and touches one file', 
   const sweep = workflow('verification-sweep.yml');
   assert.match(sweep, /permissions:\n\s+issues: write/u);
   assert.doesNotMatch(sweep, /contents: write/u);
+
+  // A closed or merged pull request for the branch must never be resurrected
+  // and silently edited by a later issue edit.
+  const openStep = workflowStepScript('refresh-entry.yml', 'refresh', 'Open the pull request');
+  assert.match(openStep, /gh pr list --head "\$BRANCH" --state open/u);
 });
 
 // The other loop that writes to an entry from an issue anybody may open, and
@@ -642,6 +647,35 @@ test('the also-deployed-by loop keeps issue text out of the shell and touches on
   );
   assert.match(workflow('bootstrap-labels.yml'), /create "content:also-deployed-by"/u);
   assert.match(workflow('missing-label.yml'), /startsWith\('Also deployed by:'\)/u);
+});
+
+// A resubmission that matches an existing row (by name or link) REPLACES that
+// row wholesale — mergeDeployment's `action: 'updated'` — and the pull request
+// must say so plainly rather than reusing the "add" wording, or a maintainer
+// approves what looks like a benign addition and actually replaces somebody
+// else's listing.
+test('the also-deployed-by pull request tells a replacement apart from an addition', () => {
+  const source = workflow('also-deployed-by.yml');
+  const openStep = workflowStepScript('also-deployed-by.yml', 'attach', 'Open the pull request');
+
+  // The bot-computed action output reaches the shell only through `env:`.
+  assert.match(source, /DEPLOYMENT_ACTION: \$\{\{ steps\.deployment\.outputs\.action \}\}/u);
+  assert.match(openStep, /if \[ "\$DEPLOYMENT_ACTION" = "updated" \]/u);
+
+  // The 'added' wording is unchanged.
+  assert.match(openStep, /The whole change is one item added to the "also deployed by" list/u);
+
+  // The 'updated' branch says this replaces an existing listing, and the
+  // checklist asks the reviewer to confirm the submitter represents that
+  // organization.
+  assert.match(openStep, /this \*\*replaces\*\* that/u);
+  assert.match(openStep, /listing rather than adding a new one/u);
+  assert.match(openStep, /one item \*\*replaced\*\* in the "also deployed by" list/u);
+  assert.match(openStep, /plausibly represents the organization whose listing this replaces/u);
+  assert.match(openStep, /Update the \$ORG deployment listing on \$SLUG/u);
+
+  // A closed or merged pull request for the branch must never be resurrected.
+  assert.match(openStep, /gh pr list --head "\$BRANCH" --state open/u);
 });
 
 test('the sweep and the script agree on the marker that dedupes a refresh thread', async () => {
