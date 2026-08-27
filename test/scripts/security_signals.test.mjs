@@ -360,6 +360,61 @@ test('over the ceiling, detail is shed before repositories are', () => {
   );
 });
 
+test('a catalog big enough to be capped still reports "unchanged" when nothing moved', () => {
+  // Below the ceiling, `doc` and `capDocument(doc).doc` are identical, so
+  // comparing against either one agrees. Above it they diverge — the file on
+  // disk is the CAPPED shape, so `sameSignals` must be compared against that,
+  // not the uncapped `doc`, or a big catalog can never report "unchanged"
+  // again even when every observation this run made matches last month's.
+  const many = Array.from({ length: 450 }, (_, i) => {
+    const slug = `entry-${String(i).padStart(4, '0')}`;
+    return {
+      slug,
+      record: shapeObservation({
+        url: `https://github.com/o/${slug}`,
+        target: repoTarget(`https://github.com/o/${slug}`),
+        fetched: '2026-09-03',
+        observed: {
+          exists: true,
+          archived: false,
+          license: 'Apache-2.0',
+          owner_type: 'Organization',
+          pushed_at: '2026-07-14',
+          security_policy: true,
+          scorecard: {
+            score: 6.4,
+            date: '2026-08-01',
+            checks: NOTABLE_CHECKS.map((name) => ({ name, score: 7 })),
+          },
+          errors: [],
+        },
+      }),
+    };
+  });
+  const doc = buildDocument({ today: '2026-09-03', records: many });
+  const { doc: cappedDoc } = capDocument(doc);
+  assert.equal(
+    cappedDoc.entries['entry-0000'].scorecard.checks,
+    undefined,
+    'the fixture must actually be capped'
+  );
+
+  // The file written a month ago, with only the dates different.
+  const previousDoc = buildDocument({ today: '2026-08-03', records: many });
+  const { text: previousText } = capDocument(previousDoc);
+
+  assert.equal(
+    sameSignals(previousText, cappedDoc),
+    true,
+    'comparing against the capped shape sees no change'
+  );
+  assert.equal(
+    sameSignals(previousText, doc),
+    false,
+    'comparing against the UNCAPPED shape wrongly reports a change — this is the bug the fix avoids'
+  );
+});
+
 /* --------------------------------------------------- shipped sample data */
 
 test('the shipped sample observations leave with the rest of the demo content', () => {

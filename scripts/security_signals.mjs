@@ -420,10 +420,15 @@ async function main(argv) {
   }
 
   const doc = buildDocument({ today, records });
-  const { text, dropped } = capDocument(doc);
+  // Compared, and diffed against, the CAPPED document — the one that is
+  // actually written. Comparing against the uncapped `doc` instead would mean
+  // a catalog big enough to trigger capping never sees `unchanged: true`
+  // again, because the written file (capped) can never equal the uncapped
+  // document it is compared to, even when nothing observed actually moved.
+  const { text, doc: cappedDoc, dropped } = capDocument(doc);
   const target = path.resolve(root, out);
   const previous = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '';
-  const unchanged = previous !== '' && sameSignals(previous, doc);
+  const unchanged = previous !== '' && sameSignals(previous, cappedDoc);
 
   const observable = records.filter((r) => r.record.applicable).length;
   const failed = records.reduce((sum, r) => sum + (r.record.errors?.length ?? 0), 0);

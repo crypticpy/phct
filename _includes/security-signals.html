@@ -84,6 +84,12 @@ Local assigns are prefixed `sig_` so nothing leaks into the caller's scope.
         </div>
         {%- endif -%}
 
+        {%- comment -%} A 404 (`exists: false`) already says the repository is
+        gone; `license` and `security_policy` are both `null` in that case, and
+        without this gate they would fall to the "none published"/"none GitHub
+        could identify" branch — asserting a fact about a repository that was
+        never there to have one. {%- endcomment -%}
+        {%- if sig_rec.exists != false -%}
         <div>
           <dt class="rail-term">License</dt>
           <dd class="rail-def">
@@ -101,6 +107,7 @@ Local assigns are prefixed `sig_` so nothing leaks into the caller's scope.
             {%- else -%}<span class="text-brand-muted">Not available</span>{%- endif -%}
           </dd>
         </div>
+        {%- endif -%}
 
         <div>
           <dt class="rail-term">OpenSSF Scorecard</dt>
