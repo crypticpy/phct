@@ -30,6 +30,28 @@ major version, and each entry says so when it happens.
   size's `scale_budgets`. The measured table lives in `docs/search.md`; the
   query itself stays at 3–9 ms even at 1,000 entries — what grows is the grid
   render, which is the number the budgets watch.
+- The cost of building search moved off the reader's path. Where the browser
+  has workers, the fetch, the parse and the whole lunr build run in
+  `assets/js/search-worker.js` while the page stays responsive, and the page
+  revives the result with `lunr.Index.load` — a fraction of the build. A
+  finished build is kept in IndexedDB, keyed to a content hash the plugin now
+  stamps into the payload (`generated_at` excluded, so a redeploy that changes
+  nothing keeps the cache warm): a return visit to an unchanged catalog
+  searches instantly, with no download and no build. Any worker or cache
+  failure falls back silently to the original inline path.
+- A low-powered device facing a large catalog is asked, not stalled. At 300+
+  entries on a device reporting few cores or little memory, the automatic
+  index load is replaced by a **Load full search** button that narrates real
+  progress — bytes downloaded, then the build — while typing keeps offering
+  the tag and filter suggestions that never needed an index. Off-screen entry
+  cards also stopped costing anything: `content-visibility: auto` lets the
+  browser skip layout and paint for the cards outside the viewport, which at a
+  thousand entries is most of the grid.
+- `/about/search/`: a public "How search works" page telling the reader what
+  the architecture means for them — no query log by design, nothing typed ever
+  leaves the device — and how the serverless engineering above holds up as the
+  catalog grows. Linked from the About page; shipped only while the catalog
+  module is on.
 
 ## [1.9.0-rc.5] — 2026-08-26
 
