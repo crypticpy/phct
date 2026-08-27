@@ -140,10 +140,13 @@ catalogs at 0/1/10/100/500/1000 entries and `scripts/interaction_performance.mjs
 retained one in real Chrome at a 4× CPU slowdown on a 390×844 viewport, recording cold
 time-to-first-result and warm keystroke p95. Which sizes get a browser fixture is
 `interaction_entries` in `quality/performance-budgets.json`; what each size must hit is its
-`scale_budgets` block. Each tier's probe gets a deadline that grows with it — a thousand entries
-under the throttle takes longer than Puppeteer's default just to reach its load event — and a tier
-that still will not answer is recorded as a finding against that size rather than throwing away the
-sizes that did measure.
+`scale_budgets` block. The probe drives **one interaction per protocol call** — the cold load, then
+each keystroke, then each filter, sort and comparison — and each call gets a deadline that grows with
+the tier. Driving a whole tier inside a single call made its entire wall time race one ceiling, which
+a thousand entries under the throttle on a shared runner loses; measuring one step at a time cannot,
+and because every step times itself in the page with `performance.now()`, the round trips between
+steps never reach the numbers. A step that still will not answer is recorded as a finding against
+that size rather than throwing away the sizes that did measure.
 
 Three things keep the client honest as the catalog grows, all in `assets/js/search.js`:
 
@@ -165,29 +168,40 @@ What the harness measured on a developer laptop, in Chrome at a 4× CPU slowdown
 |     500 |               83.3 KB |                   1107 ms |             327 ms |             731 ms |
 |    1000 |              170.6 KB |                   2682 ms |            1063 ms |            1838 ms |
 
-**Those are not the budgets.** The gate runs on a GitHub Actions runner, under the same emulation but
-on hardware roughly **2.8× slower** on the warm keystroke and **2.2× slower** on the cold load, and a
-budget is only worth having in the environment that enforces it. So the numbers in
-`quality/performance-budgets.json` are calibrated to the runner, with about 45% headroom for its
-variance, which puts every one of them well above the table above:
+**Those are not the budgets, and they are not a UX promise either.** The gate runs on a GitHub
+Actions runner, which is several times slower than a laptop under the same emulation — and, more
+awkwardly, is not even consistent with itself: two runs of identical code measured 353 ms and 510 ms
+for the same 100-entry keystroke, a **1.44× swing** on the hardware alone. A budget calibrated to one
+reading of a runner like that fails on the next reading of the same code, which teaches everyone to
+ignore it.
 
-| entries | CI cold | CI warm p95 | enforced cold | enforced warm p95 |
-| ------: | ------: | ----------: | ------------: | ----------------: |
-|     100 |  555 ms |      353 ms |             — |            500 ms |
-|     500 | 2292 ms |     2058 ms |       3500 ms |           3000 ms |
-|    1000 |       — |           — |       8500 ms |           7500 ms |
+So the enforced numbers follow one rule:
 
-The 1000-entry row is extrapolated from the 500-entry ratio rather than measured, and should be
-tightened to its real numbers once the tier has run green. Read the warm column with its cause in
-mind. Instrumenting the 1000-entry fixture puts `query()`
+> **Enforced budget = the worst CI observation × 1.75, rounded up to a clean number.** A tier with no
+> CI observation extrapolates from the **worst** CI/local ratio yet seen (3.95× warm, 3.10× cold)
+> before applying the same 1.75.
+
+| entries | metric   | worst CI observation |     or extrapolated from local |    ×1.75 |     enforced |
+| ------: | :------- | -------------------: | -----------------------------: | -------: | -----------: |
+|     100 | warm p95 |               510 ms |                              — |   892 ms |   **900 ms** |
+|     500 | warm p95 |              2058 ms |                              — |  3601 ms |  **4000 ms** |
+|     500 | cold     |              2292 ms |                              — |  4011 ms |  **4500 ms** |
+|    1000 | warm p95 |                    — | 1838 ms × 3.95 = 7261 ms |  12707 ms | **13000 ms** |
+|    1000 | cold     |                    — | 2682 ms × 3.10 = 8314 ms |  14549 ms | **15000 ms** |
+
+Read those as **regression tripwires**, not as what a reader experiences: they are set to catch a 2×
+slowdown on a throttled emulated phone, on a runner of unknown mood, against a fixture built to be
+the worst case for the grid. The UX evidence is the local table above. The 1000-entry row is
+extrapolated rather than measured and should be tightened once the tier has run green.
+
+Read the warm column with its cause in mind. Instrumenting the 1000-entry fixture puts `query()`
 itself at **3–9 ms** — the index is not what the reader waits for. The rest is the grid: publishing a
 result set re-renders the catalog page's cards synchronously, and after a query that matches nearly
 every entry the browser is still laying those cards out when the next keystroke arrives, which is
 why the p95 at 1000 entries is roughly double the p50. The fixture is the worst case for this — every
-generated entry shares the same handful of words, so every query matches all of them — and the
-budgets above the supported ceiling are set to that measured worst case. They are regression
-detectors for the whole keystroke, not a claim that search costs a second; bringing them down is
-work on the card grid, not on this file.
+generated entry shares the same handful of words, so every query matches all of them. What the
+budgets bound is therefore the whole keystroke, not search: bringing them down is work on the card
+grid, not on this file.
 
 ---
 

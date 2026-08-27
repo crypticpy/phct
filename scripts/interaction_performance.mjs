@@ -15,6 +15,9 @@ const INTERACTION_BUDGETS = new Set(['filter_response_p95_ms', 'search_response_
 // Cold time-to-first-result: the keystroke that also pays for the fetch and the
 // index build. Only ever budgeted per tier, never part of the required pair.
 const SCALE_INTERACTION_BUDGETS = new Set([...INTERACTION_BUDGETS, 'search_cold_response_ms']);
+// The warm keystrokes, cycled: words the fixture corpus actually uses, so every
+// sample is a query that answers rather than one that finds nothing.
+const QUERY_SAMPLES = ['coordination', 'intake', 'triage', 'review', 'reporting', 'fixture'];
 
 function option(argv, name, fallback) {
   const index = argv.indexOf(name);
@@ -140,17 +143,50 @@ export function mergeProbeFailure(report, entries, error) {
 }
 
 /**
- * How long one tier may take before the probe calls it stuck.
+ * How long one STEP of the probe may take before it is called stuck.
  *
  * Puppeteer's 15s default is a local-hardware number: a thousand-entry catalog
  * under a 4× CPU throttle on a CI runner does not reach its load event inside
- * it, and the probe died on the navigation instead of measuring anything.
+ * it, and the probe died on the navigation instead of measuring anything. The
+ * deadline has to stay well clear of the budget it is there to let us measure —
+ * a step that ends at the deadline reports nothing at all, where one that ends
+ * over budget reports a number someone can act on.
  *
  * @param {number} entries the fixture size.
  * @returns {number} milliseconds.
  */
 export function probeTimeoutMs(entries) {
-  return Math.max(30000, Math.ceil(Number(entries) || 0) * 60);
+  return Math.max(45000, Math.ceil(Number(entries) || 0) * 90);
+}
+
+/**
+ * Fail a step at the tier deadline rather than at the protocol's.
+ *
+ * `evaluate()` is bounded only by the browser-wide `protocolTimeout`, which is
+ * both far too coarse and reported as a bare CDP error. Racing each step gives
+ * the failure the step's own name, and lets the tier be abandoned in seconds
+ * rather than minutes.
+ *
+ * @param {Promise} promise the step.
+ * @param {number} ms its deadline.
+ * @param {string} label what to call it if it never finishes.
+ * @returns {Promise} the step's value.
+ */
+export async function withDeadline(promise, ms, label) {
+  let timer = null;
+  // Settled either way, so losing the race never leaves a rejection unhandled.
+  const settled = promise.then(
+    (value) => ({ value }),
+    (error) => ({ error })
+  );
+  const deadline = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ expired: true }), ms);
+  });
+  const outcome = await Promise.race([settled, deadline]);
+  clearTimeout(timer);
+  if (outcome.expired) throw new Error(`${label} did not finish within ${ms}ms`);
+  if (outcome.error) throw outcome.error;
+  return outcome.value;
 }
 
 /**
@@ -220,124 +256,171 @@ function close(server) {
   return new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
 
-async function measurePage(page, timeout) {
-  return page.evaluate(async (answerWithin) => {
-    const input = document.querySelector('[data-filter="search"]');
-    const sort = document.querySelector('[data-sort]');
-    if (!input) throw new Error('catalog search input was not rendered');
-    if (!sort) throw new Error('catalog sort control was not rendered');
+/**
+ * The in-page half of the probe: every interaction, exposed one step at a time.
+ *
+ * It is installed once per page and left on `window`, because the Node half
+ * drives the steps in separate `evaluate()` calls. Each step measures itself
+ * with `performance.now()` deltas taken either side of the interaction, so the
+ * protocol round trip between two steps cannot reach the numbers.
+ *
+ * Serialized to the page by puppeteer, so it may not close over module scope.
+ *
+ * @param {number} answerWithin ms a single keystroke may take before it is stuck.
+ */
+function installProbe(answerWithin) {
+  const input = document.querySelector('[data-filter="search"]');
+  const sort = document.querySelector('[data-sort]');
+  if (!input) throw new Error('catalog search input was not rendered');
+  if (!sort) throw new Error('catalog sort control was not rendered');
 
-    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
-    const paint = async () => {
-      await frame();
-      await frame();
-    };
-    const search = (query) =>
-      new Promise((resolve, reject) => {
+  const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  const paint = async () => {
+    await frame();
+    await frame();
+  };
+  const timed = async (act) => {
+    const started = performance.now();
+    act();
+    const elapsed = performance.now() - started;
+    await paint();
+    return elapsed;
+  };
+
+  const probe = {
+    controls: [],
+    sheet: null,
+    sortValues: [],
+    compare: null,
+    search(query) {
+      return new Promise((resolve, reject) => {
         const started = performance.now();
-        const timeout = setTimeout(() => {
+        const timer = setTimeout(() => {
           document.removeEventListener('catalog:search', answered);
           reject(new Error(`search did not answer ${JSON.stringify(query)} within ${answerWithin}ms`));
         }, answerWithin);
         function answered() {
-          clearTimeout(timeout);
-          resolve(performance.now() - started);
+          clearTimeout(timer);
+          // The keystroke is measured at the answer; the paint that follows is
+          // settling time for the next step, never part of this reading.
+          const elapsed = performance.now() - started;
+          paint().then(() => resolve(elapsed));
         }
         document.addEventListener('catalog:search', answered, { once: true });
         input.value = query;
         input.dispatchEvent(new Event('input', { bubbles: true }));
       });
-
-    const coldSearchMs = await search('fixture');
-    await paint();
-    const searchSamples = [];
-    const queries = ['coordination', 'intake', 'triage', 'review', 'reporting', 'fixture'];
-    for (let index = 0; index < 18; index += 1) {
-      searchSamples.push(await search(queries[index % queries.length]));
+    },
+    async openSheet() {
+      const sheet = document.querySelector('[data-filter-sheet]');
+      const sheetOpen = document.querySelector('[data-sheet-open]');
+      if (!sheet || !sheetOpen) throw new Error('catalog mobile filter dialog was not rendered');
+      probe.sheet = sheet;
+      sheetOpen.click();
       await paint();
-    }
-    await search('');
-    await paint();
-
-    const sheet = document.querySelector('[data-filter-sheet]');
-    const sheetOpen = document.querySelector('[data-sheet-open]');
-    if (!sheet || !sheetOpen) throw new Error('catalog mobile filter dialog was not rendered');
-    sheetOpen.click();
-    await paint();
-    const totalEntries = document.querySelectorAll('[data-entry]').length;
-    const filterCandidates = Array.from(sheet.querySelectorAll('[data-filter-key]'))
-      .filter((candidate) => candidate.getAttribute('aria-disabled') !== 'true')
-      .map((button) => ({
-        button,
-        count: Number(button.querySelector('[data-filter-count]')?.textContent || 0),
-      }))
-      .filter(({ count }) => count > 0 && count < totalEntries)
-      .sort((left, right) => left.count - right.count);
-    if (!filterCandidates.length) throw new Error('catalog has no enabled facet control');
-    const distinctCounts = filterCandidates.filter(
-      (candidate, at, candidates) => at === 0 || candidate.count !== candidates[at - 1].count
-    );
-    const filterControls = [
-      distinctCounts[0],
-      distinctCounts[Math.floor(distinctCounts.length / 2)],
-      distinctCounts.at(-1),
-    ].filter((candidate, at, candidates) => candidates.indexOf(candidate) === at);
-    const filterSamples = [];
-    for (let index = 0; index < 20; index += 1) {
-      const filter = filterControls[Math.floor(index / 2) % filterControls.length].button;
-      const started = performance.now();
-      filter.click();
-      filterSamples.push(performance.now() - started);
-      await paint();
-      const activeValues = new URLSearchParams(window.location.search)
-        .get(filter.dataset.filterKey)
-        ?.split(',');
-      const recorded = activeValues?.includes(filter.dataset.filterValue) || false;
-      if (recorded !== (index % 2 === 0)) {
-        throw new Error('deferred filter history did not preserve the visible facet state');
-      }
-    }
-    const sheetApply = sheet.querySelector('[data-sheet-apply]');
-    if (!sheetApply) throw new Error('catalog mobile filter dialog has no apply control');
-    sheetApply.click();
-    await paint();
-
-    const sortValues = Array.from(sort.options, (entry) => entry.value).filter(
-      (value) => value && value !== 'relevance'
-    );
-    if (sortValues.length < 2) throw new Error('catalog has fewer than two deterministic sort options');
-    const sortSamples = [];
-    for (let index = 0; index < 20; index += 1) {
-      sort.value = sortValues[index % sortValues.length];
-      const started = performance.now();
-      sort.dispatchEvent(new Event('change', { bubbles: true }));
-      sortSamples.push(performance.now() - started);
-      await paint();
-    }
-
-    const compare = document.querySelector('[data-compare-toggle]');
-    if (!compare) throw new Error('catalog has no comparison control');
-    const compareSamples = [];
-    for (let index = 0; index < 20; index += 1) {
-      const started = performance.now();
-      compare.click();
-      compareSamples.push(performance.now() - started);
-      await paint();
-    }
-
-    return {
-      coldSearchMs,
-      searchSamples,
-      filterSamples,
-      filterControls: filterControls.map(({ button, count }) => ({
+      const totalEntries = document.querySelectorAll('[data-entry]').length;
+      const candidates = Array.from(sheet.querySelectorAll('[data-filter-key]'))
+        .filter((candidate) => candidate.getAttribute('aria-disabled') !== 'true')
+        .map((button) => ({
+          button,
+          count: Number(button.querySelector('[data-filter-count]')?.textContent || 0),
+        }))
+        .filter(({ count }) => count > 0 && count < totalEntries)
+        .sort((left, right) => left.count - right.count);
+      if (!candidates.length) throw new Error('catalog has no enabled facet control');
+      const distinct = candidates.filter(
+        (candidate, at, all) => at === 0 || candidate.count !== all[at - 1].count
+      );
+      probe.controls = [distinct[0], distinct[Math.floor(distinct.length / 2)], distinct.at(-1)].filter(
+        (candidate, at, all) => all.indexOf(candidate) === at
+      );
+      return probe.controls.map(({ button, count }) => ({
         key: button.dataset.filterKey,
         value: button.dataset.filterValue,
         count,
-      })),
-      sortSamples,
-      compareSamples,
-    };
-  }, timeout);
+      }));
+    },
+    async filterStep(index) {
+      const filter = probe.controls[Math.floor(index / 2) % probe.controls.length].button;
+      const elapsed = await timed(() => filter.click());
+      const active = new URLSearchParams(window.location.search).get(filter.dataset.filterKey)?.split(',');
+      const recorded = active?.includes(filter.dataset.filterValue) || false;
+      if (recorded !== (index % 2 === 0)) {
+        throw new Error('deferred filter history did not preserve the visible facet state');
+      }
+      return elapsed;
+    },
+    async applySheet() {
+      const apply = probe.sheet.querySelector('[data-sheet-apply]');
+      if (!apply) throw new Error('catalog mobile filter dialog has no apply control');
+      apply.click();
+      await paint();
+    },
+    prepareSort() {
+      probe.sortValues = Array.from(sort.options, (entry) => entry.value).filter(
+        (value) => value && value !== 'relevance'
+      );
+      if (probe.sortValues.length < 2) {
+        throw new Error('catalog has fewer than two deterministic sort options');
+      }
+      probe.compare = document.querySelector('[data-compare-toggle]');
+      if (!probe.compare) throw new Error('catalog has no comparison control');
+    },
+    sortStep(index) {
+      sort.value = probe.sortValues[index % probe.sortValues.length];
+      return timed(() => sort.dispatchEvent(new Event('change', { bubbles: true })));
+    },
+    compareStep() {
+      return timed(() => probe.compare.click());
+    },
+  };
+  window.__phctProbe = probe;
+}
+
+/**
+ * Run every interaction as its own protocol call.
+ *
+ * Driving a whole tier inside one `evaluate()` made the tier's entire wall time
+ * race a single protocol deadline, which a thousand entries under a 4× throttle
+ * on a shared runner loses. One call per phase — and per keystroke — keeps every
+ * call short, and the tier's deadline then applies to a step rather than to an
+ * hour of work.
+ *
+ * @param {object} page the puppeteer page.
+ * @param {number} timeout the tier deadline, per step.
+ * @returns {Promise<object>} raw samples.
+ */
+async function measurePage(page, timeout) {
+  const step = (label, fn, ...args) => withDeadline(page.evaluate(fn, ...args), timeout, label);
+
+  await step('probe install', installProbe, timeout);
+  const coldSearchMs = await step('cold search', () => window.__phctProbe.search('fixture'));
+  const searchSamples = [];
+  for (let index = 0; index < 18; index += 1) {
+    const query = QUERY_SAMPLES[index % QUERY_SAMPLES.length];
+    searchSamples.push(await step(`search "${query}"`, (typed) => window.__phctProbe.search(typed), query));
+  }
+  await step('search reset', () => window.__phctProbe.search(''));
+
+  const filterControls = await step('filter setup', () => window.__phctProbe.openSheet());
+  const filterSamples = [];
+  for (let index = 0; index < 20; index += 1) {
+    filterSamples.push(await step(`filter ${index + 1}`, (at) => window.__phctProbe.filterStep(at), index));
+  }
+  await step('filter apply', () => window.__phctProbe.applySheet());
+
+  await step('sort setup', () => window.__phctProbe.prepareSort());
+  const sortSamples = [];
+  for (let index = 0; index < 20; index += 1) {
+    sortSamples.push(await step(`sort ${index + 1}`, (at) => window.__phctProbe.sortStep(at), index));
+  }
+
+  const compareSamples = [];
+  for (let index = 0; index < 20; index += 1) {
+    compareSamples.push(await step(`compare ${index + 1}`, () => window.__phctProbe.compareStep()));
+  }
+
+  return { coldSearchMs, searchSamples, filterSamples, filterControls, sortSamples, compareSamples };
 }
 
 async function runProbe(siteDirectory, supportedRun) {
@@ -361,9 +444,9 @@ async function runProbe(siteDirectory, supportedRun) {
       headless: true,
       ...(executablePath ? { executablePath } : {}),
       args: ['--no-sandbox', '--disable-dev-shm-usage'],
-      // measurePage() drives every keystroke inside one evaluate() call, so the
-      // protocol has to outlast the whole tier, not one interaction.
-      protocolTimeout: timeout * 6,
+      // A backstop, not a deadline: measurePage() takes one step per call and
+      // withDeadline() fails a stuck step long before this can fire.
+      protocolTimeout: 600000,
     });
     const page = await browser.newPage();
     page.setDefaultTimeout(timeout);

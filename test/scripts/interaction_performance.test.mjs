@@ -14,6 +14,7 @@ import {
   probeTimeoutMs,
   tierInteractionBudgets,
   timingSummary,
+  withDeadline,
 } from '../../scripts/interaction_performance.mjs';
 
 test('nearest-rank timing summaries are deterministic', () => {
@@ -113,10 +114,47 @@ test('a missing supported ceiling is an error, not a skipped tier', (t) => {
 // Puppeteer's 15s default was measured on a laptop; a thousand entries under a
 // 4x throttle on a CI runner needs longer just to reach the load event.
 test('the probe deadline grows with the fixture it is driving', () => {
-  assert.equal(probeTimeoutMs(100), 30000);
-  assert.equal(probeTimeoutMs(500), 30000);
-  assert.equal(probeTimeoutMs(1000), 60000);
-  assert.equal(probeTimeoutMs(0), 30000);
+  assert.equal(probeTimeoutMs(100), 45000);
+  assert.equal(probeTimeoutMs(500), 45000);
+  assert.equal(probeTimeoutMs(1000), 90000);
+  assert.equal(probeTimeoutMs(0), 45000);
+});
+
+// A deadline under the budget it is meant to enforce turns a slow answer into
+// no answer: the tier reports a stuck probe instead of a number to act on.
+test('every tier can measure the budget it is held to', () => {
+  const config = JSON.parse(
+    fs.readFileSync(new URL('../../quality/performance-budgets.json', import.meta.url))
+  );
+  for (const entries of config.interaction_entries) {
+    for (const [name, maximum] of Object.entries(tierInteractionBudgets(config, entries))) {
+      assert.ok(
+        probeTimeoutMs(entries) >= maximum * 3,
+        `${entries}-entry deadline ${probeTimeoutMs(entries)}ms cannot measure ${name} of ${maximum}ms`
+      );
+    }
+  }
+});
+
+test('a step that never finishes fails at its own deadline, under its own name', async () => {
+  assert.equal(await withDeadline(Promise.resolve(7), 1000, 'a step'), 7);
+  await assert.rejects(
+    withDeadline(Promise.reject(new Error('page said no')), 1000, 'a step'),
+    /page said no/
+  );
+  await assert.rejects(
+    withDeadline(new Promise(() => {}), 5, 'cold search'),
+    /cold search did not finish within 5ms/
+  );
+
+  // Losing the race must not leave an unhandled rejection behind it.
+  let refuse;
+  const stuck = new Promise((resolve, reject) => {
+    refuse = reject;
+  });
+  await assert.rejects(withDeadline(stuck, 5, 'sort 1'), /did not finish/);
+  refuse(new Error('too late'));
+  await new Promise((resolve) => setTimeout(resolve, 10));
 });
 
 test('a tier whose probe never finished is a finding, not a lost run', () => {
