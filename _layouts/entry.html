@@ -112,9 +112,15 @@ schema keeps the link. {%- endcomment -%}
     {%- else -%}
       {%- capture ent_stale_lead -%}Published {{ ent_check.date | date: '%B %Y' }} and not confirmed since{%- endcapture -%}
     {%- endif -%}
+    {%- comment -%} The one-click way out of the notice, for the person who knows
+    the answer: the refresh form with this entry's slug already in it. Answering
+    "yes" opens a pull request that stamps `verified:` and clears the notice
+    (.github/ISSUE_TEMPLATE/refresh-entry.yml, refresh-entry.yml). Only rendered
+    when the site knows its repository — the same guard the edit links use.
+    {%- endcomment -%}
     <aside class="entry-stale">
       {% include icon.html name='clock' size='sm' class='mt-0.5 shrink-0' %}
-      <p>{{ ent_stale_lead }}. Details, costs and contacts may have changed — {% if ent_contact_anchor != '' %}<a href="{{ ent_contact_anchor }}">ask the contact</a>{% else %}ask the contact{% endif %} before relying on this.</p>
+      <p>{{ ent_stale_lead }}. Details, costs and contacts may have changed — {% if ent_contact_anchor != '' %}<a href="{{ ent_contact_anchor }}">ask the contact</a>{% else %}ask the contact{% endif %} before relying on this.{% if ent_cfg.github.repository and ent_cfg.github.repository != '' %} <span class="entry-no-print">Still accurate? <a href="https://github.com/{{ ent_cfg.github.repository }}/issues/new?template=refresh-entry.yml&amp;slug={{ page.slug | query_encode }}" target="_blank" rel="noopener noreferrer">Confirm it<span class="sr-only"> (opens in a new tab)</span></a> and the date resets.</span>{% endif %}</p>
     </aside>
   {%- endif -%}
 {%- endcapture -%}

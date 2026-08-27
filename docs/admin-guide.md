@@ -16,7 +16,7 @@ page, or in the reference it links to.
 | **Private vulnerability reporting** | Settings → Security → Code security and analysis → **Private vulnerability reporting** → *Enable* | Off | Nobody can report a security problem privately; the issue chooser's fallback is the `organization.contact_email` inbox in `_data/site.yml`, so keep that current if your plan does not offer the setting. |
 | **Bootstrap labels** (run once) | Actions tab → **Bootstrap labels** → *Run workflow* | Never run | The issue forms ask for labels that do not exist yet, GitHub drops them silently, and no submission ever scaffolds a pull request. |
 | `SUBMISSIONS_OPEN` (variable) | Settings → Secrets and variables → Actions → **Variables** | Unset — anyone may submit | Set it to `false` to accept issue-driven work only from the owner, organization members and collaborators. Delete it to reopen. |
-| `VERIFICATION_SWEEP` (variable) | Same path | Unset — the sweep runs | Set it to `false` to stop the monthly [verification sweep](#the-monthly-verification-sweep) issue. A manual run still works. |
+| `VERIFICATION_SWEEP` (variable) | Same path | Unset — the sweep runs | Set it to `false` to stop the monthly [verification sweep](#the-monthly-verification-sweep) reminders. A manual run still works, and the refresh form on an entry page is unaffected. |
 | `CATALOG_METRICS` (variable) | Same path | Unset — metrics run | Set it to `false` to stop the monthly [catalog metrics](#the-monthly-catalog-metrics) schedule. A manual run still works. |
 | `CATALOG_SHOWCASE` (variable) | Same path | Unset — no showcase | Leave it unset. Set to `true` only if you want your copy to publish the template's landing page and example sites instead of your own catalog (see [the showcase](configuration.md#the-showcase)). |
 | `CONTENT_BOT_TOKEN` (secret, optional) | Settings → Secrets and variables → Actions → **Secrets** | Unset | Without it, generated pull requests report their results as **(dispatch)** statuses instead of ordinary checks. Nothing breaks — see [Checks on a generated pull request](#checks-on-a-generated-pull-request). |
@@ -31,7 +31,7 @@ quietly rather than failing loudly.
 Work down this list once, in order. [Repository settings at a glance](#repository-settings-at-a-glance) above is the same set as a table, with the optional variables and secrets alongside.
 
 - [ ] **Pages source**: Settings → Pages → Source → **GitHub Actions** (not "Deploy from a branch").
-- [ ] **Actions can open pull requests**: Settings → Actions → General → Workflow permissions → **Allow GitHub Actions to create and approve pull requests**. Without this, every workflow that opens a pull request — the content forms (`new-entry`, `new-year`, `new-event`, `update-schedule`, `update-event-attachments`, `apply-setup`), the monthly metrics, the thumbnails, and the updated-date stamp — fails at its "Create pull request" step.
+- [ ] **Actions can open pull requests**: Settings → Actions → General → Workflow permissions → **Allow GitHub Actions to create and approve pull requests**. Without this, every workflow that opens a pull request — the content forms (`new-entry`, `new-year`, `new-event`, `refresh-entry`, `update-schedule`, `update-event-attachments`, `apply-setup`), the monthly metrics, the thumbnails, and the updated-date stamp — fails at its "Create pull request" step.
 - [ ] **Labels**: run the **Bootstrap labels** workflow once (Actions tab → *Bootstrap labels* → *Run workflow*), or create these by hand, exactly as named — the automation workflows filter on them:
   - `content:new-entry` — triggers `new-entry.yml`
   - `content:new-year` — triggers `new-year.yml`
@@ -39,7 +39,9 @@ Work down this list once, in order. [Repository settings at a glance](#repositor
   - `content:new-event` — triggers `new-event.yml`
   - `content:event-attachments` — triggers `update-event-attachments.yml`
   - `content:site-config` — triggers `apply-setup.yml` (maintainers only)
-  - `verification` — applied by `verification-sweep.yml` to its rolling issue; nothing triggers on it
+  - `content:refresh` — triggers `refresh-entry.yml` (answers to a refresh reminder)
+  - `verification` — applied by `verification-sweep.yml` to the refresh issue it keeps per stale entry; nothing triggers on it
+  - `review:refresh-changes` — applied by `refresh-entry.yml` when someone reports an entry out of date; nothing triggers on it
 
   The generated issue forms (`.github/ISSUE_TEMPLATE/*.yml`) already apply these labels when someone opens the issue; you just need the labels to exist in the repo first, or GitHub silently drops them.
 - [ ] **`_data/site.yml` → `github.repository`**: set to this repo's `owner/repo`. Drives the submit form's issue links and every "edit on GitHub" link.
@@ -209,23 +211,32 @@ bots.
 
 ## The monthly verification sweep
 
-A catalog decays quietly. The pilot in an entry became a production system, the contact changed jobs, the tool was retired — and nothing in the repository changes, so the entry keeps reading as current. The template handles this in two halves: the site tells *readers* when an entry is old, and this workflow tells *you*.
+A catalog decays quietly. The pilot in an entry became a production system, the contact changed jobs, the tool was retired — and nothing in the repository changes, so the entry keeps reading as current. The template handles this in three parts: the site tells *readers* when an entry is old, the sweep asks *the person who submitted it* whether it still holds, and their answer comes back as a pull request you review.
 
-**How old is old.** Every entry has a last-confirmed date: the newest of `verified`, `updated` and `published`. When that date is further back than `catalog.verify_after_days` in `_data/site.yml` (365 by default), the entry page shows a one-line note above the fact strip, its catalog card shows "Last confirmed <Month Year>", and the card sorts after fresher ones in the default order. Nothing turns amber and nothing is hidden — an entry nobody has re-checked in a year is still the best account of that project anyone has written down.
+**How old is old.** Every entry has a last-confirmed date: the newest of `verified`, `updated` and `published`. When that date is further back than `catalog.verify_after_days` in `_data/site.yml` (365 by default), the entry page shows a one-line note above the fact strip — now carrying a **Still accurate? Confirm it** link — its catalog card shows "Last confirmed <Month Year>", and the card sorts after fresher ones in the default order. Nothing turns amber and nothing is hidden: an entry nobody has re-checked in a year is still the best account of that project anyone has written down.
 
-**The sweep.** `.github/workflows/verification-sweep.yml` runs at 07:00 UTC on the 1st of each month (and on demand from the Actions tab). It lists the entries past the window and keeps **one** open issue — titled *Verification sweep — YYYY-MM*, labelled `verification` — holding a checklist with a link to each entry, its contact address, and an "edit front matter" link. Next month it rewrites that same issue rather than opening a second one, so a thread you have been working through keeps its comments. If every entry is inside the window, no issue is opened at all.
+**The sweep.** `.github/workflows/verification-sweep.yml` runs at 07:00 UTC on the 1st of each month (and on demand from the Actions tab). For each entry past the window it opens **one** issue labelled `verification`, titled *Still accurate? <entry title>*, holding the entry's link, its last-confirmed date and the two one-click answers below. Every issue carries a hidden `<!-- refresh-entry: <slug> -->` marker, which is how the next run finds the same thread and rewrites it in place rather than opening a second one — leave that line alone. An entry that has been confirmed since gets its issue closed with a note. If everything is inside the window, nothing is opened.
 
-The workflow only asks for `issues: write`. It never edits an entry, never closes anything, and never emails a contact — deciding an entry is still true is a person's job.
+**Who gets asked.** The issue @mentions the entry's submitter when they left a GitHub username in the optional *Your GitHub username* field (the schema's `entry.submitter_key` — see [content-model.md](content-model.md#top-level-structure)), plus everyone named in `catalog.refresh_mentions` in `_data/site.yml`. That list starts empty; put your maintainer team or a review group in it so an unanswered reminder has an owner. Nobody is emailed — the mention is the whole notification.
 
-**Clearing an item.** Ask the contact whether anything has changed, fix whatever has, and add (or update) one line in `catalog/<slug>/index.md`:
+**Not all at once.** A catalog that crosses the line in a clump would otherwise arrive as fifty notifications on the 1st. One run opens at most `catalog.refresh_max_new_issues` new issues (20 by default); the run summary says how many were deferred, and the next run — or a manual one from the Actions tab — picks up where it stopped, oldest first. Existing issues are always refreshed and never count against the cap.
+
+The sweep only asks for `issues: write`. It never edits an entry.
+
+**Answering one.** Both links in the issue open the same short form, *Refresh an entry* (`.github/ISSUE_TEMPLATE/refresh-entry.yml`), with the slug already filled in:
+
+- **Yes, still accurate** → `refresh-entry.yml` stamps `verified: <today>` on `catalog/<slug>/index.md` and opens a one-line pull request that closes the issue. The whole diff is one date. Merge it and the clock resets.
+- **No, something changed** → no pull request. Nobody can turn prose into a diff mechanically, so the notes are quoted into a comment addressed to the maintainers, the issue is labelled `review:refresh-changes` and stays open until a person has applied the change. That is your queue: filter issues by that label.
+
+A maintainer can always do it by hand instead — add or update one line in `catalog/<slug>/index.md`:
 
 ```yaml
 verified: "2026-08-17"
 ```
 
-That is the whole protocol. `verified` is a reserved key like `updated`: optional, `YYYY-MM-DD`, validated by `check_front_matter.rb` when present — and, unlike `updated`, never written by automation. Setting it resets the entry's clock even if nothing else about the entry changed — which is the point, since "we checked and it is still accurate" is real information.
+`verified` is a reserved key like `updated`: optional, `YYYY-MM-DD`, validated by `check_front_matter.rb` when present. Setting it resets the entry's clock even if nothing else about the entry changed — which is the point, since "we checked and it is still accurate" is real information. The refresh flow never moves it backwards and never touches sample content; when it declines to act it says why on the issue rather than going quiet.
 
-**Turning it off.** Set the repository variable `VERIFICATION_SWEEP` to `false` ([where](#repository-settings-at-a-glance)), or delete the workflow file. To change the window instead of removing the reminder, edit `catalog.verify_after_days` in `_data/site.yml` — the site notices and the sweep both read it, so they can never disagree.
+**Turning it off.** Set the repository variable `VERIFICATION_SWEEP` to `false` ([where](#repository-settings-at-a-glance)), or delete the workflow file — the refresh form still works for anyone who follows the link on an entry page. To change the window instead of removing the reminder, edit `catalog.verify_after_days` in `_data/site.yml` — the site notices and the sweep both read it, so they can never disagree. Setting `SUBMISSIONS_OPEN` to `false` also stops outside answers becoming pull requests; the issue gets a comment saying a maintainer will apply it by hand.
 
 ## The monthly catalog metrics
 

@@ -28,6 +28,7 @@ entry:
   status_approved_value: "Reviewed & approved"  # optional — what approval means; the PR checklist asks for it
   require_link: true       # optional — an entry with no link anywhere fails validation instead of warning
   contributor_key: organization  # optional — the field the monthly metrics count distinct "contributing organizations" from
+  submitter_key: submitter_github  # optional — the text field holding the submitter's GitHub username, for refresh reminders
 
 groups:                    # ordered; group filters and submit-form sections
   - key: about
@@ -45,6 +46,8 @@ fields:
 `entry.path` is also read by `_plugins/modules.rb` (to know which pages belong to the `catalog` module) and by every script that scaffolds or reads entries.
 
 The three `status_*` keys are optional pointers, in the same spirit as `verified`: they name a field rather than hardcoding one, so a schema without a review status simply leaves them out and nothing downstream looks for it. See [Review status and deprecation](#review-status-and-deprecation).
+
+`submitter_key` is a pointer of the same shape. It names an ordinary optional `text` field — `submitter_github` in the shipped schema — where a submitter may leave their GitHub username, so the [monthly verification sweep](admin-guide.md#the-monthly-verification-sweep) can @mention the person who wrote the entry rather than only the maintainers. A leading `@` is fine, the value is only ever read as a handle (never as an address or a login), `check_front_matter.rb` warns rather than fails when it does not look like a username, and leaving the key out of the schema removes both the question and the mention.
 
 ### Groups
 
@@ -73,7 +76,7 @@ On the submit page, groups are also the steps. With JavaScript on and more than 
 | `published` | Automation | `YYYY-MM-DD`. The default sort key. |
 | `render_with_liquid` | Automation | Always `false`, and CI fails an entry without it: the body is a submitter's markdown and must not be run through Liquid at build time. |
 | `updated` | Automation, or maintainer | Optional `YYYY-MM-DD`. When present, the entry page shows "Updated …" alongside the published date, and "Recently updated" sorting uses it. The deploy stamps it when a push to `main` modifies the entry file (`scripts/stamp_updated.mjs` — modified files only, never sample content, never backwards; see [admin-guide.md](admin-guide.md#editing-or-removing-an-existing-entry)); set it by hand when you want a different day. |
-| `verified` | Maintainer | Optional `YYYY-MM-DD`. The day someone confirmed with the contact that the entry is still true. Stronger than `updated`, which only says the text changed. The scaffolder never sets it — a maintainer does, in review or when clearing an item from the [monthly sweep](admin-guide.md#the-monthly-verification-sweep). |
+| `verified` | Maintainer, or the refresh form | Optional `YYYY-MM-DD`. The day someone confirmed with the contact that the entry is still true. Stronger than `updated`, which only says the text changed. The scaffolder never sets it. A maintainer sets it in review, or somebody answers the [refresh reminder](admin-guide.md#the-monthly-verification-sweep) with "still accurate" and the automation opens a one-line pull request that does. |
 | `featured` | Maintainer | `true` pins the entry into the home carousel and shows a Featured badge. Maintainer-only; there is no submitter path to it. |
 | `thumbnail` | Maintainer | Optional image path. First choice for the card image, ahead of any `images` field. |
 
@@ -84,6 +87,8 @@ Sample entries shipped with the template also carry `sample: true`, which is how
 An entry is "last confirmed" on the **newest** of `verified`, `updated` and `published` — three progressively weaker answers to the same question, and the newest one is the honest one. Past `catalog.verify_after_days` in `_data/site.yml` (default 365) the entry page shows a quiet note near the fact strip, cards carry a one-line "Last confirmed …", and the default catalog order puts the entry after fresher ones. Nothing is hidden and nothing turns amber: an unconfirmed entry is still the best account of that project anyone has written down.
 
 Because the newest date wins, a fresh catalog shows no notices at all, and a maintainer clears one by setting `verified:` — not by touching `updated:`, which would claim an edit that did not happen.
+
+The notice on an entry page also carries a **Still accurate? Confirm it** link, and once a month the sweep asks the same question in an issue addressed to the person who submitted the entry. Both point at the same short form, and answering it "yes" opens the pull request that sets `verified:` — so the date is usually set by whoever knows the answer, not by the maintainer who chased them. See [the monthly verification sweep](admin-guide.md#the-monthly-verification-sweep).
 
 ### Review status and deprecation
 
