@@ -36,6 +36,26 @@ major version, and each entry says so when it happens.
   rendered as a rail card on the entry page beside the new maintainer-only
   `security_review` status field, under a standing disclaimer: the catalog
   links to code, it does not vouch for it.
+- Search understands more than the reader's exact words. The build derives a
+  concept map from the catalog itself — which words keep turning up in the same
+  entries without being common everywhere — and the search box quietly widens
+  each query with the top related words. A concept hit always ranks strictly
+  below every hit the reader's own words found, in the list and in the listbox,
+  and the withheld-results button says "related to" instead of "that mention"
+  when concept hits sit behind it. Derivation is deterministic, tuned by a new
+  `concepts:` block in `_data/search.yml`, and stays off below 12 entries,
+  where corpus statistics are noise, not signal.
+- Structured field values are searchable as words: a `links` field's labels and
+  an `images` field's alt text now reach the index, so an entry can be found by
+  the name of a resource it links to. Real addresses (`https://`, `mailto:`,
+  `tel:`) stay out; prose that happens to carry a colon stays in.
+- "Search at a thousand entries" is a measured budget, not a hope. The
+  performance fixture now builds catalogs at 0/1/10/100/500/1000 entries, a
+  real browser drives search, filtering and compare at every size named in
+  `interaction_entries`, and `quality/performance-budgets.json` carries each
+  size's `scale_budgets`. The measured table lives in `docs/search.md`; the
+  query itself stays at 3–9 ms even at 1,000 entries — what grows is the grid
+  render, which is the number the budgets watch.
 
 All of it is additive — the new schema fields are optional, and no existing
 entry or preset has to change.

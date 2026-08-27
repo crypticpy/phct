@@ -24,8 +24,10 @@
 //   window.__catalogFilters.apply(k, v)   turn one of them on
 //
 // Vocabulary matches lead as filter suggestions; configured synonyms widen
-// document recall at lower weight. A relevance floor keeps passing body mentions
-// behind an explicit “show more” action without removing typo tolerance.
+// document recall at lower weight, and the corpus-derived concept map widens it
+// again strictly behind every literal hit. A relevance floor keeps passing body
+// mentions behind an explicit “show more” action without removing typo
+// tolerance.
 (function () {
   const input = document.querySelector('[data-filter="search"]');
   if (!input) return;
@@ -72,6 +74,10 @@
   // term -> [term, …] from _data/search.yml, already bidirectional and
   // lowercased by _plugins/search_index.rb.
   let synonyms = {};
+  // The corpus-derived concept map and its two query-side knobs, read from the
+  // payload by readConcepts(). Empty until the index loads, and empty for good
+  // on a catalog that switched the layer off or is too small to derive one.
+  let concepts = { terms: {}, weight: 0.9, max: 0 };
   let loading = null;
   let attempts = 0;
   let options = [];
@@ -95,7 +101,13 @@
    * Flatten a doc's sections into the single string lunr indexes as `body`,
    * remembering where each section starts so a match position can be traced
    * back to the heading it fell under.
-   * @param {object} doc a search.json doc, annotated in place.
+   *
+   * Returns a NEW doc rather than annotating the parsed one, so the write-up is
+   * held once: the joined body and the spans are all the rest of this file
+   * reads, and keeping `sections` beside them left a second copy of every
+   * write-up alive for the life of the page.
+   * @param {object} doc a search.json doc.
+   * @returns {object} the doc this file uses: no sections, plus body and spans.
    */
   function prepare(doc) {
     const parts = [];
@@ -109,54 +121,16 @@
       parts.push(text);
       at += text.length;
     });
-    doc.body = parts.join(' ');
-    doc.spans = spans;
-    doc.literal = Object.fromEntries(
-      ['title', 'summary', 'facets', 'body'].map((field) => [field, String(doc[field] || '').toLowerCase()])
-    );
-  }
-
-  function literalCount(value, term) {
-    const text = String(value || '');
-    let count = 0;
-    let at = text.indexOf(term);
-    while (at >= 0) {
-      const before = at > 0 && /[\p{L}\p{N}]/u.test(text[at - 1]);
-      const end = at + term.length;
-      const after = end < text.length && /[\p{L}\p{N}]/u.test(text[end]);
-      if (!before && !after) count += 1;
-      at = text.indexOf(term, at + Math.max(1, term.length));
-    }
-    return count;
-  }
-
-  /** Avoid expensive relevance scoring when one literal word matches much of the supported catalog. */
-  function commonLiteralQuery(terms, extra) {
-    if (terms.length !== 1 || extra.length) return null;
-    const term = terms[0];
-    const fields = [
-      ['title', 10],
-      ['summary', 4],
-      ['facets', 3],
-      ['body', 1],
-    ];
-    const hits = docs
-      .map((doc, index) => {
-        let score = 0;
-        const metadata = {};
-        fields.forEach(([field, boost]) => {
-          const count = literalCount(doc.literal[field], term);
-          if (!count) return;
-          metadata[field] = {};
-          score += boost * Math.log1p(count);
-        });
-        return score ? { doc, score, meta: { [term]: metadata }, index } : null;
-      })
-      .filter(Boolean);
-    if (hits.length < 25) return null;
-    return hits
-      .sort((left, right) => right.score - left.score || left.index - right.index)
-      .map(({ doc, score, meta }) => ({ doc, score, meta }));
+    return {
+      id: doc.id,
+      title: doc.title,
+      summary: doc.summary,
+      facets: doc.facets,
+      url: doc.url,
+      kind: doc.kind,
+      body: parts.join(' '),
+      spans: spans,
+    };
   }
 
   /**
@@ -179,16 +153,19 @@
         return r.json();
       })
       .then((data) => {
-        docs = (data && data.docs) || [];
+        docs = ((data && data.docs) || []).map(prepare);
         synonyms = (data && data.synonyms) || {};
-        docs.forEach(prepare);
+        concepts = readConcepts(data && data.concepts);
         idx = lunr(function () {
           this.ref('i');
           this.field('title', { boost: 10 });
           this.field('summary', { boost: 4 });
           this.field('facets', { boost: 3 });
           this.field('body');
-          this.metadataWhitelist = ['position'];
+          // No metadataWhitelist: `position` records every occurrence of every
+          // term in every field, the largest thing the index holds — and
+          // snippetFor() locates the term itself, for the one hit it is about
+          // to render rather than for all of them in advance.
           docs.forEach((d, i) =>
             this.add({
               i: String(i),
@@ -214,19 +191,15 @@
   }
 
   /**
-   * Keep prefix/typo recall for every word in a multi-term query; otherwise an
-   * exact hit for one word can hide another word's approximate matches.
-   * @param {string} q raw search box value.
+   * The reader's own words, plus the editor's synonyms for them: everything a
+   * hit can be ranked on. Prefix/typo recall is kept for every word in a
+   * multi-term query, otherwise an exact hit for one word hides another word's
+   * approximate matches.
+   * @param {string[]} terms the query's words.
+   * @param {string[]} extra synonym terms.
    * @returns {{doc: object, score: number, meta: object}[]} ranked hits.
    */
-  function query(q) {
-    if (!idx) return [];
-    const lower = q.toLowerCase();
-    const terms = lower.split(/\s+/).filter(Boolean);
-    if (!terms.length) return [];
-    const extra = expand(lower, terms);
-    const common = commonLiteralQuery(terms, extra);
-    if (common) return common;
+  function literalHits(terms, extra) {
     const search = (approximate) =>
       idx.query((qb) => {
         terms.forEach((t) => {
@@ -250,6 +223,103 @@
     return hits
       .map((h) => ({ doc: docs[Number(h.ref)], score: h.score, meta: h.matchData.metadata }))
       .filter((h) => h.doc);
+  }
+
+  /**
+   * The entries the corpus-derived concept map reaches that the reader's own
+   * words did not — "chatbot" finding the write-up that only ever says "chat
+   * assistant".
+   *
+   * This is recall, never ranking. A doc the literal pass already found keeps
+   * its literal score untouched, and everything new lands strictly BELOW the
+   * weakest literal hit (`concepts.weight` of it), so no expansion can reorder
+   * — let alone outrank — a match the reader earned with their own words. With
+   * no literal hits to rank against, concept hits keep their own scores.
+   *
+   * @param {string[]} related concept terms.
+   * @param {object[]} literal the literal hits, best first.
+   * @returns {{doc: object, score: number, meta: object, concept: boolean}[]}
+   */
+  function conceptHits(related, literal) {
+    let hits;
+    try {
+      hits = idx.query((qb) => related.forEach((t) => qb.term(t, { boost: 1 })));
+    } catch (e) {
+      return [];
+    }
+    const seen = new Set(literal.map((h) => h.doc.id));
+    const fresh = hits
+      .map((h) => ({
+        doc: docs[Number(h.ref)],
+        score: h.score,
+        meta: h.matchData.metadata,
+        concept: true,
+      }))
+      .filter((h) => h.doc && !seen.has(h.doc.id));
+    if (!fresh.length || !literal.length) return fresh;
+    const ceiling = literal[literal.length - 1].score * concepts.weight;
+    const top = fresh[0].score || 1;
+    return fresh.map((h) => ({ ...h, score: (h.score / top) * ceiling }));
+  }
+
+  /**
+   * Rank the catalog against a query: literal hits first, then the concept
+   * layer's additions behind them.
+   * @param {string} q raw search box value.
+   * @returns {{doc: object, score: number, meta: object}[]} ranked hits.
+   */
+  function query(q) {
+    if (!idx) return [];
+    const lower = q.toLowerCase();
+    const terms = lower.split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    const extra = expand(lower, terms);
+    const literal = literalHits(terms, extra);
+    const related = relate(terms, extra);
+    return related.length ? literal.concat(conceptHits(related, literal)) : literal;
+  }
+
+  /**
+   * Read the payload's concept block, clamping every knob to a range that
+   * keeps the guarantee above true whatever `_data/search.yml` says.
+   * @param {object|undefined} raw `concepts` from /search.json.
+   * @returns {{terms: object, weight: number, max: number}}
+   */
+  function readConcepts(raw) {
+    const block = raw && typeof raw === 'object' ? raw : {};
+    const number = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+    return {
+      terms: block.terms && typeof block.terms === 'object' ? block.terms : {},
+      // 1 puts a concept hit level with the weakest literal hit; anything above
+      // that would let it climb past one, so the clamp is the guarantee.
+      weight: Math.min(1, Math.max(0, number(block.weight, 0.9))),
+      max: Math.max(0, Math.trunc(number(block.max_expansions, 4))),
+    };
+  }
+
+  /**
+   * The concept terms a query earns, taken a round at a time so one word of a
+   * multi-word query cannot spend the whole budget.
+   * @param {string[]} terms the query's words.
+   * @param {string[]} extra synonym terms already being searched.
+   * @returns {string[]}
+   */
+  function relate(terms, extra) {
+    if (!concepts.max) return [];
+    const known = new Set(terms.concat(extra));
+    const lists = terms.map((term) => concepts.terms[term] || []);
+    const out = [];
+    for (let round = 0; out.length < concepts.max; round += 1) {
+      if (!lists.some((list) => list.length > round)) break;
+      for (const list of lists) {
+        if (out.length >= concepts.max) break;
+        const word = list[round];
+        if (!word || known.has(word)) continue;
+        known.add(word);
+        out.push(word);
+      }
+    }
+    return out;
   }
 
   /**
@@ -348,6 +418,50 @@
 
   /* ------------------------------------------------------------- snippets */
 
+  const WORD_CHAR = /[\p{L}\p{N}]/u;
+
+  /**
+   * A body word as the index would have stored it, so it can be compared with
+   * the term lunr matched.
+   * @param {string} word one whole word from the body.
+   * @returns {string} its stem, or '' when the pipeline drops it.
+   */
+  function stemOf(word) {
+    try {
+      const tokens = idx.pipeline.runString(word.toLowerCase());
+      return tokens.length ? String(tokens[0]) : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /**
+   * Where in a body a lunr term really matched. The term is a stem, so it also
+   * sits inside words the index never matched — `data` is a prefix of
+   * `database`, and marking that sends the reader to the wrong section under a
+   * word nothing matched. Each candidate is widened to its whole word and kept
+   * only if that word stems to the term; the scan carries past the rest.
+   *
+   * @param {string} text the doc body.
+   * @param {string} lower the same text lowercased.
+   * @param {string} term the stemmed term from lunr's match metadata.
+   * @returns {[number, number]|null} [start, length] of the word, or null.
+   */
+  function locate(text, lower, term) {
+    const needle = term.toLowerCase();
+    if (!needle) return null;
+    let at = lower.indexOf(needle);
+    while (at > -1) {
+      let start = at;
+      while (start > 0 && WORD_CHAR.test(text[start - 1])) start -= 1;
+      let end = at + needle.length;
+      while (end < text.length && WORD_CHAR.test(text[end])) end += 1;
+      if (stemOf(text.slice(start, end)) === term) return [start, end - start];
+      at = lower.indexOf(needle, Math.max(end, at + 1));
+    }
+    return null;
+  }
+
   /**
    * The best body match for a hit: where in the write-up it landed, which
    * section that is, and enough surrounding words to read.
@@ -366,15 +480,9 @@
       let length;
       if (position) [start, length] = position;
       else {
-        const needle = term.toLowerCase();
-        start = lower.indexOf(needle);
-        while (start > 0 && /[\p{L}\p{N}]/u.test(text[start - 1])) {
-          start = lower.indexOf(needle, start + 1);
-        }
-        if (start < 0) return;
-        let end = start + needle.length;
-        while (end < text.length && /[\p{L}\p{N}]/u.test(text[end])) end += 1;
-        length = end - start;
+        const found = locate(text, lower, term);
+        if (!found) return;
+        [start, length] = found;
       }
       if (!best || start < best[0]) best = [start, length];
     });
@@ -602,7 +710,10 @@
     options = [];
     const others = results.filter((h) => h.doc.kind !== 'entry').slice(0, 5);
     const entries = results.filter((h) => h.doc.kind === 'entry').slice(0, 5);
-    const hits = others.concat(entries);
+    // Grouping by kind alone would lift a concept-matched event above the
+    // entries the reader's own words found. The sort is stable, so each group
+    // keeps its ranked order and only the concept rows move, to the end.
+    const hits = others.concat(entries).sort((a, b) => (a.concept ? 1 : 0) - (b.concept ? 1 : 0));
     const count = vocab.length + hits.length;
     if (!count) {
       close();
@@ -688,18 +799,22 @@
   function publish(entries, q) {
     const top = entries.length ? entries[0].score : 0;
     const all = lifted === q;
-    const strong = all ? entries : entries.filter((h) => h.score >= top * RELEVANCE_FLOOR);
-    const weak = entries.length - strong.length;
+    const strong = [];
+    const weak = [];
+    entries.forEach((h) => (all || h.score >= top * RELEVANCE_FLOOR ? strong : weak).push(h));
     const ids = strong.map((h) => h.doc.id);
     announce(new Set(ids), ids);
     queueCardAnnotations(strong);
 
     if (!floorEl || !moreBtn) return;
-    floorEl.hidden = weak === 0;
+    floorEl.hidden = weak.length === 0;
+    // A concept hit is held back precisely because it never says the word, so
+    // the offer says what is true of every entry behind it.
+    const held = weak.some((h) => h.concept)
+      ? [' more related to “', ' more related to “']
+      : [' more that mentions “', ' more that mention “'];
     moreBtn.textContent =
-      weak === 1
-        ? 'Show 1 more that mentions “' + q + '”'
-        : 'Show ' + weak + ' more that mention “' + q + '”';
+      weak.length === 1 ? 'Show 1' + held[0] + q + '”' : 'Show ' + weak.length + held[1] + q + '”';
     moreBtn.dataset.searchMore = q;
   }
 
