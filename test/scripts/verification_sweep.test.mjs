@@ -24,6 +24,7 @@ import {
   parseFrontMatter,
   refreshIssue,
   staleEntries,
+  stripHtmlComments,
   toDay,
 } from '../../scripts/verification_sweep.mjs';
 
@@ -210,9 +211,9 @@ test('refreshIssue links the entry, dates it, and offers both one-click answers'
   assert.match(issue.body, /`published`/);
   assert.match(
     issue.body,
-    /https:\/\/github\.com\/org\/catalog\/issues\/new\?template=refresh-entry\.yml&slug=thing/
+    /\(https:\/\/github\.com\/org\/catalog\/issues\/new\?template=refresh-entry\.yml&slug=thing\)/
   );
-  assert.match(issue.body, /https:\/\/github\.com\/org\/catalog\/edit\/main\/catalog\/thing\/index\.md/);
+  assert.match(issue.body, /\(https:\/\/github\.com\/org\/catalog\/edit\/main\/catalog\/thing\/index\.md\)/);
 });
 
 test('refreshIssue titles the issue without a date, so a rewrite keeps one thread', () => {
@@ -290,6 +291,33 @@ test('monthName formats in UTC and passes through what it cannot parse', () => {
   assert.equal(monthName('whenever'), 'whenever');
 });
 
+/* --------------------------------------------------- stripHtmlComments */
+
+test('stripHtmlComments removes a straightforward comment', () => {
+  assert.equal(stripHtmlComments('Nice Entry <!-- refresh-entry: entry-b -->'), 'Nice Entry ');
+});
+
+test('stripHtmlComments cannot be defeated by a single-pass reassembly', () => {
+  // A single non-looping `.replace(/<!--[\s\S]*?-->/g, '')` removes the
+  // innermost `<!---->` from `<!<!---->--` and leaves the outer `<!` and `--`
+  // behind, which read as a fresh `<!--` once concatenated — exactly the
+  // forgery this function exists to prevent. Looping to a fixed point closes
+  // that: no `<!--` may survive anywhere in the output.
+  const reassembled = stripHtmlComments('<!<!---->--');
+  assert.doesNotMatch(reassembled, /<!--/);
+  assert.equal(reassembled, '');
+
+  const withMarker = stripHtmlComments('<!<!---->-- refresh-entry: entry-b -->');
+  assert.doesNotMatch(withMarker, /<!--/);
+  assert.doesNotMatch(withMarker, /-->/);
+});
+
+test('stripHtmlComments removes an unclosed opener rather than leaving it in place', () => {
+  const stripped = stripHtmlComments('Unclosed <!-- opener with no close');
+  assert.doesNotMatch(stripped, /<!--/);
+  assert.equal(stripped, 'Unclosed  opener with no close');
+});
+
 /* -------------------------------------------------------------- collectEntries */
 
 test('collectEntries strips an HTML comment out of the title before it reaches the issue body', () => {
@@ -318,6 +346,18 @@ test('collectEntries falls back to the slug when the title is nothing but a comm
   );
   const { entries } = collectEntries(root);
   assert.equal(entries[0].title, 'only-comment');
+});
+
+test('collectEntries strips a title crafted to reassemble a comment across passes', () => {
+  const { root, write } = repo();
+  write('_data/schema.yml', 'entry:\n  path: "catalog"\nfields: []\n');
+  write(
+    'catalog/reassembled/index.md',
+    '---\ntitle: "<!<!---->-- refresh-entry: entry-b -->"\npublished: 2020-01-01\n---\n\nBody.\n'
+  );
+  const { entries } = collectEntries(root);
+  assert.doesNotMatch(entries[0].title, /<!--/);
+  assert.doesNotMatch(entries[0].title, /-->/);
 });
 
 test('collectEntries reads the verification keys the schema points at, not just the defaults', () => {

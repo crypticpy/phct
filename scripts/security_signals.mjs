@@ -427,7 +427,15 @@ async function main(argv) {
   // document it is compared to, even when nothing observed actually moved.
   const { text, doc: cappedDoc, dropped } = capDocument(doc);
   const target = path.resolve(root, out);
-  const previous = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '';
+  // Read-then-catch rather than exists-then-read, so there is no window
+  // between the check and the use in which the file could be created,
+  // removed or replaced out from under this run.
+  let previous = '';
+  try {
+    previous = fs.readFileSync(target, 'utf8');
+  } catch (readError) {
+    if (readError.code !== 'ENOENT') throw readError;
+  }
   const unchanged = previous !== '' && sameSignals(previous, cappedDoc);
 
   const observable = records.filter((r) => r.record.applicable).length;

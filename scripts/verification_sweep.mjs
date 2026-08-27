@@ -175,6 +175,31 @@ export function mentionLine({ submitter, mentions = [] }) {
 }
 
 /**
+ * Strip every HTML comment out of `text`, to a fixed point.
+ *
+ * A single pass of `/<!--[\s\S]*?-->/g` can leave a reconstructed `<!--`
+ * behind: `<!<!---->--` has no complete pair until the inner `<!---->` is
+ * removed, at which point the outer `<!` and `--` it left behind now read as
+ * a fresh `<!--`. Looping the same pass to a fixed point (nothing left to
+ * remove) closes that reassembly. A final pass drops any `<!--` or `-->`
+ * token that never paired up, so an unclosed opener cannot survive either —
+ * this is title text rendered into a GitHub issue body that also carries the
+ * `<!-- refresh-entry: <slug> -->` dedupe marker the workflow reads back
+ * with a first-match regex, and it must never be able to forge one.
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripHtmlComments(text) {
+  let current = String(text ?? '');
+  let previous;
+  do {
+    previous = current;
+    current = current.replace(/<!--[\s\S]*?-->/g, '');
+  } while (current !== previous);
+  return current.replace(/<!--|-->/g, '');
+}
+
+/**
  * The HTML comment that ties an issue to an entry across runs.
  * @param {string} slug
  * @returns {string}
@@ -318,10 +343,7 @@ export function collectEntries(root) {
         // which also carries the `<!-- refresh-entry: <slug> -->` dedupe
         // marker; a title containing its own HTML comment could otherwise be
         // read back as (or ahead of) that marker by the workflow's regex.
-        title:
-          String(data.title || dirent.name)
-            .replace(/<!--[\s\S]*?-->/g, '')
-            .trim() || dirent.name,
+        title: stripHtmlComments(String(data.title || dirent.name)).trim() || dirent.name,
         url: `/${entryPath}/${dirent.name}/`,
         contact: contact ? String(contact) : '',
         submitter: submitterKey ? String(data[submitterKey] ?? '') : '',
