@@ -8,6 +8,18 @@
 //   [data-search-live]         sr-only role="status": how many suggestions are open
 //   [data-search-floor]        wrapper for the "show the weaker matches" button
 //   [data-search-more]         that button
+//   [data-search-gate]         wrapper for the on-demand "Load full search" control,
+//                              unhidden on a low-powered device facing a large catalog
+//   [data-search-load]         its button
+//   [data-search-progress]     its role="status" progress line
+//
+// The input also carries data-search-worker (the path to
+// assets/js/search-worker.js), data-search-version (the payload's content
+// version) and data-search-entries (the catalog's entry count), stamped by
+// _plugins/search_index.rb via _includes/results-header.html. Where the
+// browser has workers, the fetch and the whole lunr build happen off the main
+// thread and finished builds come back from IndexedDB on unchanged catalogs;
+// without them (or when the worker fails) the original inline build runs.
 //   [data-match-slot]          optional, inside an entry card (_includes/entry-card.html):
 //                              filled with the section + snippet that matched
 //   [data-empty-suggestions]   optional, inside the zero-result panel (_layouts/catalog.html):
@@ -36,7 +48,13 @@
   const liveEl = document.querySelector('[data-search-live]');
   const floorEl = document.querySelector('[data-search-floor]');
   const moreBtn = document.querySelector('[data-search-more]');
+  const gateEl = document.querySelector('[data-search-gate]');
+  const gateBtn = document.querySelector('[data-search-load]');
+  const gateProgress = document.querySelector('[data-search-progress]');
   const indexUrl = input.dataset.searchIndex || '/search.json';
+  const workerUrl = input.dataset.searchWorker || '';
+  const indexVersion = input.dataset.searchVersion || '';
+  const catalogEntries = Number(input.dataset.searchEntries) || 0;
 
   // Share of the top hit's score a result must reach to make the grid.
   const RELEVANCE_FLOOR = 0.25;
@@ -48,6 +66,9 @@
   // A hung connection (captive portal, a proxy that accepts and never answers)
   // must fail loudly rather than leave `loading` pending for ever.
   const FETCH_TIMEOUT = 8000;
+  // Entries at which building the index is seconds of work on a weak device —
+  // which is when the reader gets asked (the gate) instead of stalled.
+  const HEAVY_ENTRIES = 300;
 
   if (typeof lunr === 'undefined') {
     if (statusEl) {
@@ -88,6 +109,23 @@
   let lifted = null;
   let annotationFrame = null;
   let annotationTimer = null;
+
+  /**
+   * A device where seconds of index building would be felt: few cores or
+   * little memory. Absent signals count as capable — the gate is for devices
+   * that SAY they are constrained, not for browsers that stay quiet.
+   * @returns {boolean}
+   */
+  function constrained() {
+    const cores = navigator.hardwareConcurrency || 0;
+    const memory = navigator.deviceMemory || 0;
+    return (cores > 0 && cores < 4) || (memory > 0 && memory < 4);
+  }
+
+  // True while full search waits behind the "Load full search" button: a
+  // low-powered device facing a large catalog. The build-time entry count and
+  // the runtime device signals each carry half of that decision.
+  let gated = Boolean(gateEl && gateBtn) && catalogEntries >= HEAVY_ENTRIES && constrained();
 
   // Unhide before writing: a live region that is still `display:none` when its
   // text changes is not announced by every screen reader.
@@ -134,12 +172,111 @@
   }
 
   /**
-   * Fetch and index `/search.json`, memoizing the result. A failed load is
-   * never memoized (see file header) so the next call retries, up to two
-   * attempts before giving up with a visible message.
+   * Fetch and index `/search.json`, memoizing the result. With a worker
+   * available the fetch, the parse and the whole lunr build leave the main
+   * thread (assets/js/search-worker.js) — and come straight back from the
+   * worker's IndexedDB copy when the catalog is unchanged since the last
+   * visit. Browsers without workers get the original inline build below; so
+   * does any worker that fails, which is why a worker failure is silent.
    * @returns {Promise<boolean>} whether `idx` is now usable.
    */
   function load() {
+    if (idx) return Promise.resolve(true);
+    if (loading) return loading;
+    if (typeof Worker !== 'undefined' && workerUrl) {
+      loading = loadViaWorker().catch(() => {
+        loading = null;
+        return loadInline();
+      });
+      return loading;
+    }
+    return loadInline();
+  }
+
+  /**
+   * Put a payload and a prebuilt index into service. `lunr.Index.load` over
+   * the worker's serialized build is a fraction of the cost of building.
+   * @param {object} data the /search.json payload.
+   * @param {object} serialized `lunr.Index.prototype.toJSON()` output.
+   */
+  function adopt(data, serialized) {
+    docs = ((data && data.docs) || []).map(prepare);
+    synonyms = (data && data.synonyms) || {};
+    concepts = readConcepts(data && data.concepts);
+    idx = lunr.Index.load(serialized);
+  }
+
+  /**
+   * Build the index in assets/js/search-worker.js, narrating download and
+   * build progress onto the gate's status line while it happens.
+   * @returns {Promise<boolean>} resolves true; rejects so load() can fall
+   *   back to the inline build.
+   */
+  function loadViaWorker() {
+    return new Promise((resolve, reject) => {
+      let worker;
+      try {
+        worker = new Worker(workerUrl);
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      const fail = (error) => {
+        worker.terminate();
+        reject(error);
+      };
+      worker.onerror = (e) => fail(new Error(e && e.message ? e.message : 'worker error'));
+      worker.onmessage = (e) => {
+        const msg = e.data || {};
+        if (msg.type === 'progress') {
+          progress(msg);
+          return;
+        }
+        if (msg.type !== 'ready') {
+          fail(new Error(msg.error || 'worker failed'));
+          return;
+        }
+        try {
+          adopt(msg.payload, msg.serialized);
+        } catch (error) {
+          fail(error);
+          return;
+        }
+        worker.terminate();
+        setStatus('');
+        resolve(true);
+      };
+      worker.postMessage({ url: indexUrl, version: indexVersion });
+    });
+  }
+
+  /**
+   * Honest progress on the gate's status line: real numbers while they are
+   * known, a named phase when they are not. The Content-Length of a
+   * compressed response undercounts what the reader will actually receive,
+   * so the total is only shown while it stays ahead of the running count.
+   * @param {{phase: string, loaded?: number, total?: number}} msg
+   */
+  function progress(msg) {
+    if (!gateProgress) return;
+    if (msg.phase === 'build') {
+      gateProgress.textContent = 'Building the search index…';
+      return;
+    }
+    const kb = Math.round((msg.loaded || 0) / 1024);
+    gateProgress.textContent =
+      msg.total && msg.total >= (msg.loaded || 0)
+        ? 'Downloading the index — ' + kb + ' of ' + Math.round(msg.total / 1024) + ' KB'
+        : 'Downloading the index — ' + kb + ' KB';
+  }
+
+  /**
+   * The original in-page load: fetch and build on the main thread, memoizing
+   * the result. A failed load is never memoized (see file header) so the next
+   * call retries, up to two attempts before giving up with a visible message.
+   * @returns {Promise<boolean>} whether `idx` is now usable.
+   */
+  function loadInline() {
     if (idx) return Promise.resolve(true);
     if (loading) return loading;
     attempts += 1;
@@ -184,7 +321,7 @@
         loading = null;
         idx = null;
         setStatus(attempts < 2 ? 'Search is unavailable — retrying…' : 'Search is unavailable — try again.');
-        if (attempts < 2) return load();
+        if (attempts < 2) return loadInline();
         return false;
       });
     return loading;
@@ -833,6 +970,7 @@
     if (!q) {
       lifted = null;
       if (floorEl) floorEl.hidden = true;
+      if (gated) setStatus('');
       queueCardAnnotations([]);
       renderSuggestions([]);
       announce(null, []);
@@ -844,6 +982,17 @@
     // /search.json is still in flight.
     const vocab = matchVocabulary(q, MAX_VOCAB_ROWS);
     renderSuggestions(matchVocabulary(q, MAX_EMPTY_CHIPS));
+    // Behind the gate the index is deliberately not loaded: the reader keeps
+    // the filter suggestions (which need no index) and an unfiltered grid,
+    // and the status line points at the button that spends the seconds on
+    // their say-so.
+    if (gated && !idx) {
+      setStatus('Full search is not loaded yet — use “Load full search” below.');
+      announce(null, []);
+      if (showList && document.activeElement === input) renderList([], vocab);
+      else close();
+      return;
+    }
     load().then((ok) => {
       // A newer keystroke has already been answered. This is reachable: the
       // retry path in load() adds a microtask hop, so a query chained on the
@@ -873,7 +1022,31 @@
     clearTimeout(timer);
     timer = setTimeout(run, 50);
   });
-  input.addEventListener('focus', () => load());
+  input.addEventListener('focus', () => {
+    if (!gated) load();
+  });
+
+  if (gated) {
+    gateEl.hidden = false;
+    gateBtn.addEventListener('click', () => {
+      // From here the reader has chosen to spend the time: drop the gate so
+      // every later path (focus, keystroke, retry) loads normally.
+      gated = false;
+      gateBtn.disabled = true;
+      if (gateProgress) gateProgress.textContent = 'Loading the search index…';
+      load().then((ok) => {
+        if (!ok) {
+          // loadInline() has already said why in [data-search-status]; leave
+          // the button armed so the reader can try again from here too.
+          gateBtn.disabled = false;
+          if (gateProgress) gateProgress.textContent = '';
+          return;
+        }
+        gateEl.hidden = true;
+        if (input.value.trim()) run(document.activeElement === input);
+      });
+    });
+  }
 
   if (moreBtn) {
     // Lifting the floor re-renders the current answer; it never re-queries and
@@ -942,11 +1115,13 @@
   // this is the only place that knows the index exists.
   if (input.value.trim()) run(document.activeElement === input);
 
-  // Backstop for the intent-based load above: warm the index when the browser
-  // is otherwise idle, so the first keystroke rarely waits on the network.
-  // Skipped on a metered or slow connection, where the index is a real cost.
+  // Backstop for the intent-based load above: build the whole index while the
+  // browser is idle, so the first keystroke rarely waits at all — the build
+  // runs in a worker where one exists, so "idle" stays honest either way.
+  // Skipped on a metered or slow connection, where the index is a real cost,
+  // and behind the gate, where loading is the reader's call to make.
   const conn = navigator.connection || {};
-  if (!conn.saveData && !/2g/.test(conn.effectiveType || '')) {
+  if (!gated && !conn.saveData && !/2g/.test(conn.effectiveType || '')) {
     const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
     idle(
       () => {

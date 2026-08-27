@@ -472,4 +472,39 @@ class SearchIndexGeneratorTest < Minitest::Test
     assert_equal "thing", parsed["docs"].first["id"]
     assert_equal "S", parsed["docs"].first["sections"].first["h"]
   end
+
+  def test_the_version_names_the_content_not_the_build
+    entry = {
+      "dir" => "catalog/thing", "layout" => "entry", "slug" => "thing",
+      "title" => "Thing", "body" => "## S\nP.\n"
+    }
+    versions = Array.new(2) do
+      site = build_site(pages: [entry.dup])
+      @generator.generate(site)
+      site.static_files.last.instance_variable_get(:@payload)[:version]
+    end
+    assert_match(/\A\h{16}\z/, versions.first)
+    # Two builds of the same catalog agree, however far apart generated_at is.
+    assert_equal versions.first, versions.last
+
+    changed = build_site(pages: [entry.merge("title" => "Other thing")])
+    @generator.generate(changed)
+    refute_equal versions.first, changed.static_files.last.instance_variable_get(:@payload)[:version]
+  end
+
+  def test_the_version_and_entry_count_are_stamped_into_site_config
+    site = build_site(pages: [
+      { "dir" => "catalog/thing", "layout" => "entry", "slug" => "thing", "title" => "Thing" },
+      { "dir" => "catalog/other", "layout" => "entry", "slug" => "other", "title" => "Other" },
+      { "dir" => "events/kickoff", "layout" => "event", "cohort" => "2026",
+        "event_id" => "kickoff", "title" => "Kickoff" }
+    ])
+    @generator.generate(site)
+
+    stamp = site.config["search_index"]
+    payload = site.static_files.last.instance_variable_get(:@payload)
+    assert_equal payload[:version], stamp["version"]
+    # Entries only: events and cohorts are searchable but never gate the UI.
+    assert_equal 2, stamp["entries"]
+  end
 end

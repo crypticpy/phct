@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "digest"
 require "json"
 require "fileutils"
 require "time"
@@ -120,11 +121,28 @@ module CatalogTemplate
         end
       end
 
+      synonym_map = synonyms(site)
+      concept_map = concepts(docs, options)
+      # The version names the CONTENT of the payload — docs plus both
+      # widenings, with `generated_at` deliberately left out — so a rebuild
+      # that changes no content keeps the same version. assets/js/search-worker.js
+      # keys its IndexedDB copy of the built index on it: a cache is exactly as
+      # stale as the content it was built from, never invalidated by a redeploy.
+      version = Digest::SHA256.hexdigest(JSON.generate([docs, synonym_map, concept_map]))[0, 16]
       payload = {
         generated_at: Time.now.utc.iso8601,
-        synonyms: synonyms(site),
-        concepts: concepts(docs, options),
+        version: version,
+        synonyms: synonym_map,
+        concepts: concept_map,
         docs: docs
+      }
+      # Stamped into the site config so _includes/results-header.html can hand
+      # both to assets/js/search.js as data attributes: the version lets the
+      # worker answer from its cache without fetching, and the entry count is
+      # the build-time half of the "is full search heavy here" decision.
+      site.config["search_index"] = {
+        "version" => version,
+        "entries" => docs.count { |doc| doc[:kind] == "entry" }
       }
       site.static_files << SearchIndexFile.new(site, payload)
     end

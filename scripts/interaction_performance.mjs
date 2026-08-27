@@ -459,6 +459,16 @@ async function runProbe(siteDirectory, supportedRun) {
         configurable: true,
         value: { effectiveType: '4g', saveData: true },
       });
+      // Pin the core count so the probe measures the same path on every
+      // runner: search.js parks full search behind a "Load full search"
+      // button on devices reporting few cores, and a 2-vCPU runner would
+      // otherwise measure the gate instead of the load. The gate has its own
+      // coverage in test/scripts/search.test.mjs; this harness measures the
+      // load itself.
+      Object.defineProperty(navigator, 'hardwareConcurrency', {
+        configurable: true,
+        value: 8,
+      });
     });
     const session = await page.createCDPSession();
     await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
