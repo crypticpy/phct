@@ -36,6 +36,7 @@ jobs:
           create "content:new-year"           "1B8A7A" "Scaffold a new cohort year"
           create "content:site-config"        "5B3E96" "Apply a site configuration from the /setup/ wizard (maintainers only)"
           create "content:refresh"            "1D4E89" "Answer to a refresh reminder: confirm an entry, or say what changed"
+          create "content:also-deployed-by"   "1D4E89" "An organization saying they deployed an existing entry too"
           # Not a content: label — nobody applies this one by hand. The monthly
           # verification sweep (verification-sweep.yml) applies it to the refresh
           # issue it keeps open per stale entry, so maintainers can find or mute

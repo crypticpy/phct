@@ -562,7 +562,7 @@ test('the canonical PHCT Pages and quality workflows cannot silently skip the sh
 });
 
 test('machine-maintained branches use lease-protected force pushes', () => {
-  for (const name of ['apply-setup.yml', 'new-entry.yml', 'refresh-entry.yml']) {
+  for (const name of ['apply-setup.yml', 'new-entry.yml', 'refresh-entry.yml', 'also-deployed-by.yml']) {
     const source = workflow(name);
     assert.doesNotMatch(source, /git push --force origin/);
     assert.match(source, /git push --force-with-lease origin/);
@@ -606,6 +606,44 @@ test('the refresh loop keeps issue text out of the shell and touches one file', 
   assert.doesNotMatch(sweep, /contents: write/u);
 });
 
+// The other loop that writes to an entry from an issue anybody may open, and
+// the only one that publishes a stranger's name, link and email address on
+// somebody else's page. Same shapes: no issue text in a shell, one file in the
+// commit, and every claim held until a maintainer merges it.
+test('the also-deployed-by loop keeps issue text out of the shell and touches one file', () => {
+  const source = workflow('also-deployed-by.yml');
+  const parsed = YAML.parse(source);
+  const steps = Object.values(parsed.jobs).flatMap((job) => job.steps ?? []);
+
+  for (const step of steps.filter((candidate) => typeof candidate.run === 'string')) {
+    assert.doesNotMatch(
+      step.run,
+      /\$\{\{\s*(github\.event\.issue\.(body|title)|steps\.deployment\.outputs\.(reason|org|error))/u,
+      `${step.name} interpolates issue text into a shell script`
+    );
+  }
+  assert.match(source, /ISSUE_BODY: \$\{\{ github\.event\.issue\.body \}\}/u);
+
+  const commit = workflowStepScript('also-deployed-by.yml', 'attach', 'Commit the listing on a new branch');
+  assert.match(commit, /git add -- "\$ENTRY_FILE"/u);
+  assert.doesNotMatch(commit, /git add -A/u, 'one listing must never sweep up an unrelated file');
+
+  // The form is hand-authored (it asks about an entry, not about the schema),
+  // so the label and the title prefix the two label workflows key off have to
+  // stay in step with it to the character.
+  const form = YAML.parse(
+    fs.readFileSync(path.join(ROOT, '.github', 'ISSUE_TEMPLATE', 'also-deployed-by.yml'), 'utf8')
+  );
+  assert.deepEqual(form.labels, ['content:also-deployed-by']);
+  assert.equal(form.title.trim(), 'Also deployed by:');
+  assert.deepEqual(
+    form.body.filter((field) => field.id).map((field) => field.id),
+    ['slug', 'org', 'url', 'email', 'note']
+  );
+  assert.match(workflow('bootstrap-labels.yml'), /create "content:also-deployed-by"/u);
+  assert.match(workflow('missing-label.yml'), /startsWith\('Also deployed by:'\)/u);
+});
+
 test('the sweep and the script agree on the marker that dedupes a refresh thread', async () => {
   const { issueMarker } = await import('../../scripts/verification_sweep.mjs');
   const sweep = workflow('verification-sweep.yml');
@@ -639,6 +677,7 @@ test('every npm dependency install selects the exact package manager after setup
 // answer on both paths.
 test('every issue-driven content workflow answers on the issue, in success and in failure', () => {
   const contentWorkflows = [
+    'also-deployed-by.yml',
     'apply-setup.yml',
     'new-entry.yml',
     'new-event.yml',
@@ -679,6 +718,7 @@ test('every issue-driven content workflow answers on the issue, in success and i
 
 test('protected-main automation stays reviewable and generated PRs can satisfy required checks', () => {
   const generatedPullRequestWorkflows = [
+    'also-deployed-by.yml',
     'apply-setup.yml',
     'new-entry.yml',
     'new-event.yml',
