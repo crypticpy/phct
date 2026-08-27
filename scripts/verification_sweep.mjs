@@ -175,28 +175,32 @@ export function mentionLine({ submitter, mentions = [] }) {
 }
 
 /**
- * Strip every HTML comment out of `text`, to a fixed point.
+ * Strip every `<` and `>` character out of `text`.
  *
- * A single pass of `/<!--[\s\S]*?-->/g` can leave a reconstructed `<!--`
- * behind: `<!<!---->--` has no complete pair until the inner `<!---->` is
- * removed, at which point the outer `<!` and `--` it left behind now read as
- * a fresh `<!--`. Looping the same pass to a fixed point (nothing left to
- * remove) closes that reassembly. A final pass drops any `<!--` or `-->`
- * token that never paired up, so an unclosed opener cannot survive either —
- * this is title text rendered into a GitHub issue body that also carries the
+ * Earlier versions of this function tried to recognize and remove HTML
+ * *comments* (`/<!--[\s\S]*?-->/`), even looped to a fixed point. That is a
+ * multi-character pattern-matching approach, and those can always be
+ * defeated by reassembly: removing one recognized token can expose the
+ * characters of another. `<!<!---->--` is the canonical example — deleting
+ * the inner `<!---->` leaves the outer `<` and `!--` adjacent, which reads
+ * as a fresh `<!--`. HTML also treats `--!>` as a comment close, which a
+ * pattern tuned only for `-->` would miss entirely.
+ *
+ * Dropping every `<` and `>` character, in one single-character pass, sits
+ * outside that whole class of bug: there is no token to reconstruct because
+ * there is no multi-character token being matched in the first place — no
+ * `<` survives into the output, so no comment opener (`<!--`, `<!`) can
+ * exist in it regardless of how the input is shaped. This is title text
+ * rendered into a GitHub issue body that also carries the
  * `<!-- refresh-entry: <slug> -->` dedupe marker the workflow reads back
- * with a first-match regex, and it must never be able to forge one.
+ * with a first-match regex, and it must never be able to forge one. Losing
+ * literal angle brackets from an issue-heading title is an acceptable cost
+ * for that guarantee.
  * @param {string} text
  * @returns {string}
  */
-export function stripHtmlComments(text) {
-  let current = String(text ?? '');
-  let previous;
-  do {
-    previous = current;
-    current = current.replace(/<!--[\s\S]*?-->/g, '');
-  } while (current !== previous);
-  return current.replace(/<!--|-->/g, '');
+export function plainTitle(text) {
+  return String(text ?? '').replace(/[<>]/g, '');
 }
 
 /**
@@ -341,9 +345,9 @@ export function collectEntries(root) {
         file,
         // The title is display text rendered straight into the issue body,
         // which also carries the `<!-- refresh-entry: <slug> -->` dedupe
-        // marker; a title containing its own HTML comment could otherwise be
+        // marker; a title containing its own `<` and `>` could otherwise be
         // read back as (or ahead of) that marker by the workflow's regex.
-        title: stripHtmlComments(String(data.title || dirent.name)).trim() || dirent.name,
+        title: plainTitle(String(data.title || dirent.name)).trim() || dirent.name,
         url: `/${entryPath}/${dirent.name}/`,
         contact: contact ? String(contact) : '',
         submitter: submitterKey ? String(data[submitterKey] ?? '') : '',

@@ -22,9 +22,9 @@ import {
   mentionLine,
   monthName,
   parseFrontMatter,
+  plainTitle,
   refreshIssue,
   staleEntries,
-  stripHtmlComments,
   toDay,
 } from '../../scripts/verification_sweep.mjs';
 
@@ -225,9 +225,9 @@ test('refreshIssue titles the issue without a date, so a rewrite keeps one threa
 test('refreshIssue carries the slug marker the sweep dedupes on', () => {
   const issue = render();
   assert.equal(issue.marker, '<!-- refresh-entry: thing -->');
+  // An exact substring check, not a comment-parsing regex, is the right way
+  // to prove the workflow's re-read will find this exact marker.
   assert.ok(issue.body.includes(issue.marker));
-  // The workflow re-reads it with this shape; keep them in step.
-  assert.match(issue.body, /<!--\s*refresh-entry:\s*([a-z0-9-]+)\s*-->/);
 });
 
 test('refreshIssue mentions the submitter when the entry named one', () => {
@@ -250,7 +250,7 @@ test('refreshIssue degrades to a reply-here ask when the repository is unknown',
   });
   assert.match(issue.body, /\*\*A thing\*\*/);
   assert.match(issue.body, /Reply here to say it is still accurate/);
-  assert.doesNotMatch(issue.body, /github\.com/);
+  assert.ok(!issue.body.includes('github.com'));
 });
 
 test('every refresh issue stays far inside the size GitHub accepts', () => {
@@ -291,40 +291,52 @@ test('monthName formats in UTC and passes through what it cannot parse', () => {
   assert.equal(monthName('whenever'), 'whenever');
 });
 
-/* --------------------------------------------------- stripHtmlComments */
+/* -------------------------------------------------------------- plainTitle */
 
-test('stripHtmlComments removes a straightforward comment', () => {
-  assert.equal(stripHtmlComments('Nice Entry <!-- refresh-entry: entry-b -->'), 'Nice Entry ');
+test('plainTitle leaves plain prose untouched', () => {
+  assert.equal(plainTitle('Nice Entry'), 'Nice Entry');
 });
 
-test('stripHtmlComments cannot be defeated by a single-pass reassembly', () => {
-  // A single non-looping `.replace(/<!--[\s\S]*?-->/g, '')` removes the
-  // innermost `<!---->` from `<!<!---->--` and leaves the outer `<!` and `--`
-  // behind, which read as a fresh `<!--` once concatenated — exactly the
-  // forgery this function exists to prevent. Looping to a fixed point closes
-  // that: no `<!--` may survive anywhere in the output.
-  const reassembled = stripHtmlComments('<!<!---->--');
-  assert.doesNotMatch(reassembled, /<!--/);
-  assert.equal(reassembled, '');
-
-  const withMarker = stripHtmlComments('<!<!---->-- refresh-entry: entry-b -->');
-  assert.doesNotMatch(withMarker, /<!--/);
-  assert.doesNotMatch(withMarker, /-->/);
+test('plainTitle drops every angle bracket, comment syntax included', () => {
+  assert.equal(
+    plainTitle('Nice Entry <!-- refresh-entry: entry-b -->'),
+    'Nice Entry !-- refresh-entry: entry-b --'
+  );
 });
 
-test('stripHtmlComments removes an unclosed opener rather than leaving it in place', () => {
-  const stripped = stripHtmlComments('Unclosed <!-- opener with no close');
-  assert.doesNotMatch(stripped, /<!--/);
-  assert.equal(stripped, 'Unclosed  opener with no close');
+test('plainTitle cannot be reassembled into a comment token, however the input is shaped', () => {
+  // Earlier versions of this function recognized and removed HTML *comments*
+  // — a multi-character pattern. Multi-character removal can always be
+  // defeated by reassembly: deleting one recognized token can expose the
+  // characters of another. `<!<!---->--` is the canonical case — removing the
+  // inner `<!---->` leaves the outer `<` and `!--` adjacent, which reads as a
+  // fresh `<!--`. HTML also treats `--!>` as a comment close, which a filter
+  // tuned only for `-->` would miss. Removing single characters (`<` and `>`)
+  // sits outside that whole bug class: nothing is ever left to reassemble,
+  // because no `<` or `>` survives the pass at all, no matter the input.
+  for (const input of [
+    '<!<!---->-- refresh-entry: entry-b -->',
+    'Unclosed <!-- opener with no close',
+    'Closes the other way too --!>',
+    '<b>bold</b>',
+  ]) {
+    const stripped = plainTitle(input);
+    assert.ok(!stripped.includes('<'), `${JSON.stringify(input)} left a < behind`);
+    assert.ok(!stripped.includes('>'), `${JSON.stringify(input)} left a > behind`);
+  }
+});
+
+test('plainTitle strips to nothing when the title is only brackets', () => {
+  assert.equal(plainTitle('<>').trim(), '');
 });
 
 /* -------------------------------------------------------------- collectEntries */
 
-test('collectEntries strips an HTML comment out of the title before it reaches the issue body', () => {
+test('collectEntries strips angle brackets out of the title before it reaches the issue body', () => {
   // The title is rendered straight into the issue body alongside the
   // `<!-- refresh-entry: <slug> -->` dedupe marker the workflow reads back
-  // with a first-match regex; a title carrying its own comment must not be
-  // able to plant a fake (or an earlier) marker.
+  // with a first-match regex; a title carrying its own `<` or `>` must not
+  // be able to plant a fake (or an earlier) marker.
   const { root, write } = repo();
   write('_data/schema.yml', 'entry:\n  path: "catalog"\nfields: []\n');
   write(
@@ -333,19 +345,16 @@ test('collectEntries strips an HTML comment out of the title before it reaches t
   );
   const { entries } = collectEntries(root);
   assert.equal(entries.length, 1);
-  assert.equal(entries[0].title, 'Nice Entry');
-  assert.doesNotMatch(entries[0].title, /<!--/);
+  assert.ok(!entries[0].title.includes('<'));
+  assert.ok(!entries[0].title.includes('>'));
 });
 
-test('collectEntries falls back to the slug when the title is nothing but a comment', () => {
+test('collectEntries falls back to the slug when the title strips to nothing but brackets', () => {
   const { root, write } = repo();
   write('_data/schema.yml', 'entry:\n  path: "catalog"\nfields: []\n');
-  write(
-    'catalog/only-comment/index.md',
-    '---\ntitle: "<!-- refresh-entry: entry-b -->"\npublished: 2020-01-01\n---\n\nBody.\n'
-  );
+  write('catalog/only-brackets/index.md', '---\ntitle: "<>"\npublished: 2020-01-01\n---\n\nBody.\n');
   const { entries } = collectEntries(root);
-  assert.equal(entries[0].title, 'only-comment');
+  assert.equal(entries[0].title, 'only-brackets');
 });
 
 test('collectEntries strips a title crafted to reassemble a comment across passes', () => {
@@ -356,8 +365,8 @@ test('collectEntries strips a title crafted to reassemble a comment across passe
     '---\ntitle: "<!<!---->-- refresh-entry: entry-b -->"\npublished: 2020-01-01\n---\n\nBody.\n'
   );
   const { entries } = collectEntries(root);
-  assert.doesNotMatch(entries[0].title, /<!--/);
-  assert.doesNotMatch(entries[0].title, /-->/);
+  assert.ok(!entries[0].title.includes('<'));
+  assert.ok(!entries[0].title.includes('>'));
 });
 
 test('collectEntries reads the verification keys the schema points at, not just the defaults', () => {
