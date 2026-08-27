@@ -61,6 +61,7 @@ jobs:
               { name: 'Add event details', label: 'content:new-event', match: (t) => t.startsWith('Event:') },
               { name: 'Start a new cohort year', label: 'content:new-year', match: (t) => t.startsWith('[Cohort]') },
               { name: 'Update a cohort schedule', label: 'content:schedule', match: (t) => t.startsWith('Schedule:') },
+              { name: 'Refresh an entry', label: 'content:refresh', match: (t) => t.startsWith('Refresh:') },
               // The entry form's prefix is the singular noun the site was
               // configured with — "[Use case] ", "[Resource] ", "[Project] " —
               // so it is matched by shape, minus the prefixes above and the

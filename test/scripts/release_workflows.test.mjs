@@ -562,7 +562,7 @@ test('the canonical PHCT Pages and quality workflows cannot silently skip the sh
 });
 
 test('machine-maintained branches use lease-protected force pushes', () => {
-  for (const name of ['apply-setup.yml', 'new-entry.yml']) {
+  for (const name of ['apply-setup.yml', 'new-entry.yml', 'refresh-entry.yml']) {
     const source = workflow(name);
     assert.doesNotMatch(source, /git push --force origin/);
     assert.match(source, /git push --force-with-lease origin/);
@@ -571,6 +571,53 @@ test('machine-maintained branches use lease-protected force pushes', () => {
   const updater = workflow('update-phct.yml');
   assert.doesNotMatch(updater, /git push --force /u);
   assert.match(updater, /push --force-with-lease origin/u);
+});
+
+// The refresh pair is the one loop in the template that writes to an entry from
+// an issue anybody may open, so the two halves are held to the shapes that make
+// that safe: no issue text in a shell, one file in the commit, and a dedupe key
+// the sweep and the script agree on to the character.
+test('the refresh loop keeps issue text out of the shell and touches one file', () => {
+  const refresh = workflow('refresh-entry.yml');
+  const parsed = YAML.parse(refresh);
+  const steps = Object.values(parsed.jobs).flatMap((job) => job.steps ?? []);
+
+  for (const step of steps.filter((candidate) => typeof candidate.run === 'string')) {
+    assert.doesNotMatch(
+      step.run,
+      /\$\{\{\s*(github\.event\.issue|steps\.refresh\.outputs\.(reason|changes|error))/u,
+      `${step.name} interpolates issue text into a shell script`
+    );
+  }
+  assert.match(refresh, /ISSUE_BODY: \$\{\{ github\.event\.issue\.body \}\}/u);
+
+  const commit = workflowStepScript(
+    'refresh-entry.yml',
+    'refresh',
+    'Commit the confirmation on a new branch'
+  );
+  assert.match(commit, /git add -- "\$ENTRY_FILE"/u);
+  assert.doesNotMatch(commit, /git add -A/u, 'a date stamp must never sweep up an unrelated file');
+
+  // `contents: write` is the whole reason this needs care; the sweep that links
+  // to it asks for nothing but the ability to open an issue.
+  const sweep = workflow('verification-sweep.yml');
+  assert.match(sweep, /permissions:\n\s+issues: write/u);
+  assert.doesNotMatch(sweep, /contents: write/u);
+});
+
+test('the sweep and the script agree on the marker that dedupes a refresh thread', async () => {
+  const { issueMarker } = await import('../../scripts/verification_sweep.mjs');
+  const sweep = workflow('verification-sweep.yml');
+  const pattern = /const MARKER = (\/.+\/);/u.exec(sweep);
+  assert.ok(pattern, 'verification-sweep.yml no longer declares a MARKER pattern');
+
+  // The literal comes from a file in this repository, not from any input.
+  const marker = new Function(`return ${pattern[1]}`)();
+  assert.deepEqual(marker.exec(issueMarker('some-entry'))?.[1], 'some-entry');
+  // Dedupe is on the marker and never on the title, which carries a name that
+  // changes; a title match that misses opens a second thread every month.
+  assert.doesNotMatch(sweep, /issue\.title === item\.title \?/u);
 });
 
 test('every npm dependency install selects the exact package manager after setup-node', () => {
@@ -596,6 +643,7 @@ test('every issue-driven content workflow answers on the issue, in success and i
     'new-entry.yml',
     'new-event.yml',
     'new-year.yml',
+    'refresh-entry.yml',
     'update-event-attachments.yml',
     'update-schedule.yml',
   ];
@@ -635,6 +683,7 @@ test('protected-main automation stays reviewable and generated PRs can satisfy r
     'new-entry.yml',
     'new-event.yml',
     'new-year.yml',
+    'refresh-entry.yml',
     'update-event-attachments.yml',
     'update-schedule.yml',
     'metrics.yml',
