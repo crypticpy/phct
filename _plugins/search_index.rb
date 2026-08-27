@@ -160,7 +160,12 @@ module CatalogTemplate
     end
 
     # A URL, a scheme-relative URL, a site-absolute path or a bare host.
-    ADDRESS = %r{\A(?:[a-z][a-z0-9+.\-]*:|//|/|\.{1,2}/|www\.)}i
+    #
+    # A scheme counts only with its `//`, or as one of the two addresses that
+    # never carry one. A bare `word:` is prose, not a scheme: "Guidance: redact
+    # PII first" and "Contact: Jane Doe" are exactly the words this flattening
+    # exists to index, and reading them as URIs would drop them silently.
+    ADDRESS = %r{\A(?:[a-z][a-z0-9+.\-]*://|mailto:|tel:|//|/|\.{1,2}/|www\.)}i
 
     # `_data/search.yml`'s `synonyms`, normalised to lowercase and made
     # bidirectional, so `assets/js/search.js` can expand a query without

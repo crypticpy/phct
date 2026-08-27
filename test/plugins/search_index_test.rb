@@ -246,6 +246,26 @@ class SearchIndexGeneratorTest < Minitest::Test
     assert_equal ["Readable"], text
   end
 
+  def test_only_a_real_address_scheme_is_dropped
+    addresses = @generator.field_text([
+                                        { "a" => "mailto:team@example.org", "b" => "tel:+15551234567",
+                                          "c" => "https://example.org/x", "d" => "HTTPS://EXAMPLE.ORG/Y" }
+                                      ])
+
+    assert_equal [], addresses
+  end
+
+  # A prose label reads as `word:`, which is not a URI scheme. Losing these was
+  # losing exactly the words this flattening was built to index.
+  def test_prose_that_carries_a_colon_is_kept
+    text = @generator.field_text([
+                                   { "a" => "Guidance: redact PII first", "b" => "Note: see appendix",
+                                     "c" => "Contact: Jane Doe", "d" => "Ratio: 2:1" }
+                                 ])
+
+    assert_equal ["Guidance: redact PII first", "Note: see appendix", "Contact: Jane Doe", "Ratio: 2:1"], text
+  end
+
   # A scalar is the reader asking for exactly that value, so a `url` field
   # marked `search: true` still indexes its own URL.
   def test_a_scalar_field_is_indexed_as_it_stands
