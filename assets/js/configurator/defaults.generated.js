@@ -186,7 +186,8 @@ export const SCHEMA = {
     "status_approved_value": "Reviewed & approved",
     "require_link": true,
     "contributor_key": "organization",
-    "submitter_key": "submitter_github"
+    "submitter_key": "submitter_github",
+    "deployments_key": "also_deployed_by"
   },
   "groups": [
     {
@@ -885,6 +886,18 @@ export const SCHEMA = {
       "weight": 8,
       "icon": "presentation",
       "description": "Attach the slide deck here. A thumbnail is generated from its first page."
+    },
+    {
+      "key": "also_deployed_by",
+      "label": "Also deployed by",
+      "prompt": "Who else is running this?",
+      "type": "links",
+      "form": false,
+      "group": "reuse",
+      "weight": 9,
+      "icon": "users",
+      "search": false,
+      "description": "Other organizations running this, maintained through the \"Also deployed by\" issue form."
     },
     {
       "key": "license",

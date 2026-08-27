@@ -23,7 +23,10 @@
 #                 - image: path or URL to an image (used as thumbnail when key == "thumbnail")
 #                 - images: a gallery — YAML list of image paths/URLs or {src, alt} items. Submitters drop
 #                   images into the GitHub issue; the scaffolder downloads them into the entry folder.
-#                 - links: labelled links — YAML list of {label, url}. Forms accept "Label | URL" per line.
+#                 - links: labelled links — YAML list of {label, url}, each item optionally carrying
+#                   `email` (a contact address, rendered as a mailto link) and `note` (one muted line
+#                   under the link row). Forms accept "Label | URL" per line and write {label, url}
+#                   only; the optional keys come from the dedicated flow that maintains such a field.
 #   required    true|false (default false)
 #   description help that the prompt does not already give: a constraint, an example, a boundary.
 #               Forms print it straight after the prompt, so it must not restate it.
@@ -97,6 +100,16 @@ entry:
   # reminder simply carries no personal mention. Never guessed from a value:
   # only the field named here is read as a handle.
   submitter_key: "submitter_github"
+  # Who else runs this (optional). Names the `links` field that lists the other
+  # organizations that deployed this use case, one item per organization
+  # ({label, url} plus the optional `email` and `note` a `links` item may carry).
+  # It is written only by the "Also deployed by" issue form
+  # (.github/ISSUE_TEMPLATE/also-deployed-by.yml ->
+  # .github/workflows/also-deployed-by.yml -> scripts/add_deployment_from_issue.mjs),
+  # never by the public submission forms, which is why the field carries
+  # `form: false`. Absent → the form reports that the feature is not configured
+  # and the entry page shows no "add your organization" link.
+  deployments_key: "also_deployed_by"
 
 # Ordered groups: { key, title, description?, icon?, placement? }.
 # Filters show facet fields grouped this way; the submit wizard turns each group
@@ -563,6 +576,27 @@ fields:
     weight: 8
     icon: presentation
     description: "Attach the slide deck here. A thumbnail is generated from its first page."
+
+  # Maintained by the "Also deployed by" flow, never asked in a submission form
+  # (`form: false`): an organization that redeployed this use case attaches
+  # itself through .github/ISSUE_TEMPLATE/also-deployed-by.yml, and
+  # scripts/add_deployment_from_issue.mjs appends it here. `entry.deployments_key`
+  # above is the pointer everything else reads, so the key can be renamed.
+  # Weight 9 puts it last in the Reuse rail card: it is the evidence under the
+  # reuse story, not the way into it.
+  - key: also_deployed_by
+    label: "Also deployed by"
+    prompt: "Who else is running this?"
+    type: links
+    form: false                 # written by the "Also deployed by" flow, never by the submitter
+    group: reuse
+    weight: 9
+    icon: users
+    # Not in the search index yet: an item is a mapping, and the index flattens
+    # scalars and string lists only. Flip `search` to true once structured
+    # values are flattened there.
+    search: false
+    description: "Other organizations running this, maintained through the \"Also deployed by\" issue form."
 
   # ---------------------------------------------------------------------------
   # "What it took" (group: cost). The five fields below are a STARTING DRAFT for
