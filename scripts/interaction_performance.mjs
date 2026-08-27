@@ -14,7 +14,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INTERACTION_BUDGETS = new Set(['filter_response_p95_ms', 'search_response_p95_ms']);
 // Cold time-to-first-result: the keystroke that also pays for the fetch and the
 // index build. Only ever budgeted per tier, never part of the required pair.
-const SCALE_INTERACTION_BUDGETS = new Set([...INTERACTION_BUDGETS, 'search_cold_response_ms']);
+// Exported so scripts/performance_fixture.mjs can spell-check `scale_budgets`
+// against everything either gate measures, not just its own half.
+export const SCALE_INTERACTION_BUDGETS = new Set([...INTERACTION_BUDGETS, 'search_cold_response_ms']);
 // The warm keystrokes, cycled: words the fixture corpus actually uses, so every
 // sample is a query that answers rather than one that finds nothing.
 const QUERY_SAMPLES = ['coordination', 'intake', 'triage', 'review', 'reporting', 'fixture'];

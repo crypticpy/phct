@@ -6,6 +6,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 import {
+  assertScaleBudgetNames,
   assetTransferBytes,
   budgetFindings,
   configuredEntryPath,
@@ -75,6 +76,24 @@ test('a browser budget in the same scale block is not mistaken for a payload met
     scaleBudgetFindings({ ...metrics, entries: 500, search_json_gzip_bytes: 1 }, scaleConfig),
     []
   );
+});
+
+// A budget nothing measures reads as enforcement and is not — the whole point
+// of the file is that every number in it is a limit somebody checks.
+test('a misspelled scale budget fails the run instead of being skipped', () => {
+  const scaleConfig = { scale_budgets: { 500: { search_response_p95ms: 250 } } };
+  assert.throws(
+    () => scaleBudgetFindings({ ...metrics, entries: 100 }, scaleConfig),
+    /scale_budgets\["500"\] budgets search_response_p95ms, which nothing measures/
+  );
+  assert.throws(() => assertScaleBudgetNames(scaleConfig), /search_cold_response_ms/);
+});
+
+test('every budget the checked-in tiers name is measured by one of the two gates', () => {
+  const budgets = JSON.parse(
+    fs.readFileSync(new URL('../../quality/performance-budgets.json', import.meta.url), 'utf8')
+  );
+  assert.doesNotThrow(() => assertScaleBudgetNames(budgets));
 });
 
 test('the browser fixture is retained for every reviewed tier the run actually built', () => {
