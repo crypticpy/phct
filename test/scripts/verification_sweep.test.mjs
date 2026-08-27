@@ -1,18 +1,23 @@
 /**
- * The pure half of the monthly verification sweep (scripts/verification_sweep.mjs):
- * date coercion, which entries count as unconfirmed, and the issue body. The
- * GitHub side lives in .github/workflows/verification-sweep.yml and only ever
- * sees the strings these functions produce.
+ * The pure half of the monthly refresh sweep (scripts/verification_sweep.mjs):
+ * date coercion, which entries count as unconfirmed, who gets mentioned, and
+ * the per-entry issue. The GitHub side lives in
+ * .github/workflows/verification-sweep.yml and only ever sees the strings these
+ * functions produce.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  MAX_LISTED,
-  issueBody,
+  DEFAULT_MAX_NEW_ISSUES,
+  MAX_ISSUE_PAYLOAD,
+  handleMention,
+  issueMarker,
   lastConfirmed,
+  mentionLine,
   monthName,
   parseFrontMatter,
+  refreshIssue,
   staleEntries,
   toDay,
 } from '../../scripts/verification_sweep.mjs';
@@ -26,9 +31,23 @@ const entry = (over = {}) => ({
   title: 'A thing',
   url: '/catalog/thing/',
   contact: 'a@example.gov',
+  submitter: '',
   data: { published: '2020-01-01' },
   ...over,
 });
+
+/** The single stale entry a `published` date of `iso` produces on 2026-08-17. */
+const stale1 = (over = {}) => staleEntries([entry(over)], day('2026-08-17'), 365)[0];
+
+const render = (over = {}, options = {}) =>
+  refreshIssue({
+    entry: stale1(over),
+    repo: 'org/catalog',
+    branch: 'main',
+    siteUrl: 'https://example.org/catalog',
+    afterDays: 365,
+    ...options,
+  });
 
 /* ------------------------------------------------------------------ toDay */
 
@@ -112,118 +131,128 @@ test('staleEntries falls back to a year for a nonsense window', () => {
   }
 });
 
-/* -------------------------------------------------------------- issueBody */
+/* ---------------------------------------------------------- handleMention */
 
-test('issueBody lists every stale entry with its contact and an edit link', () => {
-  const stale = staleEntries([entry({ data: { published: '2024-01-01' } })], day('2026-08-17'), 365);
-  const body = issueBody({
-    stale,
-    repo: 'org/catalog',
-    branch: 'main',
-    siteUrl: 'https://example.org/catalog',
-    afterDays: 365,
-    today: '2026-08-17',
-  });
-  assert.match(body, /\[A thing\]\(https:\/\/example\.org\/catalog\/catalog\/thing\/\)/);
-  assert.match(body, /last confirmed January 2024/);
-  assert.match(body, /a@example\.gov/);
-  assert.match(body, /https:\/\/github\.com\/org\/catalog\/edit\/main\/catalog\/thing\/index\.md/);
-  assert.match(body, /`verified: 2026-08-17`/);
-  assert.match(body, /^- \[ \] /m);
+test('handleMention normalises what a person actually types', () => {
+  assert.equal(handleMention('jordan-lee'), '@jordan-lee');
+  assert.equal(handleMention('@jordan-lee'), '@jordan-lee');
+  assert.equal(handleMention('  @@jordan-lee '), '@jordan-lee');
+  assert.equal(handleMention('org/data-governance'), '@org/data-governance');
 });
 
-test('issueBody degrades to plain text when the site or repo is unknown', () => {
-  const stale = staleEntries(
-    [entry({ contact: '', data: { published: '2024-01-01' } })],
-    day('2026-08-17'),
-    365
+test('handleMention mentions nobody rather than the wrong body', () => {
+  for (const bad of [
+    '',
+    null,
+    undefined,
+    'jordan lee',
+    'jordan.lee@city.gov',
+    'https://github.com/jordan-lee',
+    '-leading-hyphen',
+    'a'.repeat(40),
+  ]) {
+    assert.equal(handleMention(bad), '', `${String(bad)} should mention nobody`);
+  }
+});
+
+/* ------------------------------------------------------------ mentionLine */
+
+test('mentionLine names the submitter first and says why they were asked', () => {
+  const line = mentionLine({ submitter: '@jordan-lee', mentions: ['catalog-maintainers'] });
+  assert.match(line, /^@jordan-lee @catalog-maintainers/);
+  assert.match(line, /you submitted this entry/);
+});
+
+test('mentionLine falls back to the standing list when nobody submitted a handle', () => {
+  const line = mentionLine({ submitter: '', mentions: ['catalog-maintainers'] });
+  assert.equal(
+    line,
+    "@catalog-maintainers — nobody is named on this entry, so this one is the maintainers' to chase."
   );
-  const body = issueBody({
-    stale,
+});
+
+test('mentionLine never mentions the same person twice', () => {
+  const line = mentionLine({
+    submitter: 'jordan-lee',
+    mentions: ['@jordan-lee', 'catalog-maintainers', 'catalog-maintainers'],
+  });
+  assert.equal(line.match(/@jordan-lee/g).length, 1);
+  assert.equal(line.match(/@catalog-maintainers/g).length, 1);
+});
+
+test('mentionLine is empty when there is nobody to name', () => {
+  assert.equal(mentionLine({ submitter: '', mentions: [] }), '');
+  assert.equal(mentionLine({ submitter: 'not an account', mentions: ['also not one'] }), '');
+});
+
+/* ----------------------------------------------------------- refreshIssue */
+
+test('refreshIssue links the entry, dates it, and offers both one-click answers', () => {
+  const issue = render();
+  assert.equal(issue.slug, 'thing');
+  assert.match(issue.body, /\[A thing\]\(https:\/\/example\.org\/catalog\/catalog\/thing\/\)/);
+  assert.match(issue.body, /last confirmed \*\*January 2020\*\*/);
+  assert.match(issue.body, /`published`/);
+  assert.match(
+    issue.body,
+    /https:\/\/github\.com\/org\/catalog\/issues\/new\?template=refresh-entry\.yml&slug=thing/
+  );
+  assert.match(issue.body, /https:\/\/github\.com\/org\/catalog\/edit\/main\/catalog\/thing\/index\.md/);
+});
+
+test('refreshIssue titles the issue without a date, so a rewrite keeps one thread', () => {
+  const issue = render();
+  assert.equal(issue.title, 'Still accurate? A thing');
+  assert.doesNotMatch(issue.title, /\d{4}/);
+});
+
+test('refreshIssue carries the slug marker the sweep dedupes on', () => {
+  const issue = render();
+  assert.equal(issue.marker, '<!-- refresh-entry: thing -->');
+  assert.ok(issue.body.includes(issue.marker));
+  // The workflow re-reads it with this shape; keep them in step.
+  assert.match(issue.body, /<!--\s*refresh-entry:\s*([a-z0-9-]+)\s*-->/);
+});
+
+test('refreshIssue mentions the submitter when the entry named one', () => {
+  const issue = render({ submitter: '@jordan-lee' }, { mentions: ['catalog-maintainers'] });
+  assert.match(issue.body, /@jordan-lee @catalog-maintainers/);
+});
+
+test('refreshIssue says nothing about mentions when nobody is named', () => {
+  const issue = render();
+  assert.doesNotMatch(issue.body, /@/);
+});
+
+test('refreshIssue degrades to a reply-here ask when the repository is unknown', () => {
+  const issue = refreshIssue({
+    entry: stale1(),
     repo: '',
     branch: 'main',
     siteUrl: '',
     afterDays: 365,
-    today: '2026-08-17',
   });
-  assert.match(body, /\*\*A thing\*\*/);
-  assert.match(body, /no contact on file/);
-  assert.doesNotMatch(body, /github\.com/);
+  assert.match(issue.body, /\*\*A thing\*\*/);
+  assert.match(issue.body, /Reply here to say it is still accurate/);
+  assert.doesNotMatch(issue.body, /github\.com/);
 });
 
-test('issueBody counts in the singular and the plural', () => {
-  const one = staleEntries([entry({ data: { published: '2024-01-01' } })], day('2026-08-17'), 365);
-  const two = staleEntries(
-    [
-      entry({ data: { published: '2024-01-01' } }),
-      entry({ slug: 'other', data: { published: '2023-01-01' } }),
-    ],
-    day('2026-08-17'),
-    365
-  );
-  const render = (stale) =>
-    issueBody({ stale, repo: '', branch: 'main', siteUrl: '', afterDays: 365, today: '2026-08-17' });
-  assert.match(render(one), /^One entry has gone more than 365 days/);
-  assert.match(render(two), /^2 entries have gone more than 365 days/);
+test('every refresh issue stays far inside the size GitHub accepts', () => {
+  const issue = render({ title: 'A'.repeat(200) });
+  assert.ok(issue.body.length < 65536, `body is ${issue.body.length} characters`);
 });
 
-test('issueBody explains how to clear an item without assuming pull-request fluency', () => {
-  const stale = staleEntries([entry({ data: { published: '2024-01-01' } })], day('2026-08-17'), 365);
-  const body = issueBody({
-    stale,
-    repo: 'org/catalog',
-    branch: 'main',
-    siteUrl: '',
-    afterDays: 365,
-    today: '2026-08-17',
-  });
-  assert.match(body, /\*\*edit front matter\*\* link/);
-  assert.match(body, /\*\*Commit changes…\*\*/);
-  assert.match(body, /\*\*Create a new branch and start a pull request\*\*/);
+/* ------------------------------------------------------------------- caps */
+
+test('the two caps are separate numbers with the courtesy one much smaller', () => {
+  assert.ok(DEFAULT_MAX_NEW_ISSUES > 0);
+  assert.ok(MAX_ISSUE_PAYLOAD > DEFAULT_MAX_NEW_ISSUES);
 });
 
-test('issueBody caps the list so a big backlog cannot exceed the issue size limit', () => {
-  const entries = Array.from({ length: MAX_LISTED + 12 }, (_, index) =>
-    entry({
-      slug: `entry-${String(index).padStart(3, '0')}`,
-      title: `Entry ${index}`,
-      file: `catalog/entry-${String(index).padStart(3, '0')}/index.md`,
-      url: `/catalog/entry-${String(index).padStart(3, '0')}/`,
-      // Oldest first once sorted: index 0 is the most overdue.
-      data: { published: `2020-01-${String((index % 28) + 1).padStart(2, '0')}` },
-    })
-  );
-  const stale = staleEntries(entries, day('2026-08-17'), 365);
-  assert.equal(stale.length, MAX_LISTED + 12);
-  const body = issueBody({
-    stale,
-    repo: 'org/catalog',
-    branch: 'main',
-    siteUrl: 'https://example.org/catalog',
-    afterDays: 365,
-    today: '2026-08-17',
-  });
-  assert.equal(body.match(/^- \[ \] /gm).length, MAX_LISTED);
-  assert.match(body, /…and 12 more not listed — clear these first, then run the sweep again/);
-  // The intro still reports the real total, not the truncated one.
-  assert.match(body, new RegExp(`^${MAX_LISTED + 12} entries have gone more than`));
-  assert.ok(body.length < 65536, `body is ${body.length} characters`);
-  // The listed ones are the oldest, in the order staleEntries produced.
-  assert.ok(body.includes(stale[0].title));
-  assert.ok(!body.includes(`](https://example.org${stale.at(-1).url})`));
-});
+/* ------------------------------------------------------------ issueMarker */
 
-test('issueBody says nothing about a remainder when everything fits', () => {
-  const stale = staleEntries([entry({ data: { published: '2024-01-01' } })], day('2026-08-17'), 365);
-  const body = issueBody({
-    stale,
-    repo: 'org/catalog',
-    branch: 'main',
-    siteUrl: '',
-    afterDays: 365,
-    today: '2026-08-17',
-  });
-  assert.doesNotMatch(body, /more not listed/);
+test('issueMarker is a comment, so a reader never sees it', () => {
+  assert.equal(issueMarker('a-slug'), '<!-- refresh-entry: a-slug -->');
 });
 
 /* ------------------------------------------------------- parseFrontMatter */

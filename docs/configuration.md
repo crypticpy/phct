@@ -172,6 +172,34 @@ optional questions" toggle offers a required-only short form whenever the
 schema has optional fields. See
 [content-model.md → Groups](content-model.md#groups).
 
+### Catalog behaviour
+
+```yaml
+catalog:
+  verify_after_days: 365       # how long an entry may go unconfirmed before the page says so
+  refresh_mentions: []         # who every refresh reminder mentions, beside the entry's own submitter
+  refresh_max_new_issues: 20   # most refresh issues one monthly sweep may open
+```
+
+`verify_after_days` is the window an entry is trusted for. An entry is "confirmed"
+on the newest of its `verified`, `updated` and `published` dates, so a new catalog
+shows no notices at all; past the window the entry page carries a quiet note and a
+**Still accurate? Confirm it** link, and the monthly sweep opens a reminder issue.
+Raise it for a slow-moving catalog. The site and the sweep read the same number, so
+they cannot disagree.
+
+`refresh_mentions` is the standing audience for those reminders — usernames or
+teams, with or without the leading `@` (`["catalog-maintainers", "@org/data-governance"]`).
+The submitter is mentioned automatically when they left a GitHub username on the
+entry; this list is who hears about it when nobody answers. Empty is a fine
+answer: the issue is still opened and still labelled `verification`.
+
+`refresh_max_new_issues` caps how many *new* reminders one run may open, so a
+backlog does not arrive as one wall of notifications. Existing reminders are always
+refreshed and never counted against it; deferred entries are named in the run
+summary and picked up next month, oldest first. See
+[admin-guide.md](admin-guide.md#the-monthly-verification-sweep) for the whole loop.
+
 ### Footer
 
 ```yaml

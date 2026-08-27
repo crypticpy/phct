@@ -132,6 +132,23 @@ catalog:
   # catalog; the monthly verification sweep uses the same number.
   verify_after_days: 365
 
+  # Who the monthly refresh reminder mentions, on every entry it opens an issue
+  # for. The entry's own submitter is mentioned automatically when they gave a
+  # GitHub username (the schema's `entry.submitter_key`); this list is the
+  # standing audience beside them — the people who chase a reminder nobody
+  # answers. Usernames or teams, with or without the leading `@`:
+  #   refresh_mentions: ["catalog-maintainers", "@org/data-governance"]
+  # Empty is a fine answer: the issue is still opened, labelled and findable.
+  refresh_mentions: []
+
+  # Most refresh issues one monthly run may open. A catalog that crosses the
+  # line in a clump would otherwise arrive as fifty notifications on the 1st,
+  # which is how a maintainer mutes the whole thing. The rest are not lost or
+  # hidden: the run summary says how many were deferred, and the next run (or a
+  # manual one from the Actions tab) picks up where this one stopped, oldest
+  # first. Existing issues are always refreshed, never counted against this.
+  refresh_max_new_issues: 20
+
 # How readers are invited to reach an entry's contact
 contact:
   # Add an "Ask in the open" link beside the contact email that starts a GitHub
