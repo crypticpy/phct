@@ -9,7 +9,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createBuiltSiteServer } from './serve_built_site.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Enforced at the supported ceiling on every run. A tier above it opts in to
+// whichever of these its `scale_budgets` entry names.
 const INTERACTION_BUDGETS = new Set(['filter_response_p95_ms', 'search_response_p95_ms']);
+// Cold time-to-first-result: the keystroke that also pays for the fetch and the
+// index build. Only ever budgeted per tier, never part of the required pair.
+const SCALE_INTERACTION_BUDGETS = new Set([...INTERACTION_BUDGETS, 'search_cold_response_ms']);
 
 function option(argv, name, fallback) {
   const index = argv.indexOf(name);
@@ -53,19 +58,42 @@ export function catalogContract(siteDirectory, expectedEntries) {
   return { entryPath, entries: document.entries.length };
 }
 
-export function interactionBudgetFindings(interaction, config) {
-  const budgets = config.interaction_budgets || {};
-  for (const name of INTERACTION_BUDGETS) {
-    if (!Number.isFinite(budgets[name]) || budgets[name] <= 0) {
-      throw new Error(`interaction performance budget is missing or invalid: ${name}`);
+/**
+ * The interaction budgets that apply to one fixture size.
+ *
+ * The supported ceiling always enforces the full required pair — a missing one
+ * there is a configuration bug, not a tier that opted out. A larger tier is
+ * evidence-first: it enforces exactly what `scale_budgets["<size>"]` names, so
+ * a size can be measured and reported before anyone is ready to promise a
+ * number for it.
+ *
+ * @param {object} config quality/performance-budgets.json.
+ * @param {number} entries the fixture size being measured.
+ * @returns {Record<string, number>}
+ */
+export function tierInteractionBudgets(config, entries) {
+  if (entries === config.supported_entries) {
+    const budgets = config.interaction_budgets || {};
+    for (const name of INTERACTION_BUDGETS) {
+      if (!Number.isFinite(budgets[name]) || budgets[name] <= 0) {
+        throw new Error(`interaction performance budget is missing or invalid: ${name}`);
+      }
     }
+    return Object.fromEntries(
+      Object.entries(budgets).filter(([name]) => SCALE_INTERACTION_BUDGETS.has(name))
+    );
   }
+  const scale = config.scale_budgets?.[String(entries)] || {};
+  return Object.fromEntries(Object.entries(scale).filter(([name]) => SCALE_INTERACTION_BUDGETS.has(name)));
+}
+
+export function interactionBudgetFindings(interaction, config, entries = config.supported_entries) {
   const values = {
     filter_response_p95_ms: interaction.filter?.p95_ms,
     search_response_p95_ms: interaction.search?.warm?.p95_ms,
+    search_cold_response_ms: interaction.search?.cold_initialization_ms,
   };
-  return Object.entries(budgets)
-    .filter(([name]) => INTERACTION_BUDGETS.has(name))
+  return Object.entries(tierInteractionBudgets(config, entries))
     .map(([name, maximum]) => {
       const actual = values[name];
       if (!Number.isFinite(actual)) throw new Error(`interaction probe did not measure ${name}`);
@@ -74,16 +102,40 @@ export function interactionBudgetFindings(interaction, config) {
     .filter(({ actual, maximum }) => actual > maximum);
 }
 
-export function mergeInteractionEvidence(report, interaction, config) {
-  const run = report.runs?.find((candidate) => candidate.entries === report.supported_entries);
-  if (!run) throw new Error(`performance report has no ${report.supported_entries}-entry supported run`);
-  const findings = interactionBudgetFindings(interaction, config);
+export function mergeInteractionEvidence(report, interaction, config, entries = report.supported_entries) {
+  const run = report.runs?.find((candidate) => candidate.entries === entries);
+  if (!run) throw new Error(`performance report has no ${entries}-entry run`);
+  const findings = interactionBudgetFindings(interaction, config, entries);
   run.interaction = interaction;
   run.findings = [
-    ...(run.findings || []).filter((finding) => !INTERACTION_BUDGETS.has(finding.name)),
+    ...(run.findings || []).filter((finding) => !SCALE_INTERACTION_BUDGETS.has(finding.name)),
     ...findings,
   ];
   return findings;
+}
+
+/**
+ * Which retained fixtures the probe can actually measure.
+ *
+ * `interaction_entries` is the reviewed list; `<site>/<size>` is where
+ * scripts/performance_fixture.mjs leaves each one. A tier with no directory was
+ * never built, and is reported rather than dropped.
+ *
+ * @param {string} siteRoot the `--site` directory.
+ * @param {object} config quality/performance-budgets.json.
+ * @returns {{measurable: number[], missing: number[]}}
+ */
+export function measurableTiers(siteRoot, config) {
+  const wanted = Array.isArray(config.interaction_entries)
+    ? config.interaction_entries
+    : [config.supported_entries];
+  const measurable = [];
+  const missing = [];
+  for (const entries of wanted) {
+    if (fs.existsSync(path.join(siteRoot, String(entries), 'entries.json'))) measurable.push(entries);
+    else missing.push(entries);
+  }
+  return { measurable, missing };
 }
 
 async function loadPuppeteer() {
@@ -316,36 +368,50 @@ function writeReport(file, report) {
 
 async function main(argv) {
   const reportFile = path.resolve(ROOT, option(argv, '--report', 'performance-report.json'));
-  const siteDirectory = path.resolve(ROOT, option(argv, '--site', '_site'));
+  const siteRoot = path.resolve(ROOT, option(argv, '--site', '_site'));
   const budgetFile = path.resolve(ROOT, option(argv, '--budgets', 'quality/performance-budgets.json'));
   const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
   const config = JSON.parse(fs.readFileSync(budgetFile, 'utf8'));
-  const supportedRun = report.runs?.find((candidate) => candidate.entries === report.supported_entries);
-  if (!supportedRun)
-    throw new Error(`performance report has no ${report.supported_entries}-entry supported run`);
+  const { measurable, missing } = measurableTiers(siteRoot, config);
+  if (!measurable.length) {
+    throw new Error(`no retained browser fixture under ${siteRoot} for any of ${missing.join(', ')} entries`);
+  }
+  for (const entries of missing) {
+    console.log(`No ${entries}-entry browser fixture was retained; its interactions were not measured.`);
+  }
 
+  let current = null;
   try {
-    const interaction = await runProbe(siteDirectory, supportedRun);
-    const interactionFindings = mergeInteractionEvidence(report, interaction, config);
-    const releaseFindings = report.runs.flatMap((run) =>
-      (run.findings || []).map((finding) => ({ entries: run.entries, ...finding }))
-    );
-    writeReport(reportFile, report);
-    console.log(
-      `Low-end-mobile interactions: filter p95 ${interaction.filter.p95_ms}ms; ` +
-        `warm search p95 ${interaction.search.warm.p95_ms}ms; ` +
-        `${interactionFindings.length} interaction findings, ${releaseFindings.length} total release findings.`
-    );
-    if (releaseFindings.length === 0) return 0;
-    for (const finding of releaseFindings) {
-      console.error(`  • ${finding.entries} entries: ${finding.name} ${finding.actual} > ${finding.maximum}`);
+    for (const entries of measurable) {
+      current = report.runs?.find((candidate) => candidate.entries === entries);
+      if (!current) throw new Error(`performance report has no ${entries}-entry run`);
+      const interaction = await runProbe(path.join(siteRoot, String(entries)), current);
+      const interactionFindings = mergeInteractionEvidence(report, interaction, config, entries);
+      writeReport(reportFile, report);
+      console.log(
+        `Low-end-mobile interactions at ${entries} entries: filter p95 ${interaction.filter.p95_ms}ms; ` +
+          `warm search p95 ${interaction.search.warm.p95_ms}ms; ` +
+          `cold search ${interaction.search.cold_initialization_ms}ms; ` +
+          `${interactionFindings.length} interaction findings.`
+      );
     }
-    return 1;
+    current = null;
   } catch (error) {
-    supportedRun.interaction = { status: 'error', error: error.message };
+    if (current) current.interaction = { status: 'error', error: error.message };
     writeReport(reportFile, report);
     throw error;
   }
+
+  const releaseFindings = report.runs.flatMap((run) =>
+    (run.findings || []).map((finding) => ({ entries: run.entries, ...finding }))
+  );
+  writeReport(reportFile, report);
+  if (releaseFindings.length === 0) return 0;
+  console.error('\nPerformance budgets failed:\n');
+  for (const finding of releaseFindings) {
+    console.error(`  • ${finding.entries} entries: ${finding.name} ${finding.actual} > ${finding.maximum}`);
+  }
+  return 1;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

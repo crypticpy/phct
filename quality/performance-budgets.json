@@ -17,9 +17,17 @@
     "filter_response_p95_ms": 100,
     "search_response_p95_ms": 250
   },
+  "interaction_entries": [100, 500, 1000],
   "scale_budgets": {
     "500": {
-      "search_json_gzip_bytes": 512000
+      "search_json_gzip_bytes": 512000,
+      "search_response_p95_ms": 250,
+      "search_cold_response_ms": 3000
+    },
+    "1000": {
+      "search_json_gzip_bytes": 512000,
+      "search_response_p95_ms": 300,
+      "search_cold_response_ms": 5000
     }
   }
 }
