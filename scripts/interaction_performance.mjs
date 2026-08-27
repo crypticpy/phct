@@ -118,8 +118,12 @@ export function mergeInteractionEvidence(report, interaction, config, entries = 
  * Which retained fixtures the probe can actually measure.
  *
  * `interaction_entries` is the reviewed list; `<site>/<size>` is where
- * scripts/performance_fixture.mjs leaves each one. A tier with no directory was
- * never built, and is reported rather than dropped.
+ * scripts/performance_fixture.mjs leaves each one. A larger tier with no
+ * directory was never built, and is reported rather than dropped.
+ *
+ * The supported ceiling is the exception: it is the size the release gate is
+ * written against, so a run that did not build it has measured nothing it may
+ * release on and must say so, rather than reporting green off the larger tiers.
  *
  * @param {string} siteRoot the `--site` directory.
  * @param {object} config quality/performance-budgets.json.
@@ -134,6 +138,12 @@ export function measurableTiers(siteRoot, config) {
   for (const entries of wanted) {
     if (fs.existsSync(path.join(siteRoot, String(entries), 'entries.json'))) measurable.push(entries);
     else missing.push(entries);
+  }
+  if (missing.includes(config.supported_entries)) {
+    throw new Error(
+      `no retained browser fixture under ${siteRoot} for the supported ceiling of ` +
+        `${config.supported_entries} entries`
+    );
   }
   return { measurable, missing };
 }

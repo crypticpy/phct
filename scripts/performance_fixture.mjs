@@ -160,7 +160,6 @@ export function scaleBudgetFindings(metrics, config) {
   const budgets = config.scale_budgets?.[String(metrics.entries)] || {};
   const values = {
     search_json_gzip_bytes: metrics.search_json_gzip_bytes,
-    search_index_gzip_bytes: metrics.search_index_gzip_bytes,
     entries_json_gzip_bytes: metrics.entries_json_gzip_bytes,
   };
   return Object.entries(budgets)
@@ -247,7 +246,6 @@ function buildFixture(count, scratchRoot, budgets, siteOutput = '', baseurl = ''
       '.webp',
     ]),
     search_json_gzip_bytes: gzipBytes(path.join(siteDir, 'search.json')),
-    search_index_gzip_bytes: gzipBytes(path.join(siteDir, 'search-index.json')),
     entries_json_gzip_bytes: gzipBytes(path.join(siteDir, 'entries.json')),
   };
   // One directory per retained tier, named by its entry count: the browser

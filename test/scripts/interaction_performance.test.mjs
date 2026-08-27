@@ -97,6 +97,17 @@ test('only the retained fixtures are measurable, and the rest are named', (t) =>
   assert.deepEqual(measurableTiers(site, { supported_entries: 100 }), { measurable: [100], missing: [] });
 });
 
+// A run built only from the larger tiers has measured nothing the release gate
+// is written against, and must not be able to report green off them.
+test('a missing supported ceiling is an error, not a skipped tier', (t) => {
+  const site = fs.mkdtempSync(path.join(os.tmpdir(), 'phct-interaction-ceiling-'));
+  t.after(() => fs.rmSync(site, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(site, '500'));
+  fs.writeFileSync(path.join(site, '500', 'entries.json'), '{}');
+
+  assert.throws(() => measurableTiers(site, scaleConfig), /supported ceiling of 100 entries/);
+});
+
 test('interaction evidence replaces prior browser findings on the run it measured', () => {
   const report = {
     supported_entries: 100,
