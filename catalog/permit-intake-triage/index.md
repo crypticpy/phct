@@ -68,6 +68,7 @@ data_sources:
   - "Submittal requirement tables by permit type"
 audience: "Internal staff"
 data_governance_notes: "Applications carry applicant names, addresses and contact details. Everything stays inside the city's own Azure subscription, nothing is used to train a model, and extracted text is deleted after 30 days while the permit record itself follows the existing retention schedule. No real application data appears in this entry or its screenshot."
+security_review: "Automated checks only"
 contact_name: "Permitting systems lead"
 contact_title: "Development Services Department"
 contact_email: "permit-systems@example.org"
