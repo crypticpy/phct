@@ -90,6 +90,13 @@ entry:
   # organizations" on the governance page — live entries only, sample content
   # excluded. Absent → the figure is not published.
   contributor_key: "organization"
+  # Who to nudge when an entry goes stale (optional). Names the text field
+  # holding the submitter's GitHub username, so the monthly refresh reminder can
+  # @mention the person who wrote the entry instead of only the maintainers
+  # (scripts/verification_sweep.mjs). Absent, or blank on an entry → the
+  # reminder simply carries no personal mention. Never guessed from a value:
+  # only the field named here is read as a handle.
+  submitter_key: "submitter_github"
 
 # Ordered groups: { key, title, description?, icon?, placement? }.
 # Filters show facet fields grouped this way; the submit wizard turns each group
@@ -858,6 +865,16 @@ fields:
     group: contact
     weight: 3
     placeholder: "jordan.lee@city.gov"
+
+  - key: submitter_github
+    label: "GitHub username"
+    prompt: "Your GitHub username (optional)"
+    type: text
+    group: contact
+    weight: 4
+    search: false
+    placeholder: "jordan-lee"
+    description: "Used once a year: when this entry is due to be re-confirmed the reminder mentions you, so the request reaches the person who wrote it. Leave it blank and the reminder goes to the maintainers alone."
 
   - key: body
     label: "Full write-up"

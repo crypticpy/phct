@@ -104,7 +104,9 @@ export const SITE = {
     "image": ""
   },
   "catalog": {
-    "verify_after_days": 365
+    "verify_after_days": 365,
+    "refresh_mentions": [],
+    "refresh_max_new_issues": 20
   },
   "contact": {
     "ask_in_open": true
@@ -183,7 +185,8 @@ export const SCHEMA = {
     "status_scaffold_value": "Under review",
     "status_approved_value": "Reviewed & approved",
     "require_link": true,
-    "contributor_key": "organization"
+    "contributor_key": "organization",
+    "submitter_key": "submitter_github"
   },
   "groups": [
     {
@@ -1344,6 +1347,17 @@ export const SCHEMA = {
       "group": "contact",
       "weight": 3,
       "placeholder": "jordan.lee@city.gov"
+    },
+    {
+      "key": "submitter_github",
+      "label": "GitHub username",
+      "prompt": "Your GitHub username (optional)",
+      "type": "text",
+      "group": "contact",
+      "weight": 4,
+      "search": false,
+      "placeholder": "jordan-lee",
+      "description": "Used once a year: when this entry is due to be re-confirmed the reminder mentions you, so the request reaches the person who wrote it. Leave it blank and the reminder goes to the maintainers alone."
     },
     {
       "key": "body",

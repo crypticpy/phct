@@ -275,6 +275,22 @@ module FrontMatterCheck
       failures << "#{where(rel, front_matter, key)}: `#{key}` (#{data[key].inspect}) is not a YYYY-MM-DD date"
     end
 
+    # The submitter's GitHub username, when the schema names the field holding
+    # it (`entry.submitter_key`) and this entry filled it in. A warning, never a
+    # failure: all a malformed handle costs is the @mention on a refresh
+    # reminder a year from now, and refusing to publish an entry over a pasted
+    # profile URL would be out of all proportion. A leading `@` is fine — people
+    # type it — so it is stripped before the shape is checked.
+    submitter_key = entry["submitter_key"].to_s
+    unless submitter_key.empty? || blank?(data[submitter_key])
+      handle = data[submitter_key].to_s.strip.sub(/\A@+/, "")
+      unless handle.match?(/\A[A-Za-z0-9-]{1,39}\z/)
+        warnings << "#{where(rel, front_matter, submitter_key)}: `#{submitter_key}` (#{data[submitter_key].inspect}) " \
+                    "does not look like a GitHub username, so the refresh reminder will not be able to mention them — " \
+                    "use the username alone (`jordan-lee`), not an email address or a profile URL"
+      end
+    end
+
     # Named once, outside the type switch below, so the switch keeps branching
     # on field types and nothing else (test/configurator/schema-parity.test.mjs).
     entry_path = (entry["path"] || "catalog").to_s
