@@ -12,8 +12,10 @@
 # (verified 2026-08: a labeled content PR was still reviewed). To make
 # the review bot skip content PRs, use the Sourcery dashboard instead:
 # app.sourcery.ai -> Review Settings -> "Ignore title keywords", adding
-# the scaffold title prefixes ("Add entry:", "Add event:",
-# "Scaffold cohort", "Update cohort", "Update attachments for event").
+# the scaffold title prefixes WITHOUT the trailing colon ("Add entry",
+# "Add event", "Scaffold cohort", "Update cohort", "Update attachments
+# for event") — the field matches whole words, so "Add entry:" with the
+# colon does not match (verified live 2026-08-27).
 # Kept as intent documentation and for the legacy bot; inert otherwise.
 github:
   ignore_labels:

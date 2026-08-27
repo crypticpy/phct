@@ -32,8 +32,10 @@ before stable v1.9.0. The full rc shakedown ledger is still owed to this file.
 - **Sourcery's review product ignores the shipped `.sourcery.yaml`.** The
   `github: ignore_labels` key only reaches the legacy bot; a labeled content PR was
   still reviewed with the file on the default branch (2026-08-26). The working control
-  is the Sourcery dashboard's "Ignore title keywords" — documented in the admin guide
-  and `AGENTS.md`; decide whether the file is worth keeping as intent documentation.
+  is the Sourcery dashboard's "Ignore title keywords" — verified live 2026-08-27
+  (keywords must be entered without the trailing colon; the field matches whole
+  words) — documented in the admin guide and `AGENTS.md`; decide whether the file
+  is worth keeping as intent documentation.
 - **Branch protection with "require branches to be up to date" makes content queues
   painful.** Each merge strands every other open content PR on "branch is out-of-date";
   a maintainer who was told to just review-and-merge cannot recover without the update

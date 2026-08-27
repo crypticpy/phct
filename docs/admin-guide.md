@@ -185,7 +185,8 @@ button entirely. Every scaffolded content PR is labelled with its
 with one of five fixed prefixes: `Add entry:`, `Add event:`, `Scaffold cohort`, `Update cohort`,
 or `Update attachments for event`. For Sourcery, the setting that works is in its web dashboard,
 not the repository: app.sourcery.ai → Review Settings → **Ignore title keywords** — add the five
-prefixes there. (The template also ships a `.sourcery.yaml` with a skip-by-label rule, but that
+prefixes there, without the trailing colon (`Add entry`, not `Add entry:`); the field matches
+keywords as whole words, and punctuation in a keyword keeps it from matching. (The template also ships a `.sourcery.yaml` with a skip-by-label rule, but that
 file only reaches Sourcery's older bot; the current review product ignores it.) If you use a
 different review bot, configure its equivalent skip setting — by label or by title prefix,
 whichever it supports — and leave it on for everything else, especially template update PRs,
