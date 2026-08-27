@@ -342,6 +342,33 @@ class SearchIndexGeneratorTest < Minitest::Test
     refute terms.key?("surveillance")
   end
 
+  # Thirteen entries: "dispatch" and "console" are in seven of them (54%),
+  # "chatbot" and "assistant" in six (46%). Half of thirteen is not a whole
+  # entry, and rounding that share UP let a word over the configured ratio stay.
+  # @return [Array<Hash>]
+  def threshold_docs
+    concept_docs(13) do |index|
+      parts = []
+      parts << "The dispatch console routes the dispatch console queue." if index < 7
+      parts << "The chatbot answers residents and the assistant drafts replies." if index < 6
+      parts << "Filler prose number #{index} about unrelated topic #{index}."
+      parts.join(" ")
+    end
+  end
+
+  def test_a_word_over_the_ratio_is_dropped_at_a_size_that_does_not_divide
+    terms = @generator.concept_terms(threshold_docs, CatalogTemplate::SearchIndexGenerator::CONCEPT_DEFAULTS)
+
+    refute terms.key?("dispatch")
+    assert(terms.values.none? { |related| related.include?("dispatch") })
+  end
+
+  def test_a_word_exactly_at_the_ratio_is_kept
+    terms = @generator.concept_terms(threshold_docs, CatalogTemplate::SearchIndexGenerator::CONCEPT_DEFAULTS)
+
+    assert_includes terms["chatbot"], "assistant"
+  end
+
   def test_a_catalog_too_small_to_measure_derives_nothing
     docs = concept_docs(6) { "The chatbot answers residents and the assistant drafts replies." }
 

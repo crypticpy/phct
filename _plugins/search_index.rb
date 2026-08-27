@@ -342,7 +342,12 @@ module CatalogTemplate
       total = docs.length.to_f
       document_frequency = Hash.new(0)
       counts.each { |doc| doc.each_key { |term| document_frequency[term] += 1 } }
-      ceiling = (total * options["max_df_ratio"].to_f).ceil
+      # The most entries a word may appear in and still be about any of them.
+      # Rounded DOWN, so a word over the configured share is out at every
+      # catalog size: at 13 entries and 0.5, seven of them is 54%, not half.
+      # The epsilon only keeps a ratio that lands exactly on an entry count
+      # (0.3 of ten) from being lost to binary floating point.
+      ceiling = ((total * options["max_df_ratio"].to_f) + 1e-9).floor
       floor = options["min_df"].to_i
 
       keep = options["terms_per_entry"].to_i
