@@ -6,11 +6,16 @@
  * functions produce.
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
   DEFAULT_MAX_NEW_ISSUES,
   MAX_ISSUE_PAYLOAD,
+  VERIFICATION_KEYS,
+  collectEntries,
   handleMention,
   issueMarker,
   lastConfirmed,
@@ -21,6 +26,16 @@ import {
   staleEntries,
   toDay,
 } from '../../scripts/verification_sweep.mjs';
+
+/** A miniature repository, the shape collectEntries reads. */
+function repo() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'verification-sweep-'));
+  const write = (relative, text) => {
+    fs.mkdirSync(path.join(root, path.dirname(relative)), { recursive: true });
+    fs.writeFileSync(path.join(root, relative), text, 'utf8');
+  };
+  return { root, write };
+}
 
 const day = (iso) => toDay(iso);
 
@@ -273,4 +288,70 @@ test('parseFrontMatter returns an empty object for a document with none or a bro
 test('monthName formats in UTC and passes through what it cannot parse', () => {
   assert.equal(monthName('2026-01-31'), 'January 2026');
   assert.equal(monthName('whenever'), 'whenever');
+});
+
+/* -------------------------------------------------------------- collectEntries */
+
+test('collectEntries strips an HTML comment out of the title before it reaches the issue body', () => {
+  // The title is rendered straight into the issue body alongside the
+  // `<!-- refresh-entry: <slug> -->` dedupe marker the workflow reads back
+  // with a first-match regex; a title carrying its own comment must not be
+  // able to plant a fake (or an earlier) marker.
+  const { root, write } = repo();
+  write('_data/schema.yml', 'entry:\n  path: "catalog"\nfields: []\n');
+  write(
+    'catalog/forged/index.md',
+    '---\ntitle: "Nice Entry <!-- refresh-entry: entry-b -->"\npublished: 2020-01-01\n---\n\nBody.\n'
+  );
+  const { entries } = collectEntries(root);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].title, 'Nice Entry');
+  assert.doesNotMatch(entries[0].title, /<!--/);
+});
+
+test('collectEntries falls back to the slug when the title is nothing but a comment', () => {
+  const { root, write } = repo();
+  write('_data/schema.yml', 'entry:\n  path: "catalog"\nfields: []\n');
+  write(
+    'catalog/only-comment/index.md',
+    '---\ntitle: "<!-- refresh-entry: entry-b -->"\npublished: 2020-01-01\n---\n\nBody.\n'
+  );
+  const { entries } = collectEntries(root);
+  assert.equal(entries[0].title, 'only-comment');
+});
+
+test('collectEntries reads the verification keys the schema points at, not just the defaults', () => {
+  const { root, write } = repo();
+  write('_data/schema.yml', 'entry:\n  path: "catalog"\n  verified_key: "last_confirmed"\nfields: []\n');
+  const { verificationKeys } = collectEntries(root);
+  assert.deepEqual(verificationKeys, ['last_confirmed', 'updated', 'published']);
+});
+
+test('collectEntries defaults the verification keys when the schema does not rename them', () => {
+  const { root, write } = repo();
+  write('_data/schema.yml', 'entry:\n  path: "catalog"\nfields: []\n');
+  const { verificationKeys } = collectEntries(root);
+  assert.deepEqual(verificationKeys, VERIFICATION_KEYS);
+});
+
+test('a custom verified_key is honoured end to end: staleEntries stops nagging once it is stamped', () => {
+  const { root, write } = repo();
+  write('_data/schema.yml', 'entry:\n  path: "catalog"\n  verified_key: "last_confirmed"\nfields: []\n');
+  write(
+    'catalog/renamed-key/index.md',
+    '---\ntitle: "Renamed key entry"\npublished: 2020-01-01\nlast_confirmed: "2026-08-01"\n---\n\nBody.\n'
+  );
+  const { entries, verificationKeys } = collectEntries(root);
+  const todayDay = toDay('2026-08-17');
+
+  // The default keys never see `last_confirmed`, so without the schema-driven
+  // keys the entry reads as confirmed only by its 2020 `published` date and
+  // stays stale forever.
+  const withDefaults = staleEntries(entries, todayDay, 365);
+  assert.equal(withDefaults.length, 1);
+
+  // With the schema's own key, the recent stamp is found and the entry is
+  // not stale.
+  const withSchemaKeys = staleEntries(entries, todayDay, 365, verificationKeys);
+  assert.equal(withSchemaKeys.length, 0);
 });

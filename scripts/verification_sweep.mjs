@@ -118,13 +118,17 @@ export function monthName(iso) {
  * @param {Array<object>} entries from `collectEntries`
  * @param {number} todayDay UTC-midnight timestamp of the reference day
  * @param {number} afterDays
+ * @param {string[]} [keys] which front matter keys count as "confirmed";
+ *   defaults to the reserved `verified`/`updated`/`published` keys, but a
+ *   catalog that renamed `verified` via `entry.verified_key` (or `updated`
+ *   via `entry.updated_key`) needs the sweep to read the same key it writes.
  * @returns {Array<object>} the stale subset, each with `days` and `since` added
  */
-export function staleEntries(entries, todayDay, afterDays) {
+export function staleEntries(entries, todayDay, afterDays, keys = VERIFICATION_KEYS) {
   const limit = Number(afterDays) > 0 ? Number(afterDays) : DEFAULT_AFTER_DAYS;
   return entries
     .map((entry) => {
-      const best = lastConfirmed(entry.data);
+      const best = lastConfirmed(entry.data, keys);
       if (!best) return null;
       const days = Math.round((todayDay - best.day) / MS_PER_DAY);
       if (days <= limit) return null;
@@ -264,7 +268,7 @@ export function parseFrontMatter(text) {
  * Read every entry folder under the schema's `entry.path`.
  * @param {string} root repository root
  * @returns {{entries: Array<object>, afterDays: number, maxNew: number, mentions: string[],
- *   repo: string, branch: string, siteUrl: string}}
+ *   repo: string, branch: string, siteUrl: string, verificationKeys: string[]}}
  */
 export function collectEntries(root) {
   const read = (rel) => {
@@ -286,6 +290,14 @@ export function collectEntries(root) {
     .filter((field) => field.type === 'email')
     .map((field) => field.key);
   const submitterKey = String(schema.entry?.submitter_key || '');
+  // `refresh_entry_from_issue.mjs` stamps `schema.entry.verified_key` (default
+  // `verified`) and `stamp_updated.mjs` stamps `schema.entry.updated_key`
+  // (default `updated`) — a catalog that renamed either would otherwise have
+  // its confirmations stamped in a key this sweep never reads, so the
+  // reminder never closes.
+  const verifiedKey = String(schema.entry?.verified_key ?? 'verified');
+  const updatedKey = String(schema.entry?.updated_key ?? 'updated');
+  const verificationKeys = [verifiedKey, updatedKey, 'published'];
 
   const dir = path.join(root, entryPath);
   const entries = [];
@@ -302,7 +314,14 @@ export function collectEntries(root) {
       entries.push({
         slug: dirent.name,
         file,
-        title: String(data.title || dirent.name),
+        // The title is display text rendered straight into the issue body,
+        // which also carries the `<!-- refresh-entry: <slug> -->` dedupe
+        // marker; a title containing its own HTML comment could otherwise be
+        // read back as (or ahead of) that marker by the workflow's regex.
+        title:
+          String(data.title || dirent.name)
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .trim() || dirent.name,
         url: `/${entryPath}/${dirent.name}/`,
         contact: contact ? String(contact) : '',
         submitter: submitterKey ? String(data[submitterKey] ?? '') : '',
@@ -326,6 +345,7 @@ export function collectEntries(root) {
     repo: String(site.github?.repository || ''),
     branch: String(site.github?.branch || 'main'),
     siteUrl,
+    verificationKeys,
   };
 }
 
@@ -337,8 +357,10 @@ function main() {
   const todayArg = args.includes('--today') ? args[args.indexOf('--today') + 1] : '';
   const todayDay = toDay(todayArg) ?? toDay(new Date().toISOString().slice(0, 10));
 
-  const { entries, afterDays, maxNew, mentions, repo, branch, siteUrl } = collectEntries(process.cwd());
-  const stale = staleEntries(entries, todayDay, afterDays);
+  const { entries, afterDays, maxNew, mentions, repo, branch, siteUrl, verificationKeys } = collectEntries(
+    process.cwd()
+  );
+  const stale = staleEntries(entries, todayDay, afterDays, verificationKeys);
   const issues = stale
     .slice(0, MAX_ISSUE_PAYLOAD)
     .map((entry) => refreshIssue({ entry, repo, branch, siteUrl, afterDays, mentions }));
