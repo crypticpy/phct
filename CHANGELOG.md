@@ -8,6 +8,46 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- Stale entries now ask to be refreshed. The monthly verification sweep opens
+  one issue per entry past the `catalog.verify_after_days` window, @mentioning
+  the submitter — a new optional *Your GitHub username* form field, stored
+  under the schema's `entry.submitter_key` — plus everyone named in
+  `catalog.refresh_mentions`, opening at most `catalog.refresh_max_new_issues`
+  new issues per run (20 by default). The issue's two one-click answers open
+  the new **Refresh an entry** form: "still accurate" becomes a one-line pull
+  request stamping `verified: <today>`; "something changed" queues the notes
+  for a maintainer under the `review:refresh-changes` label. The staleness
+  notice on the entry page gained a **Still accurate? Confirm it** link, and a
+  reminder closes itself once its entry is confirmed by any route.
+- Organizations that deployed an entry's solution can attach themselves to it.
+  The **Also deployed by** form collects organization, link, and an optional
+  contact address and note; a bot pull request splices the item into the
+  entry's `also_deployed_by` list (`links` items may now carry `email` and
+  `note` keys, honored everywhere links render). A resubmission matching an
+  existing row by organization or link updates it in place — and the pull
+  request says it is a replacement, with a checklist line asking the reviewer
+  to confirm the submitter represents that organization.
+- Security signals, observed rather than asserted. A monthly sweep reads each
+  entry's linked GitHub repository — existence, archive state, last push,
+  license, security policy, OpenSSF Scorecard — into the deployment-owned
+  `_data/security_signals.json` (256 KiB cap, `SECURITY_SIGNALS` kill switch),
+  rendered as a rail card on the entry page beside the new maintainer-only
+  `security_review` status field, under a standing disclaimer: the catalog
+  links to code, it does not vouch for it.
+
+All of it is additive — the new schema fields are optional, and no existing
+entry or preset has to change.
+
+### Changed
+
+- The verification sweep opens one issue per stale entry instead of one rolling
+  monthly issue, so every reminder has an owner, a thread, and an ending. A
+  live deployment upgrading to this release should close its old
+  "Verification sweep — YYYY-MM" issue by hand once — the new sweep does not
+  know it exists.
+
 ## [1.9.0-rc.5] — 2026-08-26
 
 ### Added
