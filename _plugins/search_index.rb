@@ -203,9 +203,10 @@ module CatalogTemplate
     # PII first" and "Contact: Jane Doe" are exactly the words this flattening
     # exists to index, and reading them as URIs would drop them silently. An
     # email usually arrives without its `mailto:`, so a value that is nothing
-    # but `name@host.tld` is an address too — while prose that merely contains
-    # an `@` keeps its words.
-    ADDRESS = %r{\A(?:[a-z][a-z0-9+.\-]*://|mailto:|tel:|//|/|\.{1,2}/|www\.|\S+@\S+\.\S+\z)}i
+    # but `name@host` is an address too — the same shape the submission forms
+    # and check_front_matter.rb accept, so every address they let in stays out
+    # here — while prose that merely contains an `@` keeps its words.
+    ADDRESS = %r{\A(?:[a-z][a-z0-9+.\-]*://|mailto:|tel:|//|/|\.{1,2}/|www\.|\S+@\S+\z)}i
 
     # `_data/search.yml`'s `synonyms`, normalised to lowercase and made
     # bidirectional, so `assets/js/search.js` can expand a query without
