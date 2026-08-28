@@ -2,7 +2,7 @@
 layout: page
 title: "How search works"
 eyebrow: "About"
-summary: "Search runs entirely in your browser — nothing you type ever leaves your device."
+summary: "Search runs entirely in your browser — queries are answered on your device, not by a server."
 permalink: /about/search/
 ---
 {% assign cfg = site.data.site %}
@@ -21,8 +21,12 @@ set of static pages, and the search index is just one more public file
 (`/search.json`) alongside them. Your browser fetches it once and does the rest
 locally, which means:
 
-- **No query log.** What you search for is never transmitted, so it cannot be
-  recorded, aggregated, or subpoenaed. There is no analytics event on a search.
+- **No query log.** Typing sends nothing anywhere: every keystroke is answered
+  locally, and there is no analytics event on a search. One honest caveat —
+  the page keeps your current search in the address bar, so reloading or
+  sharing the page brings the search back, and opening such an address sends
+  the query to the web host the way any address is sent. If a search itself
+  is sensitive, clear the box before bookmarking or sharing the page.
 - **Nothing to breach.** A search backend that does not exist cannot leak.
 - **It works the same for everyone.** The index your browser searches is the
   same public file anyone can download and inspect.

@@ -492,6 +492,24 @@ class SearchIndexGeneratorTest < Minitest::Test
     refute_equal versions.first, changed.static_files.last.instance_variable_get(:@payload)[:version]
   end
 
+  def test_the_version_names_the_index_implementation_too
+    entry = {
+      "dir" => "catalog/thing", "layout" => "entry", "slug" => "thing",
+      "title" => "Thing", "body" => "## S\nP.\n"
+    }
+    FileUtils.mkdir_p(File.join(@tmp, "assets", "js"))
+    File.write(File.join(@tmp, "assets", "js", "lunr.min.js"), "/* lunr 2.3.9 */")
+    site = build_site(pages: [entry.dup])
+    @generator.generate(site)
+    before = site.static_files.last.instance_variable_get(:@payload)[:version]
+
+    # Same catalog, upgraded lunr: every cached serialized index must retire.
+    File.write(File.join(@tmp, "assets", "js", "lunr.min.js"), "/* lunr 3.0.0 */")
+    site = build_site(pages: [entry.dup])
+    @generator.generate(site)
+    refute_equal before, site.static_files.last.instance_variable_get(:@payload)[:version]
+  end
+
   def test_the_version_and_entry_count_are_stamped_into_site_config
     site = build_site(pages: [
       { "dir" => "catalog/thing", "layout" => "entry", "slug" => "thing", "title" => "Thing" },

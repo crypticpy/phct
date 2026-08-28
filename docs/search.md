@@ -216,11 +216,16 @@ their control. The public story is `/about/search/`; the mechanics are here.
   boosts and body join as the inline path (`test/scripts/search_worker.test.mjs` asserts identical
   rankings) — and any worker failure falls back silently to the original inline build, which is also
   what browsers without workers (and jsdom in the tests) run.
-- **A finished build is kept in IndexedDB**, keyed to a version that names the payload's *content*:
-  `_plugins/search_index.rb` stamps a SHA-256 over the docs and both widenings — deliberately
-  excluding `generated_at`, so a redeploy that changes no content keeps the cache warm. A return
-  visit to an unchanged catalog skips the network and the build entirely; any cache failure (no
-  IndexedDB, a lying private window) just means building every visit, exactly as before.
+- **A finished build is kept in IndexedDB**, keyed to a version that names everything the build
+  depends on: `_plugins/search_index.rb` stamps a SHA-256 over the docs, both widenings, and the
+  index implementation (`lunr.min.js` + `search-worker.js`) — deliberately excluding
+  `generated_at`, so a redeploy that changes none of that keeps the cache warm, while a content
+  edit or a lunr/worker upgrade retires every cached build on its own. A downloaded payload is
+  cached only when its own `version` stamp matches the page's, so a half-propagated deploy
+  (fresh HTML, stale `/search.json`) can serve one stale visit but never poison the cache. A
+  return visit to an unchanged catalog skips the network and the build entirely; any cache
+  failure (no IndexedDB, a lying private window) just means building every visit, exactly as
+  before.
 - **A weak device facing a large catalog gets asked first.** When the build-time entry count
   (`data-search-entries`, stamped by the plugin through `_includes/results-header.html`) reaches
   `HEAVY_ENTRIES` (300 in `assets/js/search.js`) *and* the device reports few cores or little

@@ -51,7 +51,7 @@ function bootWorker(options = {}) {
      * @returns {Promise<object>} that terminal message.
      */
     async answer(request = {}) {
-      scope.onmessage({ data: { url: '/search.json', version: 'v1', ...request } });
+      scope.onmessage({ data: { url: '/search.json', version: INDEX.version, ...request } });
       for (let waited = 0; waited < 200; waited += 1) {
         const done = messages.find((m) => m.type === 'ready' || m.type === 'error');
         if (done) return done;
@@ -198,12 +198,34 @@ test('an unchanged catalog is answered from the cache without fetching', async (
 test('a changed catalog rebuilds and overwrites the stale cache row', async () => {
   const rows = { payload: { version: 'v0', payload: { docs: [] }, serialized: { stale: true } } };
   const worker = bootWorker({ indexedDB: fakeIndexedDb(rows) });
-  const done = await worker.answer({ version: 'v1' });
+  const done = await worker.answer();
 
   assert.equal(done.type, 'ready');
   assert.equal(done.cached, false);
-  assert.equal(rows.payload.version, 'v1', 'the fresh build replaced the stale row');
+  assert.equal(rows.payload.version, INDEX.version, 'the fresh build replaced the stale row');
   assert.deepEqual(rows.payload.payload, INDEX);
+});
+
+test('a version-skewed download is served but never cached', async () => {
+  // Fresh HTML, stale /search.json (a half-propagated deploy): the download
+  // still answers this visit, but must not squat under the new version.
+  const rows = {};
+  const worker = bootWorker({ indexedDB: fakeIndexedDb(rows) });
+  const done = await worker.answer({ version: 'newer-than-the-json' });
+
+  assert.equal(done.type, 'ready');
+  assert.equal(done.cached, false);
+  assert.deepEqual(done.payload, INDEX);
+  assert.equal(rows.payload, undefined, 'the skewed payload was not cached');
+});
+
+test('a cross-origin or protocol-relative url is refused, not fetched', async () => {
+  for (const url of ['https://example.com/search.json', '//example.com/search.json']) {
+    const worker = bootWorker({ fetch: () => Promise.reject(new Error('must not fetch')) });
+    const done = await worker.answer({ url });
+    assert.equal(done.type, 'error', `"${url}" is refused`);
+    assert.match(done.error, /refused to fetch/);
+  }
 });
 
 test('a blank version neither reads nor writes the cache', async () => {

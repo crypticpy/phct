@@ -123,12 +123,17 @@ module CatalogTemplate
 
       synonym_map = synonyms(site)
       concept_map = concepts(docs, options)
-      # The version names the CONTENT of the payload — docs plus both
-      # widenings, with `generated_at` deliberately left out — so a rebuild
-      # that changes no content keeps the same version. assets/js/search-worker.js
-      # keys its IndexedDB copy of the built index on it: a cache is exactly as
-      # stale as the content it was built from, never invalidated by a redeploy.
-      version = Digest::SHA256.hexdigest(JSON.generate([docs, synonym_map, concept_map]))[0, 16]
+      # The version names everything the cached build depends on: the CONTENT
+      # of the payload — docs plus both widenings, with `generated_at`
+      # deliberately left out — and the INDEX IMPLEMENTATION, because the
+      # serialized index assets/js/search-worker.js keeps in IndexedDB is also
+      # shaped by the lunr build and the worker's fields, boosts and body join.
+      # A rebuild that changes none of that keeps the same version, so a
+      # redeploy never invalidates a warm cache; a template upgrade that
+      # touches lunr or the worker retires every cached build on its own.
+      version = Digest::SHA256.hexdigest(
+        JSON.generate([docs, synonym_map, concept_map]) + implementation_fingerprint(site)
+      )[0, 16]
       payload = {
         generated_at: Time.now.utc.iso8601,
         version: version,
@@ -145,6 +150,19 @@ module CatalogTemplate
         "entries" => docs.count { |doc| doc[:kind] == "entry" }
       }
       site.static_files << SearchIndexFile.new(site, payload)
+    end
+
+    # The files whose bytes decide what a serialized lunr index looks like,
+    # digested. Missing files (a stripped-down test site) contribute nothing,
+    # deterministically.
+    #
+    # @param site [Jekyll::Site]
+    # @return [String]
+    def implementation_fingerprint(site)
+      %w[lunr.min.js search-worker.js].map do |name|
+        path = site.in_source_dir("assets", "js", name)
+        File.file?(path) ? Digest::SHA256.file(path).hexdigest : ""
+      end.join
     end
 
     # A field value as the words a reader could type for it.

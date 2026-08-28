@@ -28,7 +28,16 @@ const KEY = 'payload';
 
 self.onmessage = (event) => {
   const msg = event.data || {};
-  build(String(msg.url || '/search.json'), String(msg.version || ''));
+  const url = String(msg.url || '/search.json');
+  // Only the page that spawned this dedicated worker can message it (there is
+  // no origin to check — dedicated-worker messages carry none), but the fetch
+  // target is still pinned to a same-origin absolute path: a single leading
+  // slash, so neither a cross-origin nor a protocol-relative URL gets through.
+  if (!/^\/(?!\/)/.test(url)) {
+    postMessage({ type: 'error', error: 'refused to fetch ' + url });
+    return;
+  }
+  build(url, String(msg.version || ''));
 };
 
 /**
@@ -46,7 +55,14 @@ async function build(url, version) {
     const payload = await download(url);
     postMessage({ type: 'progress', phase: 'build' });
     const serialized = index(payload).toJSON();
-    await writeCache(version, payload, serialized);
+    // A half-propagated deploy can pair fresh HTML with a stale /search.json
+    // (or vice versa). The download still answers THIS visit — it is the best
+    // copy available — but only a payload that is what the page said it would
+    // be is cached, so a skewed response can never squat under the new
+    // version and hide catalog updates from every later visit.
+    if (payload && payload.version === version) {
+      await writeCache(version, payload, serialized);
+    }
     postMessage({ type: 'ready', payload: payload, serialized: serialized, cached: false });
   } catch (error) {
     postMessage({ type: 'error', error: String((error && error.message) || error) });
