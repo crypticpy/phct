@@ -23,12 +23,12 @@ platform: []
 vendor: ""
 expertise: Anyone on staff
 readiness: []
-repo_url: ""
+repo_url: "https://github.com/crypticpy/phct"
 demo_url: ""
 docs_url: ""
 resources: []
 screenshots: []
-deck_pdf: "/catalog/release-rehearsal-live-publishing-check/deck.pdf"
+deck_pdf: ""
 also_deployed_by: []
 license: MIT
 access_terms: ""
