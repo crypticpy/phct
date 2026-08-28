@@ -2,17 +2,20 @@
 
 - Evidence date: 2026-08-28
 - PHCT starting baseline: `c9fcb223826f2fc8c945d894420c16a2b8ff5da0`
-- PHCT candidate: `v1.9.0-rc.6`, cut from protected `main` at the merge of the
-  searchable "Also deployed by" listings ([PR #46](https://github.com/crypticpy/phct/pull/46),
-  all ruleset-required contexts plus scale, audit, and CodeQL green at merged head
-  `cf55fd735d091172222801d551ee989abb3b0319`) — the head of the entry-lifecycle,
-  concept-search and search-performance line merged in
+- PHCT candidate: `v1.9.0-rc.7`, cut from protected `main` at the merge of the two
+  rc.6 refresh-cycle robustness fixes found in downstream review
+  ([PR #49](https://github.com/crypticpy/phct/pull/49), merged at
+  `af54f2810ed9d94fbfbb9b92ecf500ceaba18ddb`) and this release pull request.
+  It supersedes
+  [`v1.9.0-rc.6`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.6), published at
+  immutable commit `c33e76b05fda6a9bdaa7beea7527414b13d74c1b` — cut at the merge of the
+  searchable "Also deployed by" listings ([PR #46](https://github.com/crypticpy/phct/pull/46)),
+  the head of the entry-lifecycle, concept-search and search-performance line merged in
   [PR #43](https://github.com/crypticpy/phct/pull/43),
   [PR #44](https://github.com/crypticpy/phct/pull/44) and
-  [PR #45](https://github.com/crypticpy/phct/pull/45) — and this release pull request.
-  It supersedes
-  [`v1.9.0-rc.5`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.5), published at
-  immutable commit `607169f1b12c6bb44e959e626c19f2ca9eefa6f0`, which itself superseded
+  [PR #45](https://github.com/crypticpy/phct/pull/45) — which itself superseded
+  [`v1.9.0-rc.5`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.5) at
+  immutable commit `607169f1b12c6bb44e959e626c19f2ca9eefa6f0`, which superseded
   [`v1.9.0-rc.4`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.4) at
   `c41149eaacab353c82403477bf0c5b2f26a48650`; the
   [`v1.9.0-rc.2`](https://github.com/crypticpy/phct/releases/tag/v1.9.0-rc.2) record at
@@ -135,7 +138,7 @@ No automated P0 or P1 defect is known at this checkpoint.
 |---|---|---|---|
 | RR-H01 | Review these changes and obtain green required CI plus independent human approval in PHCT and BCHC. | PHCT maintainer | In progress — rc.6's machine-verified update ([BCHC PR #30](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/30)) and the feature adoption ([BCHC PR #31](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/31)) merged 2026-08-28 with green required checks after human review of #30. The [PHCT PR #49](https://github.com/crypticpy/phct/pull/49) merge resets the line: the stable cut now requires an rc.7 candidate and one more human-reviewed BCHC update. |
 | RR-H02 | Tag an immutable PHCT release candidate, run the actual BCHC update workflow, review the checksum report and generated changes, then prove revert/rollback of the update pull request. | PHCT maintainer | Complete for rc.6 — immutable `v1.9.0-rc.6` consumed through the live updater with the fail-closed ownership-contract gate proven ([run 33134382533](https://github.com/crypticpy/bchc-ai-use-case-catalog/actions/runs/33134382533)) before [BCHC PR #30](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/30); offline rollback proof retained 2026-08-28: reverting update merge `c0826d9` restores the full `v1.9.0-rc.5` state (58 template files, lock included) touching zero deployment-owned content — the live revert-PR path stays open under RR-H07. Repeat for rc.7 and the stable tag. |
-| RR-H03 | Complete a real issue → pull request → media processing → review → merge → Pages deploy → notification rehearsal in both repositories. Use non-sensitive test content and remove it afterward. | Repository admins | In progress — the BCHC leg completed 2026-08-28: a real web-form submission became [BCHC PR #27](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/27) carrying real media (PDF deck plus generated AVIF/WebP derivatives), merged at `610c0fc`, deployed through Pages, and was verified live (entry page, media files, and `search.json`); the test entry was then removed end to end via [BCHC PR #32](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/32) and verified gone. The PHCT-side rehearsal and the notification-delivery confirmation remain open. |
+| RR-H03 | Complete a real issue → pull request → media processing → review → merge → Pages deploy → notification rehearsal in both repositories. Use non-sensitive test content and remove it afterward. | Repository admins | In progress — the BCHC leg completed 2026-08-28: a real web-form submission became [BCHC PR #27](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/27) carrying real media (PDF deck plus generated AVIF/WebP derivatives), merged at `610c0fc`, deployed through Pages, and was verified live (entry page, media files, and `search.json`); the test entry was then removed end to end via [BCHC PR #32](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/32) and verified gone. The PHCT leg completed later the same day: form-contract issue [#51](https://github.com/crypticpy/phct/issues/51) was scaffolded into [PR #52](https://github.com/crypticpy/phct/pull/52), the content gates correctly rejected the link-less draft until the maintainer amendment `84dd8bf` (the exact remedies the admin guide prescribes), it merged at `3a3e717`, was verified live on the deployed showcase (entry page and search index), and was removed via [PR #53](https://github.com/crypticpy/phct/pull/53) with the removal verified live. Only the notification-delivery confirmation remains open. |
 | RR-H04 | Name a BCHC product owner and backup technical maintainer; grant least-privilege access; update `CODEOWNERS`, `MAINTAINERS.md`, and the private contact system. | BCHC sponsor | Deferred until organizational handoff; it is not a wider-demo prerequisite. |
 | RR-H05 | Correct and verify branch rules, required checks/approval, Pages environment protection, Actions permissions, secrets/variables, domain/DNS, security settings, labels, and notifications against `docs/bchc/operations-inventory.yml`. | Repository admins | In progress — a fresh read-only API audit on 2026-08-28 was synced into `docs/bchc/operations-inventory.yml` (BCHC PRs [#31](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/31) and [#33](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/33)); the intentionally-unset repository variables are documented as default-on. Four admin items remain manual: require a human approval, disable Actions PR approval, protect release tags, and confirm notification delivery. |
 | RR-H06 | Manually test current Firefox, Safari, Edge, iOS Safari, and Android Chrome plus VoiceOver and NVDA; verify 200%/400% zoom, keyboard-only use, visible focus, forced colors, reduced motion, and representative long/empty/error content. | Accessibility reviewer | Open |
