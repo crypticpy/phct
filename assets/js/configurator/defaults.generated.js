@@ -931,7 +931,7 @@ export const SCHEMA = {
       "group": "reuse",
       "weight": 9,
       "icon": "users",
-      "search": false,
+      "search": true,
       "description": "Other organizations running this, maintained through the \"Also deployed by\" issue form."
     },
     {

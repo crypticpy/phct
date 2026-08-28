@@ -48,7 +48,11 @@ major version, and each entry says so when it happens.
 - Structured field values are searchable as words: a `links` field's labels and
   an `images` field's alt text now reach the index, so an entry can be found by
   the name of a resource it links to. Real addresses (`https://`, `mailto:`,
-  `tel:`) stay out; prose that happens to carry a colon stays in.
+  `tel:`, and bare emails) stay out; prose that happens to carry a colon stays
+  in.
+- **Also deployed by** listings are searchable: an entry can now be found by
+  the name of an organization running it, while each deployment's link and
+  contact address stay out of the index.
 - "Search at a thousand entries" is a measured budget, not a hope. The
   performance fixture now builds catalogs at 0/1/10/100/500/1000 entries, a
   real browser drives search, filtering and compare at every size named in
