@@ -24,7 +24,7 @@
   [rc.2 run](https://github.com/crypticpy/bchc-ai-use-case-catalog/actions/runs/32599759546):
   immutable tag and full SHA resolved, protected paths preserved byte-for-byte,
   merged at `fd7206981c58107df626f50062f08ad6aee1a0e0`); the
-  published BCHC demo is locked to `v1.9.0-rc.4` pending the rc.6 update (`v1.9.0-rc.5` was superseded before its downstream update ran).
+  published BCHC demo then consumed `v1.9.0-rc.5` via [PR #14](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/14) on 2026-08-26 and is locked there pending the rc.6 update, whose ownership-contract migration (`_data/security_signals.json`) rides [BCHC PR #29](https://github.com/crypticpy/bchc-ai-use-case-catalog/pull/29) ahead of the updater rerun.
 - Automated code baseline: **green**
 - Wider-demo candidate: **no-go until parent interface polish and the remaining manual/live demo gates pass**
 - Stable release and BCHC handoff: **no-go until the human and live-repository gates below pass**
