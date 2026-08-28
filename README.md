@@ -104,7 +104,7 @@ A fork is a copy, not a subscription: template releases do not reach you on thei
 ```bash
 git remote add template https://github.com/crypticpy/phct.git
 git fetch template --tags
-npm run upgrade:check -- --to v1.9.0-rc.5 # read-only: what this exact release changes, in two lists
+npm run upgrade:check -- --to v1.9.0-rc.6 # read-only: what this exact release changes, in two lists
 ```
 
 The whole protected-update and manual-recovery recipe: [`docs/upgrading.md`](docs/upgrading.md).
