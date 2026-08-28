@@ -630,10 +630,10 @@ fields:
     group: reuse
     weight: 9
     icon: users
-    # Not in the search index yet: an item is a mapping, and the index flattens
-    # scalars and string lists only. Flip `search` to true once structured
-    # values are flattened there.
-    search: false
+    # Searchable: the index flattens structured values (field_text in
+    # _plugins/search_index.rb), so each deployment contributes its
+    # organization name and note while its URL stays out of the index.
+    search: true
     description: "Other organizations running this, maintained through the \"Also deployed by\" issue form."
 
   # ---------------------------------------------------------------------------

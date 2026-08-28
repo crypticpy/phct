@@ -255,6 +255,20 @@ class SearchIndexGeneratorTest < Minitest::Test
     assert_equal [], addresses
   end
 
+  # `mailto:` is usually typed without its scheme. A value that is nothing
+  # but an email is an address; prose that merely contains one keeps its words.
+  def test_a_bare_email_is_an_address_too
+    text = @generator.field_text([
+                                   { "email" => "digital-services@health.example.gov",
+                                     "intranet" => "ops@intranet",
+                                     "note" => "Ask at desk@example.org before visiting" }
+                                 ])
+
+    # `ops@intranet` has no dot, but the submission forms accept it — whatever
+    # they let in stays out of the index.
+    assert_equal ["Ask at desk@example.org before visiting"], text
+  end
+
   # A prose label reads as `word:`, which is not a URI scheme. Losing these was
   # losing exactly the words this flattening was built to index.
   def test_prose_that_carries_a_colon_is_kept
