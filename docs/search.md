@@ -203,6 +203,47 @@ generated entry shares the same handful of words, so every query matches all of 
 budgets bound is therefore the whole keystroke, not search: bringing them down is work on the card
 grid, not on this file.
 
+## 1b. Where the cost went
+
+Four pieces move the cost above off the reader's path — or, where it cannot be moved, put it under
+their control. The public story is `/about/search/`; the mechanics are here.
+
+- **The build happens off the main thread.** Where the browser has workers,
+  `assets/js/search-worker.js` fetches `/search.json`, parses it and runs the entire lunr build,
+  then posts the payload plus `lunr.Index.prototype.toJSON()` back; the page revives it with
+  `lunr.Index.load`, a fraction of the build's cost, so typing and scrolling never freeze behind an
+  index under construction. The worker builds the **same index byte for byte** — same ref, fields,
+  boosts and body join as the inline path (`test/scripts/search_worker.test.mjs` asserts identical
+  rankings) — and any worker failure falls back silently to the original inline build, which is also
+  what browsers without workers (and jsdom in the tests) run.
+- **A finished build is kept in IndexedDB**, keyed to a version that names everything the build
+  depends on: `_plugins/search_index.rb` stamps a SHA-256 over the docs, both widenings, and the
+  index implementation (`lunr.min.js` + `search-worker.js`) — deliberately excluding
+  `generated_at`, so a redeploy that changes none of that keeps the cache warm, while a content
+  edit or a lunr/worker upgrade retires every cached build on its own. A downloaded payload is
+  cached only when its own `version` stamp matches the page's, so a half-propagated deploy
+  (fresh HTML, stale `/search.json`) can serve one stale visit but never poison the cache. A
+  return visit to an unchanged catalog skips the network and the build entirely; any cache
+  failure (no IndexedDB, a lying private window) just means building every visit, exactly as
+  before.
+- **A weak device facing a large catalog gets asked first.** When the build-time entry count
+  (`data-search-entries`, stamped by the plugin through `_includes/results-header.html`) reaches
+  `HEAVY_ENTRIES` (300 in `assets/js/search.js`) *and* the device reports few cores or little
+  memory, the automatic load is replaced by a **Load full search** button (`[data-search-gate]`)
+  narrating real progress — bytes downloaded, then the build phase. Until it is pressed, typing
+  still offers the vocabulary suggestions, which never needed the index, and the grid stays
+  unfiltered rather than silently wrong. Absent device signals count as capable: the gate is for
+  devices that say they are constrained.
+- **Off-screen cards cost nothing.** `content-visibility: auto` on `.entry-card`
+  (`assets/css/components/catalog.css`) lets the browser skip layout and paint for cards outside
+  the viewport — at 1000 entries, most of the grid, and the grid is what the warm column above is
+  made of.
+
+The probe pins both runtime signals so every runner measures the same path:
+`navigator.connection.saveData` is `true` (so the idle prewarm stays out of the cold number — CI's
+"cold" is a true cold) and `navigator.hardwareConcurrency` is `8` (so a 2-vCPU runner measures the
+load, not the gate; the gate has its own jsdom coverage in `test/scripts/search.test.mjs`).
+
 ---
 
 ## 2. Vocabulary-aware suggestions

@@ -9,7 +9,7 @@
     "catalog_html_gzip_bytes": 102400,
     "catalog_dom_nodes": 12000,
     "css_gzip_bytes": 30720,
-    "javascript_gzip_bytes": 43008,
+    "javascript_gzip_bytes": 46080,
     "search_json_gzip_bytes": 512000,
     "entries_json_gzip_bytes": 512000
   },

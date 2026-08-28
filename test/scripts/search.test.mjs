@@ -26,10 +26,14 @@ const SEARCH = fs.readFileSync(path.join(ROOT, 'assets', 'js', 'search.js'), 'ut
 
 /**
  * A booted catalog page with search wired up.
- * @param {{index?: object, fetch?: Function, noLunr?: boolean}} [options]
+ * @param {{index?: object, fetch?: Function, noLunr?: boolean, cores?: number,
+ *   entries?: number, workerUrl?: string}} [options]
  *   index overrides the payload /search.json resolves with; fetch replaces the
  *   whole stub (to fail, hang, or count calls); noLunr boots without the
  *   library, the way a blocked CDN-free build would if the bundle 404'd.
+ *   cores pins navigator.hardwareConcurrency, and entries/workerUrl stamp the
+ *   input's data-search-entries / data-search-worker the way
+ *   _includes/results-header.html would, for the gate and worker paths.
  * @returns {Promise<object>}
  */
 async function boot(options = {}) {
@@ -58,6 +62,16 @@ async function boot(options = {}) {
     else window.addEventListener('load', resolve);
   });
 
+  if (options.cores !== undefined) {
+    Object.defineProperty(window.navigator, 'hardwareConcurrency', {
+      configurable: true,
+      value: options.cores,
+    });
+  }
+  const inputEl = window.document.querySelector('[data-filter="search"]');
+  if (options.entries !== undefined) inputEl.setAttribute('data-search-entries', String(options.entries));
+  if (options.workerUrl) inputEl.setAttribute('data-search-worker', options.workerUrl);
+
   if (!options.noLunr) window.eval(LUNR);
   window.eval(SEARCH);
 
@@ -74,6 +88,9 @@ async function boot(options = {}) {
     status: document.querySelector('[data-search-status]'),
     floor: document.querySelector('[data-search-floor]'),
     more: document.querySelector('[data-search-more]'),
+    gate: document.querySelector('[data-search-gate]'),
+    gateLoad: document.querySelector('[data-search-load]'),
+    gateProgress: document.querySelector('[data-search-progress]'),
     rows: () => Array.from(document.querySelectorAll('[data-search-results] [role="option"]')),
     slots: () =>
       Array.from(document.querySelectorAll('[data-entry-id]'))
@@ -593,4 +610,132 @@ test('without lunr the box reports itself unavailable instead of throwing', asyn
 
   assert.equal(page.status.classList.contains('hidden'), false);
   assert.match(page.status.textContent, /unavailable/i);
+});
+
+/* --------------------------------------------------------- the load gate */
+
+test('the gate never appears for a small catalog or a capable device', async () => {
+  const small = await boot({ cores: 2, entries: 4 });
+  assert.equal(small.gate.hidden, true);
+
+  const capable = await boot({ cores: 8, entries: 1000 });
+  assert.equal(capable.gate.hidden, true);
+  await capable.type('notice');
+  assert.deepEqual([...capable.window.__searchMatches], ['notice-translation']);
+});
+
+test('a weak device facing a large catalog waits behind the gate', async () => {
+  const page = await boot({ cores: 2, entries: 1000 });
+  assert.equal(page.gate.hidden, false);
+
+  await page.type('notice');
+  // Nothing was fetched, nothing was filtered, and the status line says why.
+  assert.equal(page.requests.length, 0);
+  assert.equal(page.window.__searchMatches, null);
+  assert.match(page.status.textContent, /Load full search/);
+  // Clearing the box clears the pointer with it.
+  await page.type('');
+  assert.equal(page.status.textContent, '');
+});
+
+test('the gate button loads the index and answers the waiting query', async () => {
+  const page = await boot({ cores: 2, entries: 1000 });
+  await page.type('notice');
+  page.gateLoad.click();
+  await settle(page.window);
+
+  assert.equal(page.requests.filter((r) => r.url === '/search.json').length, 1);
+  assert.equal(page.gate.hidden, true);
+  assert.deepEqual([...page.window.__searchMatches], ['notice-translation']);
+  // From here the box behaves like any other device's.
+  await page.type('permit');
+  assert.deepEqual([...page.window.__searchMatches], ['permit-tracker']);
+  assert.equal(page.requests.filter((r) => r.url === '/search.json').length, 1);
+});
+
+/* ------------------------------------------------------- the worker path */
+
+/**
+ * The serialized index assets/js/search-worker.js would post, built inside
+ * the page's own lunr so revive-versus-build equivalence is exercised on the
+ * exact bytes the worker contract carries.
+ * @param {object} window a booted page's window (lunr already evaluated).
+ * @param {object} index the payload to build from.
+ * @returns {object} `lunr.Index.prototype.toJSON()` output.
+ */
+function serializedIndex(window, index) {
+  window.__payload = index;
+  return window.eval(
+    `lunr(function () {
+      this.ref('i');
+      this.field('title', { boost: 10 });
+      this.field('summary', { boost: 4 });
+      this.field('facets', { boost: 3 });
+      this.field('body');
+      window.__payload.docs.forEach((d, i) =>
+        this.add({
+          i: String(i), title: d.title, summary: d.summary, facets: d.facets,
+          body: (d.sections || []).map((s) => s.t || '').filter(Boolean).join(' '),
+        })
+      );
+    }).toJSON()`
+  );
+}
+
+test('a worker-built index is adopted without any main-thread fetch or build', async () => {
+  const page = await boot({ workerUrl: '/assets/js/search-worker.js' });
+  const serialized = serializedIndex(page.window, INDEX);
+  const seen = { messages: [], urls: [] };
+  page.window.Worker = class {
+    constructor(url) {
+      seen.urls.push(url);
+    }
+    postMessage(msg) {
+      seen.messages.push(msg);
+      setTimeout(() => {
+        this.onmessage({ data: { type: 'progress', phase: 'build' } });
+        this.onmessage({ data: { type: 'ready', payload: INDEX, serialized, cached: true } });
+      }, 0);
+    }
+    terminate() {
+      seen.terminated = true;
+    }
+  };
+
+  await page.type('notice');
+
+  assert.deepEqual(seen.urls, ['/assets/js/search-worker.js']);
+  // Parsed through JSON: the message object was born in the jsdom realm, and
+  // strict deep equality would reject its foreign Object.prototype.
+  assert.deepEqual(JSON.parse(JSON.stringify(seen.messages)), [{ url: '/search.json', version: '' }]);
+  assert.equal(seen.terminated, true);
+  assert.equal(page.requests.length, 0);
+  assert.deepEqual([...page.window.__searchMatches], ['notice-translation']);
+  const row = page.rows().find((li) => li.dataset.url.includes('notice-translation'));
+  assert.ok(row, 'the listbox offers the worker-indexed entry');
+});
+
+test('a broken worker falls back to the inline build without a visible seam', async () => {
+  // A worker whose very construction throws (a CSP that bans worker-src)…
+  const page = await boot({ workerUrl: '/assets/js/search-worker.js' });
+  page.window.Worker = class {
+    constructor() {
+      throw new Error('workers disabled');
+    }
+  };
+  await page.type('notice');
+  assert.equal(page.requests.filter((r) => r.url === '/search.json').length, 1);
+  assert.deepEqual([...page.window.__searchMatches], ['notice-translation']);
+
+  // …and one that starts, then reports it could not build.
+  const errored = await boot({ workerUrl: '/assets/js/search-worker.js' });
+  errored.window.Worker = class {
+    postMessage() {
+      setTimeout(() => this.onmessage({ data: { type: 'error', error: 'no index for you' } }), 0);
+    }
+    terminate() {}
+  };
+  await errored.type('notice');
+  assert.equal(errored.requests.filter((r) => r.url === '/search.json').length, 1);
+  assert.deepEqual([...errored.window.__searchMatches], ['notice-translation']);
 });

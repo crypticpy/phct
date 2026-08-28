@@ -33,4 +33,7 @@ Questions about the catalog or the review process? Email [{{ cfg.organization.co
 
 ## Built with
 
-This site runs on GitHub Pages and is managed entirely through GitHub issues and pull requests. The template is open source; see the repository{% if cfg.github.repository and cfg.github.repository != '' %} at [github.com/{{ cfg.github.repository }}](https://github.com/{{ cfg.github.repository }}){% endif %} for the code and the maintainer guide.
+This site runs on GitHub Pages and is managed entirely through GitHub issues and pull requests.
+{% if cfg.modules.catalog %}
+Search runs entirely in your browser — nothing you type ever leaves your device. [How search works]({{ '/about/search/' | relative_url }}) explains the engineering behind that.
+{% endif %} The template is open source; see the repository{% if cfg.github.repository and cfg.github.repository != '' %} at [github.com/{{ cfg.github.repository }}](https://github.com/{{ cfg.github.repository }}){% endif %} for the code and the maintainer guide.
