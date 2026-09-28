@@ -39,6 +39,7 @@ export const SITE = {
   },
   "demo": true,
   "demo_starter_url": "",
+  "demo_message": "",
   "modules": {
     "catalog": true,
     "submit": true,
@@ -1415,8 +1416,8 @@ export const SCHEMA = {
       "required": true,
       "group": "story",
       "weight": 1,
-      "description": "Markdown is supported. Suggested headings: Problem, Approach, What it took (data, staffing, cost), Results, Lessons learned, How to reuse.",
-      "placeholder": "## Problem\n\n## Approach\n\n## What it took\n\n## Results\n\n## Lessons learned\n\n## How to reuse this\n"
+      "description": "Markdown is supported. Suggested headings: Problem, Approach, Time and resources (data, staffing, cost), Results, Lessons learned, How to reuse.",
+      "placeholder": "## Problem\n\n## Approach\n\n## Time and resources\n\n## Results\n\n## Lessons learned\n\n## How to reuse this\n"
     }
   ]
 };

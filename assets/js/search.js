@@ -1020,7 +1020,10 @@
     lifted = null;
     queueCardAnnotations([]);
     clearTimeout(timer);
-    timer = setTimeout(run, 50);
+    timer = setTimeout(() => {
+      timer = null;
+      run();
+    }, 50);
   });
   input.addEventListener('focus', () => {
     if (!gated) load();
@@ -1080,6 +1083,15 @@
       if (open) {
         e.preventDefault();
         close();
+        // A keystroke still inside the debounce would reopen the popup 50ms
+        // after it was dismissed. Answer that query now, without the list, so
+        // the grid still matches the box; run() bumps runSeq, which also drops
+        // any older answer still in flight.
+        if (timer !== null) {
+          clearTimeout(timer);
+          timer = null;
+          run(false);
+        }
       }
       // Clearing has to go through the same path a keystroke takes, otherwise
       // filters.js never hears about it and ?q= survives in the URL (and a
