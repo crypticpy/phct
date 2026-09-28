@@ -8,6 +8,21 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.10.0-rc.1] — 2026-09-28
+
+**Upgrading a deployment.** Everything new is opt-in and renders identically
+when unset: no `link_access` block in `_data/site.yml` means no labels and no
+new validation, and a blank `demo_message` keeps the default demo banner. One
+page needs a hand edit to show the labels: `resources/**` is deployment-owned
+(`merge=ours`), so the update leaves your `resources/index.md` alone, and its
+old per-item `<li>` markup never shows them. Replace that markup with
+`{% include resource-item.html item=item %}` inside the `group.items` loop, as
+the template's own `resources/index.md` now does; with no `link_access` block
+the include renders the same row as before. The `ai-use-cases` heading rename
+and the commented `require_public_link`, `demo_message` and `link_access`
+examples live in `_data/schema.yml` and `_data/site.yml`, which are yours: copy
+them by hand if you want them.
+
 ### Added
 
 - Link access labels. An optional `link_access` block in `_data/site.yml`
@@ -73,6 +88,22 @@ major version, and each entry says so when it happens.
   Freshness is now read from git history (the PDF's last commit must be the
   thumbnail's or an ancestor of it), because a checkout's modification times
   kept the old thumbnail. Fork pull requests are still skipped.
+
+### Docs
+
+- The BCHC reference deployment's transfer and rename are recorded: it now
+  lives at `Big-Cities-Health-Coalition/use-case-catalog`, and present-tense
+  references (`docs/ecosystem.md`, the README, the maintainer and release
+  docs) point there. Historical records keep their old links, which GitHub
+  redirects.
+
+### Security
+
+- `sharp` 0.35.3 → 0.35.4 clears advisory GHSA-rgj7-g3m4-5g8c, which failed
+  `npm run security:audit`. It arrived with the rest of the npm dev-dependency
+  group (eslint, jsdom, postcss-cli 12, prettier and others), alongside the
+  GitHub Actions group (CodeQL, `ruby/setup-ruby`, `actions/deploy-pages`) and
+  `sass-embedded` 1.105.0. No template behaviour change.
 
 ## [1.9.0] — 2026-08-29
 
@@ -1254,7 +1285,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.10.0-rc.1...HEAD
+[1.10.0-rc.1]: https://github.com/crypticpy/phct/compare/v1.9.0...v1.10.0-rc.1
 [1.9.0]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.7...v1.9.0
 [1.9.0-rc.7]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.6...v1.9.0-rc.7
 [1.9.0-rc.6]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.5...v1.9.0-rc.6
