@@ -960,13 +960,13 @@ fields:
     required: true
     group: story
     weight: 1
-    description: "Markdown is supported. Suggested headings: Problem, Approach, What it took (data, staffing, cost), Results, Lessons learned, How to reuse."
+    description: "Markdown is supported. Suggested headings: Problem, Approach, Time and resources (data, staffing, cost), Results, Lessons learned, How to reuse."
     placeholder: |
       ## Problem
 
       ## Approach
 
-      ## What it took
+      ## Time and resources
 
       ## Results
 

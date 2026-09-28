@@ -30,11 +30,49 @@ major version, and each entry says so when it happens.
 - `docs/admin-guide.md` "Large files": keep big public files in one long-lived
   GitHub Release and link them, and why Git LFS does not work on Pages. The
   50 MB file-size failure now points there.
+- An optional `demo_message` in `_data/site.yml` replaces the demo banner's
+  sentence (and its setup and launch-guide links) with your own inline
+  markdown, for a deployment that keeps `demo: true` while its content is
+  provisional. Unset, the banner renders exactly as before.
+
+### Changed
+
+- The `ai-use-cases` body placeholder's cost heading is now "Time and
+  resources", so an entry written from it no longer has two "What it took"
+  headings (its own and the field group's). The generated issue form and setup
+  defaults are regenerated; existing entries are untouched.
 
 ### Fixed
 
 - The event-attachments form rejects a URL that is not `http(s)` (such as a
   `javascript:` link or a relative path) instead of writing it to the schedule.
+- Search: pressing Escape while a query was still debouncing closed the list,
+  then the pending search reopened it. Escape now cancels the pending run and
+  answers the query with the list kept closed.
+- A long list value on the entry page wraps inside its chip instead of pushing
+  a 320px page sideways.
+- Focus rings clear 3:1 everywhere. The header brand, the mobile menu button,
+  the desktop nav and the gallery file cards drew a translucent `primary/30`
+  ring (about 1.7:1); they now use the site-wide solid ring. On the footer and
+  the hero's links the ring turns `on_dark` over a `primary_dark` gap: a
+  `primary` ring there was 1.6:1 in the default theme and 2.7:1 in a red on
+  near-black one.
+- The site name wraps to two lines in the header on a phone instead of being
+  cut off with an ellipsis.
+- The catalog, facet pages and the home page's recent grid eager-load the first
+  card in the first row that has a picture, not just the first card, so the
+  largest image is no longer lazy-loaded when the newest entry has none.
+- Each row of the entry fact strip now spans the strip, so its dividers run
+  edge to edge instead of stopping where each fact's text did.
+- On a short entry the rail's extra height no longer opens empty bands below
+  the header and above the body (about 110px each, where 32px was intended).
+- File labels keep a leading acronym: "Download slide deck or one-pager (PDF)",
+  not "(pdf)". A new `downcase_first` filter lower-cases only the first letter,
+  and leaves a label that starts with an acronym alone.
+- The thumbnail workflow re-renders `thumb.jpg` when its PDF is replaced.
+  Freshness is now read from git history (the PDF's last commit must be the
+  thumbnail's or an ancestor of it), because a checkout's modification times
+  kept the old thumbnail. Fork pull requests are still skipped.
 
 ## [1.9.0] — 2026-08-29
 
