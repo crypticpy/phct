@@ -32,6 +32,11 @@ Local assigns are prefixed `fv_` so nothing leaks into the caller's scope.
     {%- assign fv_values = fv_v | as_list -%}
     {%- if fv_values.size > 0 -%}
     {%- comment -%}
+    The values are free text (a `list` item can be a whole phrase), so each chip is
+    `chip-wrap` and its <li> is `min-w-0 max-w-full`: a long value wraps inside the
+    column instead of pushing a 320px page sideways. The filter rail's facet pills
+    and the cards' single-line chips keep `.chip`'s truncation.
+
     `links_entries: true` (a `list` field) says the values are slugs of other entries
     in this catalog. Each is resolved against the entry pages and rendered as a chip
     linking to it, showing that entry's title rather than its slug. A slug that
@@ -43,12 +48,12 @@ Local assigns are prefixed `fv_` so nothing leaks into the caller's scope.
         {%- assign fv_target = nil -%}
         {%- if fv_f.links_entries -%}{%- assign fv_target = fv_entry_pages | where: 'slug', fv_x | first -%}{%- endif -%}
         {%- if fv_target -%}
-        <li><a class="chip-plain hover:border-brand-primary hover:text-brand-primary" href="{{ fv_target.url | relative_url | escape }}">{% include icon.html name='link' size='xs' %}{{ fv_target.title | escape }}</a></li>
+        <li class="min-w-0 max-w-full"><a class="chip-plain chip-wrap hover:border-brand-primary hover:text-brand-primary" href="{{ fv_target.url | relative_url | escape }}">{% include icon.html name='link' size='xs' %}{{ fv_target.title | escape }}</a></li>
         {%- else -%}
         {%- assign fv_xm = fv_f | option_meta: fv_x -%}
         {%- comment -%} Only an option's OWN icon earns a glyph; the field icon would repeat on every chip. {%- endcomment -%}
         {%- assign fv_xraw = fv_f.option_meta[fv_x] -%}
-        <li><span class="{% if fv_xm.tone == 'warn' %}chip-warn{% else %}chip-plain{% endif %}">{%- if fv_xraw.icon -%}{% include icon.html name=fv_xraw.icon size='xs' %}{%- endif -%}{{ fv_x | escape }}</span></li>
+        <li class="min-w-0 max-w-full"><span class="{% if fv_xm.tone == 'warn' %}chip-warn{% else %}chip-plain{% endif %} chip-wrap">{%- if fv_xraw.icon -%}{% include icon.html name=fv_xraw.icon size='xs' %}{%- endif -%}{{ fv_x | escape }}</span></li>
         {%- endif -%}
       {%- endfor -%}
     </ul>
@@ -166,7 +171,7 @@ Local assigns are prefixed `fv_` so nothing leaks into the caller's scope.
     <a class="link-row" href="{{ fv_v | relative_url | escape }}" download>
       <span class="flex min-w-0 items-center gap-3">
         {% include icon.html name='document' size='sm' class='shrink-0 text-brand-primary' %}
-        <span class="flex min-w-0 flex-col"><span class="truncate">Download {{ fv_f.label | downcase | escape }}</span><span class="text-xs font-normal text-brand-muted">{{ fv_v | split: '.' | last | upcase | escape }}</span></span>
+        <span class="flex min-w-0 flex-col"><span class="truncate">Download {{ fv_f.label | downcase_first | escape }}</span><span class="text-xs font-normal text-brand-muted">{{ fv_v | split: '.' | last | upcase | escape }}</span></span>
       </span>
       {% include icon.html name='download' size='sm' class='shrink-0 text-brand-primary' %}
     </a>

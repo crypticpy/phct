@@ -50,8 +50,13 @@ github:
 # `demo_starter_url` (optional) is a copy of the template that has already been
 # through the launch guide — the banner offers it as "what a fresh copy looks
 # like on day one". Only used while `demo` is true; leave blank to omit the link.
+# `demo_message` (optional) replaces the banner's whole sentence, links included,
+# with your own — inline markdown or a plain string, e.g.
+#   demo_message: "Entries are provisional until the review panel signs them off."
+# Leave blank for the default copy.
 demo: true
 demo_starter_url: ""
+demo_message: ""
 
 # Modules: turn site sections on or off. Navigation, home page blocks and
 # workflows adapt automatically.

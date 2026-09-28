@@ -67,6 +67,7 @@ Used to build the `/submit/` form's GitHub issue URL, the "Suggest an edit on Gi
 ```yaml
 demo: true
 demo_starter_url: ""
+demo_message: ""
 ```
 
 While `demo` is `true`, every page carries a **Demo content** banner
@@ -78,6 +79,19 @@ fictional health departments with nothing to say so.
 [launch.md](launch.md) — configured, samples removed, one entry — and the banner adds "See what a
 fresh copy looks like on day one" with that link. It ships blank, which drops the sentence. It is
 only read while `demo` is `true`, so there is nothing to clean up once the banner is off.
+
+`demo_message` is optional too. Set it when a deployment keeps the banner on while its own
+content is still provisional, and the template's "Configure it or follow the launch guide"
+sentence would send readers to a wizard they have no use for. It replaces that whole sentence,
+the setup, launch-guide and starter-site links with it, and is written as inline markdown, so a
+plain string works and so does a link:
+
+```yaml
+demo_message: "Entries are drafts until the [review panel](https://example.org/review-panel) signs them off."
+```
+
+The **Demo content** label stays. Blank or absent, the banner shows the default sentence. Like
+`demo_starter_url`, it is only read while `demo` is `true`.
 
 It is turned off by whatever removes the content: `npm run eject:samples`, the **Remove the demo
 content** checkbox on the Apply setup issue, or `npm run setup`'s last question. Delete the key
