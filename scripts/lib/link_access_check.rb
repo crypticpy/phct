@@ -210,7 +210,7 @@ module LinkAccessCheck
     path = File.join(root, "_data", "resources.yml")
     return [] unless File.file?(path)
 
-    groups = YAML.safe_load(File.read(path), permitted_classes: [Date, Time], aliases: false)
+    groups = YAML.safe_load(File.read(path), permitted_classes: [Date, Time], aliases: true)
     return [] unless groups.is_a?(Array)
 
     groups.each_with_index.flat_map do |group, group_index|

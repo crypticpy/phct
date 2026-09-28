@@ -103,6 +103,26 @@ class LinkAccessCheckTest < Minitest::Test
     assert_empty warnings
   end
 
+  # Jekyll reads _data files with aliases on, so a deployment may use anchors in
+  # site.yml or resources.yml; the validator must read them the same way.
+  def test_yaml_aliases_in_site_and_resources_data_are_accepted
+    write_site(<<~YAML)
+      org: &org Example Org
+      footer_owner: *org
+      #{SITE}
+    YAML
+    File.write(File.join(@root, "_data", "resources.yml"), <<~YAML)
+      - title: Guides
+        items:
+          - &guide { title: Guide, url: "https://files.example.org/g", access: members }
+          - *guide
+    YAML
+
+    failures, warnings = run_check
+    assert_empty failures
+    assert_empty warnings
+  end
+
   def test_a_site_without_the_block_is_not_checked
     write_site("name: Test\n")
     write_entry("plain", "- label: Report\n  url: https://files.example.org/x")

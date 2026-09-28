@@ -40,9 +40,10 @@ module FrontMatterCheck
   # Parse YAML with the same restrictions Jekyll's safe loader applies.
   # @param text [String]
   # @param source [String] path used in the error message
+  # @param aliases [Boolean] allow YAML anchors/aliases, as Jekyll does for _data files
   # @return [Hash]
-  def load_yaml(text, source)
-    YAML.safe_load(text, permitted_classes: [Date, Time], permitted_symbols: [], aliases: false) || {}
+  def load_yaml(text, source, aliases: false)
+    YAML.safe_load(text, permitted_classes: [Date, Time], permitted_symbols: [], aliases: aliases) || {}
   rescue Psych::SyntaxError => e
     raise "#{source} has invalid YAML: #{e.message}"
   end
@@ -477,7 +478,7 @@ module FrontMatterCheck
     # The optional `link_access` block: its own shape, then the `access:` values
     # in _data/resources.yml that point into it. Entries are checked below.
     site_path = File.join(root, "_data", "site.yml")
-    site = File.exist?(site_path) ? load_yaml(File.read(site_path), "_data/site.yml") : {}
+    site = File.exist?(site_path) ? load_yaml(File.read(site_path), "_data/site.yml", aliases: true) : {}
     link_access = site.is_a?(Hash) ? site["link_access"] : nil
     failures.concat(LinkAccessCheck.config_failures(link_access, LinkAccessCheck.icon_names(root)))
     failures.concat(LinkAccessCheck.resources_failures(root, link_access))
