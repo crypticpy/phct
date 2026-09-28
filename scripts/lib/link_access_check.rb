@@ -20,12 +20,10 @@ module LinkAccessCheck
   LEVEL_TEXT_KEYS = %w[label icon note request_url].freeze
   WHERE = "_data/site.yml: `link_access"
 
-  module_function
-
   # The icon names _includes/icon.html can draw, read off its "Names:" line.
   # @param root [String] repository root
   # @return [Array<String>, nil] nil when the file (or the line) is missing, so the icon check is skipped
-  def icon_names(root)
+  def self.icon_names(root)
     path = File.join(root, "_includes", "icon.html")
     return nil unless File.file?(path)
 
@@ -36,13 +34,13 @@ module LinkAccessCheck
   # The configured levels, or {} when there are none (or the block is malformed).
   # @param config [Object]
   # @return [Hash]
-  def levels(config)
+  def self.levels(config)
     config.is_a?(Hash) && config["levels"].is_a?(Hash) ? config["levels"] : {}
   end
 
   # @param value [String]
   # @return [Boolean] true for an http(s) URL, the same test check_front_matter.rb applies
-  def http_url?(value)
+  def self.http_url?(value)
     value.to_s.match?(%r{\Ahttps?://[^\s"'<>]+\z})
   end
 
@@ -50,7 +48,7 @@ module LinkAccessCheck
   # @param config [Object] site.yml's `link_access` value
   # @param icons [Array<String>, nil] drawable icon names, nil to skip the icon check
   # @return [Array<String>] failures
-  def config_failures(config, icons = nil)
+  def self.config_failures(config, icons = nil)
     return [] if config.nil?
     return ["#{WHERE}` must be a mapping with `levels` and/or `hosts`, got #{config.inspect}"] unless config.is_a?(Hash)
 
@@ -73,7 +71,7 @@ module LinkAccessCheck
   # @param level [Object]
   # @param icons [Array<String>, nil]
   # @return [Array<String>] failures
-  def level_failures(name, level, icons)
+  def self.level_failures(name, level, icons)
     spot = "#{WHERE}.levels.#{name}`"
     failures = []
     unless name.to_s.match?(LEVEL_NAME)
@@ -102,7 +100,7 @@ module LinkAccessCheck
   # @param index [Integer]
   # @param levels [Hash] the configured levels
   # @return [Array<String>] failures
-  def rule_failures(rule, index, levels)
+  def self.rule_failures(rule, index, levels)
     spot = "#{WHERE}.hosts[#{index}]`"
     return ["#{spot} must be a mapping of {match, name, access, download}, got #{rule.inspect}"] unless rule.is_a?(Hash)
 
@@ -127,7 +125,7 @@ module LinkAccessCheck
   # " (members, staff)", or " (none are configured)".
   # @param levels [Hash]
   # @return [String]
-  def known(levels)
+  def self.known(levels)
     levels.empty? ? " (none are configured)" : " (#{levels.keys.join(', ')})"
   end
 
@@ -136,7 +134,7 @@ module LinkAccessCheck
   # @param config [Object] site.yml's `link_access` value
   # @param spot [String] where the value is, for the message ("x/index.md:9: `resources[0].access`")
   # @return [String, nil]
-  def item_access_failure(value, config, spot)
+  def self.item_access_failure(value, config, spot)
     return nil if value.is_a?(String) && levels(config).key?(value.strip)
 
     "#{spot} is #{value.inspect}, which is not a level under _data/site.yml `link_access.levels`#{known(levels(config))}"
@@ -150,7 +148,7 @@ module LinkAccessCheck
   # @param config [Object] site.yml's `link_access` value
   # @param prefix [String] "x/index.md:9: `resources", completed with "[0].access`"
   # @return [Array<String>] failures
-  def links_access_failures(value, config, prefix)
+  def self.links_access_failures(value, config, prefix)
     return [] if config.nil?
 
     Array(value).each_with_index.filter_map do |item, index|
@@ -165,7 +163,7 @@ module LinkAccessCheck
   # @param data [Hash] front matter
   # @param fields [Array<Hash>] schema fields
   # @return [Array(String, Object)] [url, access] pairs
-  def entry_links(data, fields)
+  def self.entry_links(data, fields)
     fields.flat_map do |field|
       value = data[field["key"].to_s]
       case field["type"].to_s
@@ -192,7 +190,7 @@ module LinkAccessCheck
   # @param config [Object] site.yml's `link_access` value
   # @param links [Array(String, Object)] from #entry_links
   # @return [Boolean]
-  def no_public_link?(config, links)
+  def self.no_public_link?(config, links)
     return false if links.empty? || !config.is_a?(Hash)
 
     links.all? do |url, access|
@@ -206,7 +204,7 @@ module LinkAccessCheck
   # @param root [String] repository root
   # @param config [Object] site.yml's `link_access` value
   # @return [Array<String>] failures
-  def resources_failures(root, config)
+  def self.resources_failures(root, config)
     return [] if config.nil?
 
     path = File.join(root, "_data", "resources.yml")

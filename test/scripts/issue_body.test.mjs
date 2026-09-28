@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  codeSpan,
   coerce,
   hostOf,
   isHttpUrl,
@@ -306,6 +307,13 @@ test('slugFallback names a folder for a title with no Latin characters at all', 
   assert.equal(slugFallback(77), slugFallback(77));
   // No issue number (a local run): still a legal slug, just not a stable one.
   assert.match(slugFallback(''), /^entry-[a-z0-9]+$/);
+});
+
+test('codeSpan quotes submitter text literally, with no way out of the span', () => {
+  assert.equal(codeSpan('@octocat https://example.org/x'), '`@octocat https://example.org/x`');
+  // A backtick would close the span early and let the rest render as markdown.
+  assert.equal(codeSpan('a `b` c'), "`a 'b' c`");
+  assert.equal(codeSpan(null), '`null`');
 });
 
 test('siteHttpUrl returns the URL the page and the validator accept, or nothing', () => {

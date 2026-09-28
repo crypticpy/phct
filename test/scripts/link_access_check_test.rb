@@ -264,6 +264,54 @@ class LinkAccessCheckTest < Minitest::Test
     end
   end
 
+  # -- the helpers, directly --------------------------------------------------------
+
+  def test_entry_links_collects_url_fields_and_links_items_with_their_access
+    fields = YAML.safe_load(SCHEMA)["fields"]
+    data = {
+      "repo_url" => " https://github.com/org/repo ",
+      "summary" => "https://not-a-link-field.example",
+      "resources" => [
+        "https://bare.example.org/x",
+        "  ",
+        { "label" => "Folder", "url" => "https://files.example.org/1", "access" => "members" },
+        { "label" => "No URL" },
+        42
+      ]
+    }
+    assert_equal(
+      [["https://github.com/org/repo", nil], ["https://bare.example.org/x", nil], ["https://files.example.org/1", "members"]],
+      LinkAccessCheck.entry_links(data, fields)
+    )
+    assert_empty LinkAccessCheck.entry_links({ "repo_url" => "", "resources" => "not a list" }, fields)
+  end
+
+  def test_no_public_link_needs_links_and_a_block
+    config = YAML.safe_load(SITE)["link_access"]
+    gated = [["https://files.example.org/1", nil]]
+    assert LinkAccessCheck.no_public_link?(config, gated)
+    refute LinkAccessCheck.no_public_link?(config, gated + [["https://example.net/open", nil]])
+    refute LinkAccessCheck.no_public_link?(config, []), "no links at all is require_link's business"
+    refute LinkAccessCheck.no_public_link?(nil, gated)
+  end
+
+  def test_known_lists_the_configured_levels_for_a_message
+    assert_equal " (members, staff)", LinkAccessCheck.known({ "members" => {}, "staff" => {} })
+    assert_equal " (none are configured)", LinkAccessCheck.known({})
+  end
+
+  def test_icon_names_reads_the_names_line_or_skips_the_icon_check
+    assert_equal %w[download link lock], LinkAccessCheck.icon_names(@root)
+    File.write(File.join(@root, "_includes", "icon.html"), "no names line here\n")
+    assert_nil LinkAccessCheck.icon_names(@root)
+    FileUtils.rm(File.join(@root, "_includes", "icon.html"))
+    assert_nil LinkAccessCheck.icon_names(@root)
+  end
+
+  def test_the_shipped_icon_list_has_the_documented_example_icon
+    assert_includes LinkAccessCheck.icon_names(FrontMatterCheck::DEFAULT_ROOT), "lock"
+  end
+
   def test_one_public_link_anywhere_is_enough
     write_site(SITE)
     write_entry(

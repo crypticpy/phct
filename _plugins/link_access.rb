@@ -21,12 +21,10 @@
 # to. Nothing here registers with Jekyll.
 module CatalogTemplate
   module LinkAccess
-    module_function
-
     # "example.org/p/" -> ["example.org", "/p/"]; "example.org" -> ["example.org", ""].
     # @param match [String] a host rule's `match`
     # @return [Array(String, String)] lower-cased host, path prefix ("" for none)
-    def split_match(match)
+    def self.split_match(match)
       text = match.to_s.strip
       slash = text.index("/")
       return [text.downcase, ""] unless slash
@@ -55,7 +53,7 @@ module CatalogTemplate
     #
     # @param url [String]
     # @return [Array(String, String), nil] lower-cased host and normalized path, nil unless http(s) with a host
-    def host_and_path(url)
+    def self.host_and_path(url)
       text = url.to_s.strip.delete("\t\n\r")
       found = %r{\Ahttps?:[/\\]*([^/\\?#]*)([^?#]*)}i.match(text)
       return nil unless found
@@ -73,7 +71,7 @@ module CatalogTemplate
     # dot segment leaves a trailing slash.
     # @param path [String] a URL path, "/" separated
     # @return [String]
-    def remove_dot_segments(path)
+    def self.remove_dot_segments(path)
       segments = path.split("/", -1)
       segments.shift # the empty string before the leading "/"
       kept = []
@@ -96,7 +94,7 @@ module CatalogTemplate
     # @param config [Hash] the link_access block
     # @param url [String]
     # @return [Hash, nil]
-    def rule_for(config, url)
+    def self.rule_for(config, url)
       rules = config["hosts"]
       return nil unless rules.is_a?(Array)
 
@@ -123,7 +121,7 @@ module CatalogTemplate
     # @param url [String]
     # @param access [String, nil] the item's own `access:`, overriding its host rule
     # @return [Hash, nil] name, access, label, icon, note, request_url, download
-    def resolve(config, url, access = nil)
+    def self.resolve(config, url, access = nil)
       return nil unless config.is_a?(Hash)
 
       rule = rule_for(config, url)

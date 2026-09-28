@@ -204,6 +204,18 @@ class ThemeFiltersTest < Minitest::Test
     assert_nil link_access_host(nil).link_access("https://files.example.org/x")
   end
 
+  def test_link_access_is_nil_without_a_site_or_with_a_malformed_site_yml
+    no_site = ThemeFiltersHost.new
+    no_site.instance_variable_set(:@context, Liquid::Context.new)
+    assert_nil no_site.link_access("https://files.example.org/x")
+
+    # A site.yml that parsed to a list, not a mapping, has no link_access to read.
+    list_site = ThemeFiltersHost.new
+    site = Struct.new(:data).new({ "site" => ["link_access"] })
+    list_site.instance_variable_set(:@context, Liquid::Context.new({}, {}, { site: site }))
+    assert_nil list_site.link_access("https://files.example.org/x")
+  end
+
   def test_link_access_merges_the_host_rule_with_its_level
     meta = link_access_host(LINK_ACCESS).link_access("https://files.example.org/projects/1")
 
