@@ -8,6 +8,34 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- Link access labels. An optional `link_access` block in `_data/site.yml`
+  names access levels (label, icon, screen-reader note, request-access link)
+  and host rules (a host plus an optional path prefix, first match wins). A
+  link on a matching host shows the rule's name, the level's chip, and the
+  note as screen-reader text. A links item can override its host rule with
+  `access: <level>`. The labels appear on entry links, `url` fields, the reuse
+  card, event attachments, cohort materials and resources. `npm run validate`
+  checks the block, fails an `access:` that names no configured level (a site
+  without the block is not checked), and warns when
+  every link on an entry needs a sign-in; `entry.require_public_link: true`
+  makes that a failure. A site without the block renders byte for byte as
+  before.
+- A `file` field may hold an `http(s)` URL: the entry page renders an outbound
+  row instead of a download. The scaffolder stores a pasted non-GitHub link
+  without downloading it, and keeps the URL when a download is refused. The
+  upload control tells submitters to paste big or workspace-hosted files as a
+  link.
+- `docs/admin-guide.md` "Large files": keep big public files in one long-lived
+  GitHub Release and link them, and why Git LFS does not work on Pages. The
+  50 MB file-size failure now points there.
+
+### Fixed
+
+- The event-attachments form rejects a URL that is not `http(s)` (such as a
+  `javascript:` link or a relative path) instead of writing it to the schedule.
+
 ## [1.9.0] — 2026-08-29
 
 Stable release. Records-only promotion of the accepted `v1.9.0-rc.7`

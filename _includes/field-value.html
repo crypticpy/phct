@@ -58,7 +58,7 @@ Local assigns are prefixed `fv_` so nothing leaks into the caller's scope.
     {%- if fv_demo_sample -%}
     <span class="inline-flex items-center gap-1.5 font-medium text-brand-muted">{% include icon.html name='info' size='sm' %}<span>{{ fv_f.label | escape }}</span><span class="text-xs font-normal">Demo placeholder — not live</span></span>
     {%- else -%}
-    <a class="inline-flex items-baseline gap-1.5 font-medium text-brand-primary hover:underline" href="{{ fv_v | escape }}" target="_blank" rel="noopener noreferrer">{{ fv_f.label | escape }}<span class="link-host text-xs font-normal text-brand-muted">{{ fv_v | link_host | escape }}</span><span class="sr-only"> (opens in a new tab)</span>{% include icon.html name='external-link' size='xs' class='self-center' %}</a>
+    <a class="inline-flex items-baseline gap-1.5 font-medium text-brand-primary hover:underline" href="{{ fv_v | escape }}" target="_blank" rel="noopener noreferrer">{{ fv_f.label | escape }}{% include link-meta.html url=fv_v class='link-host text-xs font-normal text-brand-muted' %}<span class="sr-only"> (opens in a new tab)</span>{% include icon.html name='external-link' size='xs' class='self-center' %}</a>
     {%- endif -%}
 
   {%- when 'links' -%}
@@ -69,6 +69,11 @@ Local assigns are prefixed `fv_` so nothing leaks into the caller's scope.
     neither renders exactly as it always did. They sit OUTSIDE the anchor: an
     <a> inside an <a> is invalid, and the note is not part of the link's name.
     A string item (the bare-URL shorthand) answers nil to both.
+
+    An item may also carry `access` (a level from site.yml `link_access`), which
+    overrides its host rule; link-meta.html renders the host line and, outside
+    the anchor, the level's note and "Request access" link. With no
+    `link_access` block both render exactly what this row always showed.
     {%- endcomment -%}
     {%- assign fv_links = fv_v -%}
     {%- if fv_links.first -%}
@@ -91,11 +96,12 @@ Local assigns are prefixed `fv_` so nothing leaks into the caller's scope.
           <a class="link-row group" href="{{ fv_url | escape }}" target="_blank" rel="noopener noreferrer">
             <span class="flex min-w-0 items-center gap-3">
               {% include icon.html name='link' size='sm' class='shrink-0 text-brand-primary' %}
-              <span class="flex min-w-0 flex-col"><span class="truncate">{{ fv_label | escape }}</span><span class="link-host truncate text-xs font-normal text-brand-muted">{{ fv_url | link_host | escape }}</span></span>
+              <span class="flex min-w-0 flex-col"><span class="truncate">{{ fv_label | escape }}</span>{% include link-meta.html url=fv_url access=fv_l.access class='link-host truncate text-xs font-normal text-brand-muted' %}</span>
             </span>
             <span class="sr-only">(opens in a new tab)</span>
             {% include icon.html name='external-link' size='sm' class='shrink-0 text-brand-primary' %}
           </a>
+          {%- include link-meta.html url=fv_url access=fv_l.access part='after' class='mt-1 px-4 text-xs text-brand-muted' -%}
           {%- endif -%}
           {%- if fv_note != '' -%}<p class="mt-1 px-4 text-xs text-brand-muted">{{ fv_note | escape }}</p>{%- endif -%}
           {%- if fv_email != '' -%}
@@ -130,8 +136,33 @@ Local assigns are prefixed `fv_` so nothing leaks into the caller's scope.
     {%- endif -%}
 
   {%- when 'file' -%}
+    {%- comment -%}
+    A `file` value is a path in the repository, or an http(s) URL for a file too
+    big for GitHub or kept in a shared workspace (check_front_matter.rb accepts
+    both). The URL gets the same external row as a `links` item.
+    {%- endcomment -%}
+    {%- assign fv_is_link = fv_v | http_url -%}
     {%- assign fv_found = site.static_files | where: 'path', fv_v | size -%}
-    {%- if fv_found > 0 -%}
+    {%- if fv_is_link -%}
+      {%- if fv_demo_sample -%}
+    <span class="link-row">
+      <span class="flex min-w-0 items-center gap-3">
+        {% include icon.html name='info' size='sm' class='shrink-0 text-brand-muted' %}
+        <span class="flex min-w-0 flex-col"><span class="truncate">{{ fv_f.label | escape }}</span><span class="text-xs font-normal text-brand-muted">Sample resource — not live</span></span>
+      </span>
+    </span>
+      {%- else -%}
+    <a class="link-row group" href="{{ fv_v | escape }}" target="_blank" rel="noopener noreferrer">
+      <span class="flex min-w-0 items-center gap-3">
+        {% include icon.html name='document' size='sm' class='shrink-0 text-brand-primary' %}
+        <span class="flex min-w-0 flex-col"><span class="truncate">{{ fv_f.label | escape }}</span>{% include link-meta.html url=fv_v class='link-host truncate text-xs font-normal text-brand-muted' %}</span>
+      </span>
+      <span class="sr-only">(opens in a new tab)</span>
+      {% include icon.html name='external-link' size='sm' class='shrink-0 text-brand-primary' %}
+    </a>
+    {%- include link-meta.html url=fv_v part='after' class='mt-1 px-4 text-xs text-brand-muted' -%}
+      {%- endif -%}
+    {%- elsif fv_found > 0 -%}
     <a class="link-row" href="{{ fv_v | relative_url | escape }}" download>
       <span class="flex min-w-0 items-center gap-3">
         {% include icon.html name='document' size='sm' class='shrink-0 text-brand-primary' %}
