@@ -11,7 +11,7 @@ This repository is shipped configured as an **AI Use Case Catalog**, where publi
 - [Resource library](https://crypticpy.github.io/phct/examples/resource-library/) — shorter entries and more of them: guides, toolkits and datasets.
 - [Blank catalog](https://crypticpy.github.io/phct/examples/blank/) — the smallest useful starting point, ready to be renamed.
 
-**Where the coalition catalog lives:** the health-coalition catalog this template grew out of is now its own repository, [crypticpy/bchc-ai-use-case-catalog](https://github.com/crypticpy/bchc-ai-use-case-catalog). This repository stays the generic template — see [docs/ecosystem.md](docs/ecosystem.md) for the full map of the repository family.
+**Where the coalition catalog lives:** the health-coalition catalog this template grew out of is now its own repository, [Big-Cities-Health-Coalition/use-case-catalog](https://github.com/Big-Cities-Health-Coalition/use-case-catalog). This repository stays the generic template — see [docs/ecosystem.md](docs/ecosystem.md) for the full map of the repository family.
 
 <p align="center">
   <img src="docs/images/home.png" alt="Home page: dark hero with search, calls to action, an honest stat line and the newest entries listed alongside; a browse-by grid of the schema's facets underneath." width="720">

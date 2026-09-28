@@ -506,13 +506,13 @@ body:
     id: body
     attributes:
       label: Full write-up
-      description: "What's the story? Markdown is supported. Suggested headings: Problem, Approach, What it took (data, staffing, cost), Results, Lessons learned, How to reuse."
+      description: "What's the story? Markdown is supported. Suggested headings: Problem, Approach, Time and resources (data, staffing, cost), Results, Lessons learned, How to reuse."
       value: |
         ## Problem
 
         ## Approach
 
-        ## What it took
+        ## Time and resources
 
         ## Results
 
