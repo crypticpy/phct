@@ -17,6 +17,7 @@ import {
   parseIssueForm,
   parseMultiselect,
   parseSections,
+  siteHttpUrl,
   rawValue,
   slugFallback,
   slugify,
@@ -305,6 +306,27 @@ test('slugFallback names a folder for a title with no Latin characters at all', 
   assert.equal(slugFallback(77), slugFallback(77));
   // No issue number (a local run): still a legal slug, just not a stable one.
   assert.match(slugFallback(''), /^entry-[a-z0-9]+$/);
+});
+
+test('siteHttpUrl returns the URL the page and the validator accept, or nothing', () => {
+  assert.equal(siteHttpUrl('https://files.example.org/deck.pdf'), 'https://files.example.org/deck.pdf');
+  assert.equal(siteHttpUrl('  http://example.org/a  '), 'http://example.org/a');
+  // The scheme is case-insensitive in a browser; the page's `http_url` test is not.
+  assert.equal(siteHttpUrl('HTTPS://Drive.Example.com/Deck.pdf'), 'https://Drive.Example.com/Deck.pdf');
+  // Quotes, angle brackets and spaces would break the href attribute the page writes.
+  for (const bad of [
+    "https://example.org/it's.pdf",
+    'https://example.org/"x"',
+    'https://example.org/<x>',
+    'https://example.org/a b',
+    'ftp://example.org/x',
+    'javascript:alert(1)',
+    '/catalog/x/deck.pdf',
+    '',
+    null,
+  ]) {
+    assert.equal(siteHttpUrl(bad), '', String(bad));
+  }
 });
 
 test('isHttpUrl and hostOf', () => {

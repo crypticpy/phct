@@ -88,6 +88,11 @@ entry:
   # drawing a warning: nobody could evaluate or adopt a resource nobody can
   # reach.
   require_link: true
+  # The same bar for a reader outside the organization (optional). When
+  # _data/site.yml sets up `link_access` and every link on an entry resolves to
+  # an access level ("Members only"), validation warns; `require_public_link:
+  # true` makes that a failure. No effect without a `link_access` block.
+  # require_public_link: true
   # Contributing organizations (optional). The field whose distinct values the
   # monthly metrics workflow (scripts/metrics.mjs) counts as "contributing
   # organizations" on the governance page — live entries only, sample content

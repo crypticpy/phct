@@ -149,6 +149,19 @@ catalog:
   # first. Existing issues are always refreshed, never counted against this.
   refresh_max_new_issues: 20
 
+# Who can open a link (optional). Labels links on hosts not every reader can
+# open — a members-only workspace, a shared drive — and big files kept in a
+# release, from their host; an item in a `links` field can set `access: <level>`
+# itself. First matching rule wins. Leave it out and links render as they always
+# have. Full reference: docs/configuration.md#link-access.
+#   link_access:
+#     levels:
+#       members: { label: "Members only", icon: lock, note: "Sign-in required.", request_url: "" }
+#     hosts:
+#       - { match: "workspace.example.org/p/", name: "Workspace" }                 # public share links
+#       - { match: "workspace.example.org", name: "Workspace", access: members }
+#       - { match: "github.com/your-org/your-repo/releases/download/", name: "File library", download: true }
+
 # How readers are invited to reach an entry's contact
 contact:
   # Add an "Ask in the open" link beside the contact email that starts a GitHub
