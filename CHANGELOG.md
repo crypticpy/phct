@@ -8,6 +8,20 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.10.0-rc.2] — 2026-09-28
+
+Second candidate. rc.1's live BCHC update stopped before opening a pull request
+because one build test assumed the deployment's content, not the template's.
+
+### Fixed
+
+- The build test for the catalog's eager-loaded card image assumed a picture in
+  the first row. The updater runs the suite on a deployment's own entries, and
+  a catalog whose three newest entries have no picture failed the update even
+  though the page did exactly what the layout intends (nothing above the fold to
+  eager-load). The test now expects no eager image in that case, and checks that
+  the eager image is the first row's first picture otherwise.
+
 ## [1.10.0-rc.1] — 2026-09-28
 
 **Upgrading a deployment.** Everything new is opt-in and renders identically
@@ -1285,7 +1299,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.10.0-rc.1...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.10.0-rc.2...HEAD
+[1.10.0-rc.2]: https://github.com/crypticpy/phct/compare/v1.10.0-rc.1...v1.10.0-rc.2
 [1.10.0-rc.1]: https://github.com/crypticpy/phct/compare/v1.9.0...v1.10.0-rc.1
 [1.9.0]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.7...v1.9.0
 [1.9.0-rc.7]: https://github.com/crypticpy/phct/compare/v1.9.0-rc.6...v1.9.0-rc.7

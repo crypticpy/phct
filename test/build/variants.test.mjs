@@ -351,9 +351,8 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
     { skip: needs('all-modules') },
     () => {
       const { dir, siteDir } = built.get('all-modules');
-      const cards = [
-        ...page(siteDir, entryNoun(dir).path).querySelectorAll('[data-entry-grid] [data-entry]'),
-      ];
+      const catalog = page(siteDir, entryNoun(dir).path);
+      const cards = [...catalog.querySelectorAll('[data-entry-grid] [data-entry]')];
       // The variant strips the newest entry's pictures, so this is the case the
       // per-variant check above has to get right rather than skip past.
       assert.equal(
@@ -361,10 +360,20 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
         null,
         'precondition: the first card should have no picture'
       );
-      const eager = [
-        ...page(siteDir, entryNoun(dir).path).querySelectorAll('[data-entry-grid] img[loading="eager"]'),
-      ];
+      const eager = [...catalog.querySelectorAll('[data-entry-grid] img[loading="eager"]')];
+      // The layout only looks at the first row (3 cards): a picture below it is
+      // below the fold. The updater runs this suite on a deployment's own
+      // entries, whose first row may have no picture at all.
+      const firstPicture = cards
+        .slice(0, 3)
+        .map((card) => card.querySelector('img'))
+        .find(Boolean);
+      if (!firstPicture) {
+        assert.equal(eager.length, 0, 'no picture in the first row, so nothing should load eagerly');
+        return;
+      }
       assert.equal(eager.length, 1, `expected one eager card image, found ${eager.length}`);
+      assert.equal(eager[0], firstPicture, 'the eager image should be the first picture in the first row');
       assert.equal(eager[0].getAttribute('fetchpriority'), 'high');
     }
   );
