@@ -22,7 +22,15 @@ const REPO = 'crypticpy/phct';
 
 const booted = [];
 test.after(() => booted.forEach((dom) => dom.window.close()));
-let bootCount = 0;
+
+// The module wires the page up as soon as it loads, as it does in the browser. Imported
+// once, against a page without the status app (so that first run does nothing); each test
+// then gets a fresh page and calls initStatusPage itself. One import keeps coverage
+// attributed to assets/js/status-page.js rather than to a new URL per test.
+const blank = new JSDOM('<!doctype html><body></body>');
+booted.push(blank);
+globalThis.document = blank.window.document;
+const { initStatusPage } = await import('../../assets/js/status-page.js');
 
 /** A Response-shaped answer. */
 const answer = (status, body) => ({ status, ok: status >= 200 && status < 300, json: async () => body });
@@ -63,8 +71,7 @@ async function boot({
     assert.equal(init?.headers?.Accept, 'application/vnd.github+json');
     return respond(String(address));
   };
-  bootCount += 1;
-  await import('../../assets/js/status-page.js?boot=' + bootCount);
+  initStatusPage();
   return { win, doc: win.document, requests };
 }
 

@@ -37,7 +37,11 @@ const TIMEOUT_MS = 10000;
 /** Words a screen reader hears before each step's name; the circle's fill says the same visually. */
 const STEP_STATE_WORDS = { done: 'Done: ', current: 'Current stage: ', upcoming: 'Not yet: ' };
 
-(function () {
+/**
+ * Wire the page up. Called once below, when the module loads; safe on a page without the
+ * status app (it does nothing).
+ */
+export function initStatusPage() {
   const app = document.querySelector('[data-status-app]');
   if (!app) return;
   const repo = app.dataset.repo || '';
@@ -320,4 +324,6 @@ const STEP_STATE_WORDS = { done: 'Done: ', current: 'Current stage: ', upcoming:
     input.value = linked.trim();
     lookup(linked, { fromReader: false });
   }
-})();
+}
+
+initStatusPage();
