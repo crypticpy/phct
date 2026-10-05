@@ -8,6 +8,8 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.1] — 2026-10-05
+
 **Upgrading a deployment.** Run **Bootstrap labels** once after updating: it
 adds the five `status:*` labels and `needs-triage` (the automation also creates
 them on first use). Nothing needs configuring; the optional `notifications:`
@@ -1405,7 +1407,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.1...HEAD
+[1.11.0-rc.1]: https://github.com/crypticpy/phct/compare/v1.10.0...v1.11.0-rc.1
 [1.10.0]: https://github.com/crypticpy/phct/compare/v1.10.0-rc.2...v1.10.0
 [1.10.0-rc.2]: https://github.com/crypticpy/phct/compare/v1.10.0-rc.1...v1.10.0-rc.2
 [1.10.0-rc.1]: https://github.com/crypticpy/phct/compare/v1.9.0...v1.10.0-rc.1
