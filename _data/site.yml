@@ -69,6 +69,7 @@ modules:
   cohorts: false     # Cohort / program-year pages with timelines & materials
   resources: false   # Curated resource library from _data/resources.yml
   governance: true   # The governance & policies page (/governance/) from _data/governance.yml
+  status: true       # "Check your submission" page (/status/): look up a submission by its GitHub number
 
 # Home page copy. `image` (optional) is a wide illustration layered into the
 # hero's dark ground — it fades in toward the right so the headline stays on a
@@ -113,6 +114,19 @@ submit:
   turnaround: "Intake checks it within about five business days and the Governance Committee reviews it within about ten more; you keep ownership of anything you share."   # the last step of "what happens next" — make it a promise you can keep
   review_note: "Please do not include protected health information, credentials or non-public data. Link out to repositories and documents rather than pasting sensitive content."
   fallback_email: "catalog@example.org"   # "Email it instead" button; leave blank (and clear organization.contact_email) to drop the button
+
+# "Check your submission" page (module: status). A submitter types the number
+# GitHub gave their submission and sees its title, date and stage, read from
+# the issue's `status:*` label through GitHub's public API (so the repository
+# must be public). The issue automation links here as /status/?n=<number>.
+# Every key is optional; leave one blank for the built-in wording.
+status:
+  heading: "Check your submission"
+  intro: "Already sent us something? Enter its number to see where it is in the review."
+  label: "Submission number"
+  hint: "GitHub gave your submission a number when you sent it, like #42. It is in the title of your submission on GitHub and in every email GitHub sends you about it."
+  button: "Check status"
+  link_label: "Check a submission"   # the footer link to this page
 
 # Events page (module: events). `image` is an optional wide banner (about 20:7)
 # shown under the page header; leave blank for a text-only header.

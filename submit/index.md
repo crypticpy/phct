@@ -51,6 +51,8 @@ scripts:
     [data-review]             empty container the "check your answers" step and
                               the confirmation panel are rendered into
     [data-review-next]        <template> holding the full "what happens next"
+    [data-after-submit]       <template> the confirmation panel shows: the issue
+                              number, GitHub's emails and the status page
     [data-form-chrome]        parts of the form hidden while the review shows
     [data-option-view=k__i]   <template> for option i of field k on the card
     [data-line-view=<key>]    <template> for a `card: line` field
@@ -92,6 +94,17 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
   truthiness — an empty string is truthy in Liquid.
 {%- endcomment -%}
 {%- assign gh_repo = cfg.github.repository | default: '' -%}
+
+{%- comment -%}
+  What a submitter should know once the issue exists: it has a number, GitHub
+  emails them about it, and (when the `status` module is on) the status page
+  looks it up. Shown as the last step of "what happens next" in the review
+  panel and again in the confirmation panel (template[data-after-submit],
+  cloned by assets/js/submit/review.js). `== false`, not truthiness: a site.yml
+  from before the module existed has no `status` key, and the page still builds
+  there (_plugins/modules.rb).
+{%- endcomment -%}
+{%- capture sub_status_note -%}GitHub gives your submission a number, like #42. Keep it: GitHub emails you each time something changes{% unless cfg.modules.status == false %}, and you can <a class="font-medium text-brand-primary underline underline-offset-2 hover:no-underline" href="{{ '/status/' | relative_url }}">check where it stands</a> with that number at any time{% endunless %}.{%- endcapture -%}
 
 {%- comment -%}
   `submit.accepting: false` pauses intake without removing the page: readers get
@@ -533,6 +546,9 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
       {%- endif %}
       <li>2. Automation turns the issue into a draft page and opens a pull request.</li>
       <li>3. {{ cfg.submit.turnaround | default: 'A maintainer reviews it — usually within a few days.' }}</li>
+      {%- if gh_repo != '' %}
+      <li>4. {{ sub_status_note }}</li>
+      {%- endif %}
     </ol>
     {%- if cfg.submit.review_note %}
     <p class="mt-3 flex items-start gap-1.5 rounded-md bg-brand-accent/10 p-2 text-sm text-brand-ink">
@@ -540,6 +556,16 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
     </p>
     {%- endif %}
   </template>
+
+  {%- comment -%}
+    The confirmation panel's note on following the submission once it is sent.
+  {%- endcomment -%}
+  {%- if gh_repo != '' %}
+  <template data-after-submit>
+    <p class="font-semibold text-brand-ink">After you submit</p>
+    <p class="mt-1 text-sm text-brand-muted">{{ sub_status_note }}</p>
+  </template>
+  {%- endif %}
 
   {%- if badge_field -%}
   {%- for o in badge_field.options -%}{%- assign om = badge_field | option_meta: o -%}

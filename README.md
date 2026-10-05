@@ -181,6 +181,7 @@ catalog/<slug>/index.md  published entries; screenshots live in catalog/<slug>/s
                          (ten sample entries ship with the template, marked `sample: true`)
 cohorts/<year>/          cohort landing page + event pages (module: cohorts)
 governance/              /governance/ — review process, roles and policies from _data/governance.yml (module: governance)
+status/                  /status/ — "Check your submission": a submission's stage by its GitHub number (module: status)
 styleguide/              /styleguide/ — live rendering of the design system against your theme (noindex)
 docs/                    index.md (start here), launch.md, admin-guide.md, contributor-guide.md, incidents.md,
                          configuration.md, content-model.md, search.md, images.md, upgrading.md, decisions.md,

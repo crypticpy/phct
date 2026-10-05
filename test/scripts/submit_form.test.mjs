@@ -332,6 +332,8 @@ test('the review step reads the answers back before anything is sent', async () 
   });
   assert.match(panel.textContent, /Service request routing/);
   assert.match(panel.textContent, /What happens next/);
+  assert.match(panel.textContent, /4\. GitHub gives your submission a number/);
+  assert.ok(panel.querySelector('a[href="/status/"]'), '"what happens next" links to the status page');
   // Optional questions left blank are shown as such rather than dropped.
   assert.match(panel.textContent, /Not answered/);
 });
@@ -391,6 +393,14 @@ test('the confirmation panel says the submission is not finished yet', async () 
   assert.match(panel.textContent, /Submit new issue/);
   const reopen = panel.querySelector('a[target="_blank"]');
   assert.equal(reopen.href, ctx.opened[0], 'the prefilled link is kept, so the tab can be reopened');
+  // What to do once it is filed: keep the number, watch for GitHub's emails,
+  // and where to look it up (submit/index.md, template[data-after-submit]).
+  assert.match(panel.textContent, /After you submit/);
+  assert.match(panel.textContent, /GitHub gives your submission a number, like #42\. Keep it/);
+  assert.match(panel.textContent, /GitHub emails you each time something changes/);
+  const status = Array.from(panel.querySelectorAll('a')).find((a) => a.getAttribute('href') === '/status/');
+  assert.ok(status, 'the confirmation links to the status page');
+  assert.equal(status.textContent, 'check where it stands');
   // The draft is the submitter's only copy until the issue is actually filed.
   assert.ok(ctx.storedDraft(), 'the draft survives the hand-off');
   press(ctx, 'Submitted it? Delete the saved draft');
