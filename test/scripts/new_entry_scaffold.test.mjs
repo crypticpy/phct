@@ -164,3 +164,111 @@ test('a file link the page could not render is stored with a lower-case scheme, 
   assert.match(warnings, new RegExp(`\\\`${field.key}\\\`.*could not be used`));
   assert.ok(warnings.includes("it's-the-deck.pdf"), warnings);
 });
+
+// Select, multiselect and boolean questions are single-line text inputs on the
+// issue form (GitHub prefills nothing else from /submit/'s link), so their
+// answers arrive as typed text. The bodies below are built from the schema, in
+// GitHub's rendering, so no field key or option is named here.
+
+/** The repository schema, parsed. */
+const repoSchema = () => yaml.load(fs.readFileSync(path.join(ROOT, '_data', 'schema.yml'), 'utf8'));
+
+/** The fields the issue form asks of each kind. */
+const asked = (schema, type) => schema.fields.filter((field) => field.form !== false && field.type === type);
+
+/**
+ * An issue body answering every form question, `### Label` then the answer,
+ * with the write-up last (the parser treats everything after it as prose).
+ * @param {object} schema
+ * @param {(field: object) => string} choice the text typed for a choice question
+ * @returns {string}
+ */
+function bodyFor(schema, choice) {
+  const sample = {
+    url: 'https://example.org',
+    email: 'someone@example.org',
+    date: '2026-01-02',
+    number: '3',
+  };
+  const fields = schema.fields.filter((field) => field.form !== false);
+  const ordered = [
+    ...fields.filter((f) => f.type !== 'markdown'),
+    ...fields.filter((f) => f.type === 'markdown'),
+  ];
+  return ordered
+    .map((field) => {
+      let answer;
+      if (['select', 'multiselect', 'boolean'].includes(field.type)) answer = choice(field);
+      else if (['file', 'image', 'images', 'links'].includes(field.type)) answer = '_No response_';
+      else answer = sample[field.type] ?? `Value for ${field.key}`;
+      return `### ${field.label}\n\n${answer}`;
+    })
+    .join('\n\n');
+}
+
+test('choice answers typed in any case reach the front matter as their exact options', () => {
+  const schema = repoSchema();
+  const body = bodyFor(schema, (field) =>
+    field.type === 'boolean'
+      ? 'yes'
+      : field.type === 'select'
+        ? ` ${String(field.options.at(-1)).toUpperCase()} `
+        : field.options
+            .slice(0, 2)
+            .map((option) => String(option).toLowerCase())
+            .join(',')
+  );
+  const stdout = dryRunOutput(ROOT, body);
+  const fm = dryRun(ROOT, body);
+  for (const field of asked(schema, 'select')) assert.equal(fm[field.key], field.options.at(-1), field.key);
+  for (const field of asked(schema, 'multiselect')) {
+    assert.deepEqual(fm[field.key], field.options.slice(0, 2), field.key);
+  }
+  for (const field of asked(schema, 'boolean')) assert.equal(fm[field.key], true, field.key);
+  assert.doesNotMatch(stdout, /Answers to fix/);
+});
+
+test('an answer that is not an option is left out of the front matter and listed for the reviewer', () => {
+  const schema = repoSchema();
+  const select = asked(schema, 'select')[0];
+  const multi = asked(schema, 'multiselect')[0];
+  assert.ok(select && multi, 'the repository schema asks at least one select and one multiselect');
+  const body = bodyFor(schema, (field) => {
+    if (field === select) return 'Not a real option';
+    if (field === multi) return `${field.options[0]}, Space travel`;
+    return field.type === 'boolean' ? 'Yes' : String(field.options[0]);
+  });
+  // The scaffold still succeeds (dryRunOutput asserts exit 0) …
+  const stdout = dryRunOutput(ROOT, body);
+  const fm = dryRun(ROOT, body);
+  // … writes nothing invalid …
+  assert.equal(fm[select.key], '');
+  assert.deepEqual(fm[multi.key], [multi.options[0]]);
+  // … and tells the reviewer what to put right.
+  const checklist = stdout.slice(stdout.indexOf('# pull request checklist'));
+  assert.match(checklist, /^### Answers to fix$/m);
+  assert.ok(
+    checklist.includes(`- [ ] **${select.label}** (\`${select.key}\`): \`Not a real option\``),
+    checklist
+  );
+  assert.ok(checklist.includes(`- [ ] **${multi.label}** (\`${multi.key}\`): \`Space travel\``), checklist);
+});
+
+test('an issue in the old dropdown rendering still scaffolds every choice answer', () => {
+  // test/fixtures/issue-basic.md was written by the dropdown form: exact option
+  // text, multi-selects comma-joined, one multiselect still as checkboxes.
+  const schema = repoSchema();
+  const stdout = dryRunOutput(ROOT);
+  const fm = dryRun(ROOT);
+  const answered = [...asked(schema, 'select'), ...asked(schema, 'multiselect')].filter((field) =>
+    new RegExp(`^### ${field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\n(?!_No response_)`, 'm').test(
+      ISSUE_BODY
+    )
+  );
+  assert.ok(answered.length >= 4, 'the fixture answers several choice questions');
+  for (const field of answered) {
+    const values = [fm[field.key]].flat();
+    assert.ok(values.length > 0 && values.every((v) => field.options.includes(v)), `${field.key}: ${values}`);
+  }
+  assert.doesNotMatch(stdout, /Answers to fix/);
+});

@@ -339,12 +339,18 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
         {%- assign describedby = fid | append: '-help ' | append: fid | append: '-error' -%}
         {%- assign question = f.prompt | default: f.label -%}
         {%- comment -%}
-          Every control the generator emits is an input, a textarea or a
-          dropdown — GitHub prefills all three from the query string. Nothing is
-          unprefillable today, but the plumbing that says so is kept: change one
-          field back to `checkboxes` and the form starts warning about it again.
+          GitHub prefills an issue form's text fields (`input`, `textarea`)
+          from the query string and nothing else: a `dropdown` or `checkboxes`
+          opens empty, and an `upload` cannot take a value at all. So the
+          generator asks select, multiselect and boolean questions as text
+          inputs (assets/js/configurator/issue-template.js) and they travel
+          like any other answer. An `image` question is the exception: it is an
+          `upload` on GitHub, so the address typed here cannot be carried, and
+          data-prefill="false" makes the review step say so and offer a copy
+          button. A `file` question takes no answer on this page.
         {%- endcomment -%}
         {%- assign prefillable = 'true' -%}
+        {%- if f.type == 'image' -%}{%- assign prefillable = 'false' -%}{%- endif -%}
         <div class="field" id="{{ fid }}-field" data-field="{{ f.key }}" data-type="{{ f.type }}" data-required="{{ f.required | default: false }}"
              data-label="{{ f.label | escape }}" data-question="{{ question | escape }}" data-error="{{ f.error | escape }}"
              data-slot="{{ slot }}" data-weight="{{ f.weight | default: 5 }}"
