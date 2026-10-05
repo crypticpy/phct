@@ -146,7 +146,7 @@ Links
 
 Mechanics
 
-- [ ] The **Validate Content** check is green (`check_front_matter.rb`, `check_file_sizes.rb` and the image-derivatives check).
+- [ ] The **Content: entries and site build** check is green (`check_front_matter.rb`, `check_file_sizes.rb`, the image-derivatives check and the site build). The other checks show as skipped on a submission; see [which checks a submission runs](#which-checks-a-submission-runs).
 - [ ] If a slide deck was promised, it has been uploaded into `catalog/<slug>/` as `deck.pdf`.
 - [ ] The maintainer checklist in the pull request body is complete. (Generated PRs carry their own checklist; `.github/PULL_REQUEST_TEMPLATE.md` is the one hand-opened PRs get.)
 
@@ -166,6 +166,20 @@ The template handles this without a token: after opening the pull request, each 
 3. Add it as a repository secret named `CONTENT_BOT_TOKEN` (Settings → Secrets and variables → Actions → Secrets).
 
 Give it a short expiry and re-issue it on a calendar reminder; the workflows fall back to `GITHUB_TOKEN` and the dispatch path the moment the secret is absent, so an expired token degrades rather than breaks. The token's user becomes the author of every content commit, so use a machine account if you would rather that not be a person's name. [SECURITY.md](../SECURITY.md) covers the trust this delegates.
+
+### Which checks a submission runs
+
+A pull request that changes only entry content runs one check: **Content: entries and site build** (part of **Validate Content**). Entry content means files inside an entry's folder (`catalog/<slug>/`, or your schema's `entry.path`) of the kinds a submission produces: `index.md`, screenshots and their AVIF/WebP versions, PDFs and thumbnails, plus `_data/derivatives.json`. Every pull request the submission, refresh and *also deployed by* workflows open is one of these.
+
+Every other check (lint, unit tests, coverage, the preset builds, Quality, Supply chain, CodeQL, Performance and scale, workflow lint) shows as *skipped* on that pull request. Skipped is not a problem: GitHub counts a skipped check as passed, so it never blocks the merge. A pull request that touches anything else, even one file, runs every check as before, and so does every PHCT update.
+
+A red **Content: entries and site build** is about the entry, never about the code. Open it and read the first failing step:
+
+- **Validate data files, front matter and file sizes**: the entry breaks a rule in the schema. The log names the file and the field, for example a required field that is empty, a choice that is not one of the options, or a file that is too large. Fix the entry in the pull request.
+- **Image derivatives are in sync**: an image is missing its smaller versions. See [Screenshots and images](#screenshots-and-images).
+- **Run Jekyll doctor and build the production site** or **Check built links**: the site does not build, or a link on the new page is broken.
+
+The check runs on every pull request, so it can be made required. Add **Content: entries and site build** to the branch ruleset's required checks: until you do, a red content check is visible but does not stop the merge button.
 
 ### PHCT updates use a separate token
 
