@@ -27,6 +27,14 @@ major version, and each entry says so when it happens.
   about it, and (when the status module is on) where to check on it. The
   footer gains a *Check a submission* link.
 
+### Security
+
+- `brace-expansion` is updated to 5.0.12 (GHSA-qhr7-859c-m2p7,
+  GHSA-6j4f-fj2g-mc7p, GHSA-q2hr-2g5m-vwhr). `braces` (GHSA-vfj7-8cjw-p6xm) has
+  no patched release; it reaches the tree only through Tailwind 3 at build
+  time, with this repository's own content globs, so it is registered as a P2
+  exception in `quality/security-exceptions.yml` until 2026-12-31 (#78).
+
 ## [1.10.0] — 2026-09-28
 
 Stable release. Records-only promotion of the accepted `v1.10.0-rc.2`
