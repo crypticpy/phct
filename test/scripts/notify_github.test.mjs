@@ -528,11 +528,15 @@ test("missing-label: a maintainer's form submission gets the message but no stat
   assert.deepEqual(github.labelsOf(41), []);
 });
 
-test('missing-label: any other outsider issue is acknowledged; a bug report gets no status', async () => {
+test('missing-label: any other outsider issue is acknowledged with no status or status link', async () => {
   const question = await runMissingLabel({ title: 'How do I submit?' });
   assert.match(question.commentsOn(41)[0], /Thank you for getting in touch!/);
-  assert.match(question.commentsOn(41)[0], /status\/\?n=41/);
-  assert.deepEqual(question.labelsOf(41).sort(), ['needs-triage', STATUS.received]);
+  assert.doesNotMatch(
+    question.commentsOn(41)[0],
+    /status\/\?n=/,
+    'the status page only knows content:* issues, so no link'
+  );
+  assert.deepEqual(question.labelsOf(41), ['needs-triage']);
 
   const bug = await runMissingLabel({ title: '[Bug] Search is broken' });
   assert.doesNotMatch(bug.commentsOn(41)[0], /status\/\?n=/);

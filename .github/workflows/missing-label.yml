@@ -130,14 +130,14 @@ jobs:
               core.info(`"${title}" was opened by a maintainer and is not a content submission; saying nothing.`);
               return;
             }
-            // A bug report or a question is not a submission, so it gets no
-            // status label and no status-page link.
-            const submission = !OTHER_FORMS.some((prefix) => title.startsWith(prefix));
+            // No form claimed it, so it is not a tracked submission: no status
+            // label and no status-page link (the page only knows issues with a
+            // content:* label). A maintainer who relabels it starts the flow.
             await notify.notifyIssue({
               github, context, core,
               kind: 'triage_ack',
               once: true,
-              status: submission ? notify.STATUS.received : '',
-              vars: submission ? {} : { status_url: '' }
+              status: '',
+              vars: { status_url: '' }
             });
             await notify.addTriageLabel({ github, context, core });
