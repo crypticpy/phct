@@ -564,6 +564,28 @@ test('missing-label: any other outsider issue is acknowledged with no status or 
   );
 });
 
+test('missing-label: a site-problem report is acknowledged and left for triage, never taken for a submission', async () => {
+  const form = YAML.parse(
+    fs.readFileSync(path.join(ROOT, '.github/ISSUE_TEMPLATE/site-problem.yml'), 'utf8')
+  );
+  // The issue as GitHub renders the form: its title prefix, one heading per question.
+  const title = `${form.title}the search box does nothing`;
+  const body = form.body
+    .filter((element) => element.type !== 'markdown')
+    .map((element) => `### ${element.attributes.label}\n\n_No response_`)
+    .join('\n\n');
+
+  const outsider = await runMissingLabel({ title, body });
+  const [comment] = outsider.commentsOn(41);
+  assert.match(comment, /Thank you for getting in touch!/);
+  assert.doesNotMatch(comment, /It looks like a/, 'no form claims it, so no "label missing" message');
+  assert.doesNotMatch(comment, /status\/\?n=/);
+  assert.deepEqual(outsider.labelsOf(41), ['needs-triage']);
+
+  const maintainer = await runMissingLabel({ title, body, association: 'COLLABORATOR' });
+  assert.deepEqual(maintainer.calls, []);
+});
+
 test("missing-label: a maintainer's own issue gets no comment at all", async () => {
   const github = await runMissingLabel({ title: 'Plan the next release', association: 'MEMBER' });
   assert.deepEqual(github.calls, []);

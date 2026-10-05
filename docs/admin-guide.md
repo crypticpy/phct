@@ -49,7 +49,7 @@ Work down this list once, in order. [Repository settings at a glance](#repositor
   - `needs-triage`: applied by `missing-label.yml` to an issue from outside the project that no submission form claimed, so you can find it
 
   The generated issue forms (`.github/ISSUE_TEMPLATE/*.yml`) already apply these labels when someone opens the issue; you just need the labels to exist in the repo first, or GitHub silently drops them.
-- [ ] **`_data/site.yml` → `github.repository`**: set to this repo's `owner/repo`. Drives the submit form's issue links and every entry page's "Suggest an edit" and "Report an issue" links.
+- [ ] **`_data/site.yml` → `github.repository`**: set to this repo's `owner/repo`. Drives the submit form's issue links, every entry page's "Suggest an edit" link, and the footer's "Report a problem with the site" link.
 - [ ] Configure branding/theme/schema via `/setup/` or `npm run setup` (see the [README](../README.md) quick start and [configuration reference](configuration.md)). With no terminal, paste the wizard's three `_data/*.yml` files into the **Apply setup (creates PR)** issue form and merge the pull request it opens.
 - [ ] Clear the demo content: `npm run eject:samples`, or the **Remove the demo content** checkbox on that same Apply setup issue. Until it is gone every page carries a *Demo content* banner — that is deliberate, and it is the only thing telling a visitor that "Baytown Metro Health District" is fictional. The same step switches the `governance` module off; rewrite `_data/governance.yml` as your own review process and policies, then set `governance: true` again. It also removes the showcase — `_showcase/`, `_data/showcase.yml` and `assets/images/showcase/`, the landing page and example sites the template publishes about itself (see [the showcase](configuration.md#the-showcase)). Your fork never builds those anyway: your home page is your catalog.
 - [ ] Optional: **`CONTENT_BOT_TOKEN`** — a fine-grained personal access token that makes the checks on generated pull requests run without a click. See [Checks on a generated pull request](#checks-on-a-generated-pull-request) below for what it changes and what to grant it.
@@ -249,7 +249,6 @@ bots.
 - **Remove**: delete the entry's folder (`catalog/<slug>/`) in a PR. Reserve this for the cases deprecation does not cover — a duplicate, a submission that should never have been merged, a contributor who withdraws consent.
   Deleting the folder removes the page but not the git history: if the entry contained protected data, a real person's contact details, or anything published without consent, stop here and follow [incidents.md](incidents.md) instead.
 - **Un-feature / feature**: toggle `featured: true`/`false` in the entry's front matter. `featured` is a reserved key set by automation to `false` on scaffold; there's no UI for it, it's maintainer-only (the schema's `form: false` fields, like `featured` would be if added, are hidden from submission forms by design).
-- Every entry page also has a **Report an issue with this entry** link, which opens a blank pre-titled GitHub issue (not labelled, so it does not trigger automation) — read and triage these manually.
 
 ## Edit requests
 
@@ -260,6 +259,12 @@ Every entry page has a **Suggest an edit** link. It opens a short form (`.github
 **What you do**: nothing is applied automatically. Edit the entry file on a branch, open a pull request labelled `content:edit-request` whose body says `Closes #N`, and merge it once you are satisfied. Merging closes the issue and marks it published; closing the pull request unmerged is a decline, with the same comment as any other form. To decline without a pull request, reply with the reason, swap the status label for `status:declined` and close the issue as not planned.
 
 You can also assign the issue to a coding agent (whichever one your organization uses) to draft the pull request. [docs/edit-requests.md](edit-requests.md) is the exact recipe for it, or for a person: change only what was asked, take `select` values only from the schema, never invent facts, validate, and flag anything that needs confirming with the entry's contact. The agent drafts; a person always reviews and merges.
+
+## Site problem reports
+
+The footer of every page has a **Report a problem with the site** link. It opens a short form (`.github/ISSUE_TEMPLATE/site-problem.yml`) that asks what went wrong, and optionally the page address and the browser and device. It is about the site, not about one entry: changes to an entry come in as [edit requests](#edit-requests).
+
+**What arrives**: an issue titled *Site problem: …* with no label, so no content workflow runs on it and it never appears on `/status/`. `missing-label.yml` posts the short acknowledgement to a report from outside the project and labels it `needs-triage`; one opened by an owner, member or collaborator gets nothing. Triage these by hand: fix the problem, reply, or relabel the issue if it turns out to be something else. To link someone straight to the form for a particular page, add `&page=<the page address>` to the link and GitHub fills in the *Page address* box.
 
 ## The monthly verification sweep
 

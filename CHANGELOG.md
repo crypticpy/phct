@@ -27,6 +27,15 @@ major version, and each entry says so when it happens.
   reword the acknowledgement under `notifications.messages` (`edit_request`,
   `edit_request_unknown_entry`) if you like. See
   [Edit requests](docs/admin-guide.md#edit-requests).
+- **Report a problem with the site.** The per-entry *Report an issue* link,
+  which opened a blank pre-titled issue, is gone: entry pages keep only
+  *Suggest an edit*. Instead the footer of every page links to a short new
+  form, `.github/ISSUE_TEMPLATE/site-problem.yml`, that asks what went wrong
+  and, optionally, the page address and the browser and device. It carries no
+  label, so no content workflow runs on it: `missing-label.yml` acknowledges a
+  report from outside the project and labels it `needs-triage` for a
+  maintainer to triage by hand. See
+  [Site problem reports](docs/admin-guide.md#site-problem-reports).
 
 ## [1.11.0-rc.4] — 2026-10-05
 

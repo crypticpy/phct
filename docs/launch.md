@@ -109,7 +109,7 @@ collaborators, so the form is safe to leave enabled on a public repository.
 
 The wizard asks for your repository as `owner/repo` and writes it to `github.repository` in
 `_data/site.yml`. Get this right: it drives the submit form's issue links, every "Suggest an edit"
-link, and the contact links in the issue chooser. The `Validate Content` check fails any
+link, the footer's "Report a problem with the site" link, and the contact links in the issue chooser. The `Validate Content` check fails any
 pull request where `github.repository` still names the template's repository, so a copy that skips
 this step will not merge.
 

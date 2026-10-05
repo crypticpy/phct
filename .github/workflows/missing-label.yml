@@ -80,7 +80,9 @@ jobs:
             // The other forms (bug, docs, feature, accessibility) also carry a
             // label, but nothing is automated from them: a maintainer reads the
             // issue either way. Only the content forms go silent, so only they
-            // are matched here.
+            // are matched here. The site-problem form carries no label at all
+            // and falls through to the acknowledgement below, like any other
+            // outside issue.
             const OTHER_FORMS = ['[Bug]', '[Docs]', '[Feature]', '[Accessibility]'];
 
             // Ordered: "Event attachments:" has to be tried before "Event:".

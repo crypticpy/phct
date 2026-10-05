@@ -101,8 +101,8 @@ jobs:
             }
 
             // A fork that never ran the wizard still carries the template's own
-            // `github.repository`, and every "Submit", "Edit this page" and
-            // "Report an issue" link on the site then points at someone else's
+            // `github.repository`, and every "Submit", "Suggest an edit" and
+            // "Report a problem" link on the site then points at someone else's
             // repository. Nothing else notices; the links just quietly go
             // somewhere wrong.
             const setup = `https://github.com/${owner}/${repo}/issues/new?template=apply-setup.yml`;
