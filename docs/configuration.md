@@ -60,7 +60,7 @@ github:
   branch: "main"
 ```
 
-Used to build the `/submit/` form's GitHub issue URL, the "Suggest an edit on GitHub" and "Report an issue" links on entry pages, and the "Watch the repository" links throughout. **Update this after using the template** — it does not infer itself from where the site is actually hosted. The CLI wizard (`npm run setup`) fills the question in from your git remote; the browser wizard at `/setup/` cannot detect it at all, so on its **Basics** step (site and organization identity), under *GitHub*, check that the **Repository** field says *your* `owner/repo` and not the template's before you continue. A hand-edited `_data/site.yml` is entirely up to you. The `Validate Content` check fails any pull request where this key still names another repository, so a copy that skips it will not merge.
+Used to build the `/submit/` form's GitHub issue URL, the "Suggest an edit" and "Report an issue" links on entry pages, and the "Watch the repository" links throughout. **Update this after using the template** — it does not infer itself from where the site is actually hosted. The CLI wizard (`npm run setup`) fills the question in from your git remote; the browser wizard at `/setup/` cannot detect it at all, so on its **Basics** step (site and organization identity), under *GitHub*, check that the **Repository** field says *your* `owner/repo` and not the template's before you continue. A hand-edited `_data/site.yml` is entirely up to you. The `Validate Content` check fails any pull request where this key still names another repository, so a copy that skips it will not merge.
 
 ### Demo mode
 
@@ -273,11 +273,14 @@ the draft, mentioning the submitter so GitHub subscribes them to the review),
 `scaffold_failed`, `pr_failed`, `paused`, `no_change`, `handed_over`,
 `triage_ack`, `label_missing`, `changes_requested`, `with_committee`,
 `with_partner`, `declined`, `published`, `edit_held`, `edit_summary` (posted on
-the draft for the reviewer), and the shared paragraphs `status_help` and
-`status_page`. Placeholders are written `{name}`: `{number}` (the issue,
-as `#12`), `{pr_url}`, `{notes_url}`, `{page_url}`, `{turnaround}`,
-`{appeal}`, `{reviewers}`, `{site_name}`, `{reason}` (quoted), `{details}`,
-`{changes}`, `{status_help}` and `{status_url}`. Separate paragraphs with a
+the draft for the reviewer), `edit_request` (the acknowledgement of a
+[Suggest an edit](admin-guide.md#edit-requests) request), and the shared
+paragraphs `status_help`, `status_page` and `edit_request_unknown_entry` (the
+`{entry_note}` in `edit_request` when the slug names no entry). Placeholders are
+written `{name}`: `{number}` (the issue, as `#12`), `{pr_url}`, `{notes_url}`,
+`{page_url}`, `{turnaround}`, `{appeal}`, `{reviewers}`, `{site_name}`,
+`{reason}` (quoted), `{details}`, `{changes}`, `{entry_note}`, `{entry}` (the
+slug as typed, or "the entry you named"), `{status_help}` and `{status_url}`. Separate paragraphs with a
 blank line; a paragraph whose placeholders are all empty is left out, so
 "**How long it takes:** {turnaround}" disappears when no turnaround is set. A
 name the automation does not send is ignored with a warning in the run log, and

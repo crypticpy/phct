@@ -95,6 +95,13 @@ jobs:
               { name: 'Start a new cohort year', label: 'content:new-year', match: (t) => t.startsWith('[Cohort]') },
               { name: 'Update a cohort schedule', label: 'content:schedule', match: (t) => t.startsWith('Schedule:') },
               { name: 'Refresh an entry', label: 'content:refresh', match: (t) => t.startsWith('Refresh:') },
+              // "Edit:" is a common start for a hand-written issue too, so the
+              // edit form also needs its form-shaped body.
+              {
+                name: 'Suggest an edit',
+                label: 'content:edit-request',
+                match: (t) => formShapedBody && t.startsWith('Edit:'),
+              },
               {
                 name: 'Also deployed by',
                 label: 'content:also-deployed-by',

@@ -528,6 +528,20 @@ test("missing-label: a maintainer's form submission gets the message but no stat
   assert.deepEqual(github.labelsOf(41), []);
 });
 
+test('missing-label: an edit request whose label was dropped gets the rescue message; a plain "Edit:" issue does not', async () => {
+  const github = await runMissingLabel({
+    title: 'Edit: Water routing',
+    body: '### Entry slug\n\nwater-routing\n\n### What should change?\n\nThe stage.',
+  });
+  const [comment] = github.commentsOn(41);
+  assert.match(comment, /It looks like a \*\*Suggest an edit\*\* submission/);
+  assert.match(comment, /add the `content:edit-request` label/);
+  assert.deepEqual(github.labelsOf(41).sort(), ['needs-triage', STATUS.received]);
+
+  const hand = await runMissingLabel({ title: 'Edit: the home page has a typo', body: 'Plain text' });
+  assert.match(hand.commentsOn(41)[0], /Thank you for getting in touch!/, 'no form body, no form');
+});
+
 test('missing-label: any other outsider issue is acknowledged with no status or status link', async () => {
   const question = await runMissingLabel({ title: 'How do I submit?' });
   assert.match(question.commentsOn(41)[0], /Thank you for getting in touch!/);
