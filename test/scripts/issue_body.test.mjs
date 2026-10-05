@@ -462,3 +462,11 @@ test('coerce maps each schema type to its front matter shape', () => {
   assert.equal(coerce({ type: 'markdown' }, 'x'), null);
   assert.equal(coerce({ type: 'images' }, 'x'), null);
 });
+
+test('coerceChoice strips wrapping quotes, and a long run of quotes stays fast', () => {
+  const field = { type: 'select', options: ['Pilot', 'In production'] };
+  assert.deepEqual(coerceChoice(field, '"Pilot".'), { value: 'Pilot', unmatched: [] });
+  const started = Date.now();
+  coerceChoice(field, `a${'"'.repeat(65000)}a`);
+  assert.ok(Date.now() - started < 500, 'quote stripping is linear');
+});

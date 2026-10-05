@@ -145,12 +145,17 @@ function choiceKey(value) {
  * @returns {string}
  */
 function tidyPiece(piece) {
-  return choiceKey(piece)
+  const text = choiceKey(piece)
     .replace(/^[-*]\s+/, '')
-    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
-    .replace(/\.$/, '')
-    .trim();
+    .replace(/^["'“”‘’]+/, '');
+  // Trailing quotes and periods by hand: an unanchored `[…]+$` retries at every position
+  // and is quadratic on a long run of quotes.
+  let end = text.length;
+  while (end > 0 && (QUOTES.has(text[end - 1]) || text[end - 1] === '.')) end -= 1;
+  return text.slice(0, end).trim();
 }
+
+const QUOTES = new Set(['"', "'", '“', '”', '‘', '’']);
 
 /**
  * The canonical option a typed piece names, or undefined.
