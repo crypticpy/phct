@@ -8,6 +8,27 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- Every submission sent from `/submit/` lost its select, multiselect and
+  yes/no answers. The page carries each answer to GitHub in the issue link, but
+  GitHub prefills only an issue form's text fields from a link, and the
+  generated `new-entry.yml` asked those questions as dropdowns, so they opened
+  empty. The submitter had to pick them all again, and a required one blocked
+  *Submit new issue* until they did. They are now single-line text inputs that
+  arrive filled in. The field's help (or a note above it when the list is long)
+  says what to type: the options, a multiselect's options separated by commas,
+  **Yes** for a yes/no question. The scaffolder maps typed answers onto the
+  schema's options regardless of case or spacing, keeps an option that contains
+  a comma whole, and still reads issues filed with the old dropdown form. An
+  answer that matches no option is left out of the front matter rather than
+  failing **Validate Content**, and the pull request lists it under a new
+  **Answers to fix** block for the maintainer. On `/submit/`, an `image`
+  question (an upload on GitHub, so it cannot be prefilled either) is now
+  listed under the answers to bring across by hand. Deployments get the fix
+  through the PHCT updater: its pull request regenerates `new-entry.yml` from
+  your schema. Nothing in the schema or existing entries changes.
+
 ## [1.11.0-rc.2] — 2026-10-05
 
 Second candidate. rc.1's live BCHC update stopped before opening a pull request
