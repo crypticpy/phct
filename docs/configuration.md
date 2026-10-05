@@ -237,6 +237,52 @@ When the module is on and `github.repository` is set, the footer gets a
 *Check a submission* link (`status.link_label`) and the submit page's "what
 happens next" and confirmation panel link here. There is no header item.
 
+### Submitter notifications
+
+Submitters are not subscribed to the draft pull request the automation opens,
+but GitHub emails them every comment on their own issue. So each step of a
+submission is a comment there, and the issue carries exactly one status label
+(`status:received`, `status:in-review`, `status:changes-requested`,
+`status:published` or `status:declined`). The wording is in
+`scripts/lib/notify.mjs` and works with no configuration; the optional
+`notifications:` block in `_data/site.yml` adjusts it:
+
+```yaml
+notifications:
+  turnaround: ""          # "How long it takes" in the comments; defaults to submit.turnaround
+  appeal: ""              # "If you disagree:" on a declined submission; defaults to the
+                          # first paragraph of the appeals policy in _data/governance.yml
+                          # (while the governance module is on), then a generic line
+  reviewers:
+    committee: ""         # who `review:committee` hands a submission to ("review committee")
+    partner: ""           # who `review:partner` hands it to ("partner reviewers")
+  logo: ""                # image above every comment: a site path or an https:// address
+  logo_alt: ""            # its alt text; defaults to the site name
+  messages:               # replace any message by name
+    declined: |
+      Thank you for sharing **{number}** with us. ...
+```
+
+Message names: `draft_ready`, `draft_updated`, `draft_mention` (posted once on
+the draft, mentioning the submitter so GitHub subscribes them to the review),
+`scaffold_failed`, `pr_failed`, `paused`, `no_change`, `handed_over`,
+`triage_ack`, `label_missing`, `changes_requested`, `with_committee`,
+`with_partner`, `declined`, `published`, `edit_held`, `edit_summary` (posted on
+the draft for the reviewer), and the shared paragraphs `status_help` and
+`status_page`. Placeholders are written `{name}`: `{number}` (the issue,
+as `#12`), `{pr_url}`, `{notes_url}`, `{page_url}`, `{turnaround}`,
+`{appeal}`, `{reviewers}`, `{site_name}`, `{reason}` (quoted), `{details}`,
+`{changes}`, `{status_help}` and `{status_url}`. Separate paragraphs with a
+blank line; a paragraph whose placeholders are all empty is left out, so
+"**How long it takes:** {turnaround}" disappears when no turnaround is set. A
+name the automation does not send is ignored with a warning in the run log, and
+a misspelt placeholder is printed as written, so a typo shows up in the comment.
+
+The `{status_url}` link appears unless `modules.status: false` switches the
+`/status/` page off.
+Every comment carries a hidden `<!-- phct-notify:… -->` line so a re-run never
+posts the same message twice.
+
 ### Catalog behaviour
 
 ```yaml

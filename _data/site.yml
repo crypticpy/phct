@@ -128,6 +128,22 @@ status:
   button: "Check status"
   link_label: "Check a submission"   # the footer link to this page
 
+# What the automation tells a submitter on their issue (GitHub emails every
+# comment to them). Everything is optional: the defaults in
+# scripts/lib/notify.mjs need no configuration, and `submit.turnaround` above is
+# already used for "How long it takes". Uncomment to adjust.
+# notifications:
+#   turnaround: ""            # overrides submit.turnaround in the comments only
+#   appeal: ""                # "If you disagree:" line on a declined submission (default: the appeals policy's first paragraph)
+#   reviewers:
+#     committee: "review committee"    # who `review:committee` hands a submission to
+#     partner: "partner reviewers"     # who `review:partner` hands a submission to
+#   logo: ""                  # an image at the top of every comment: a site path (/assets/images/logo.png) or an https:// address
+#   logo_alt: ""              # its alt text (default: the site name)
+#   messages:                 # replace any message by name; see docs/configuration.md
+#     declined: |
+#       Thank you for sharing **{number}** with us. ...
+
 # Events page (module: events). `image` is an optional wide banner (about 20:7)
 # shown under the page header; leave blank for a text-only header.
 events:
