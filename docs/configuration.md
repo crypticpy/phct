@@ -278,7 +278,8 @@ blank line; a paragraph whose placeholders are all empty is left out, so
 name the automation does not send is ignored with a warning in the run log, and
 a misspelt placeholder is printed as written, so a typo shows up in the comment.
 
-The `{status_url}` link appears only while the `/status/` page is switched on.
+The `{status_url}` link appears unless `modules.status: false` switches the
+`/status/` page off.
 Every comment carries a hidden `<!-- phct-notify:… -->` line so a re-run never
 posts the same message twice.
 

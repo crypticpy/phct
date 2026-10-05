@@ -241,27 +241,15 @@ export function siteUrl({ configUrl = '', cname = '', repository = '' } = {}) {
 }
 
 /**
- * Whether the /status/ page is on, read defensively: the page is its own
- * feature and may be configured as a module toggle or as a block, at the top
- * level or under `submit:`. Any explicit `false` wins; otherwise any `true`
- * turns it on; absent means off.
+ * Whether the /status/ page is on. It matches `_plugins/modules.rb`, which
+ * builds a module's pages unless its key is explicitly `false`, so a
+ * `site.yml` written before the status module existed still gets the link.
  *
  * @param {object} site parsed `_data/site.yml`
  * @returns {{enabled: boolean, path: string}}
  */
 export function statusPage(site = {}) {
-  const flag = (value) => {
-    if (typeof value === 'boolean') return value;
-    if (isObject(value) && typeof value.enabled === 'boolean') return value.enabled;
-    return undefined;
-  };
-  const blocks = [site?.status, site?.status_page, site?.submit?.status, site?.submit?.status_page];
-  const flags = [flag(site?.modules?.status), ...blocks.map(flag)];
-  const enabled = !flags.includes(false) && flags.includes(true);
-  const declared =
-    blocks.map((block) => (isObject(block) ? text(block.path) : '')).find(Boolean) || '/status/';
-  const path = `/${declared.replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/');
-  return { enabled, path };
+  return { enabled: site?.modules?.status !== false, path: '/status/' };
 }
 
 /**

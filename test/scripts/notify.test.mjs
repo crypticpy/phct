@@ -95,7 +95,13 @@ test('draft_ready says what happens next, how long, and where the draft is', () 
   assert.match(body, /\*\*How long it takes:\*\* About two weeks\./);
   assert.match(body, /pull\/8/);
   assert.doesNotMatch(body, /\{/, 'no placeholder left unfilled');
-  assert.doesNotMatch(body, /check where it stands/, 'no status link while the page is off');
+  assert.match(body, /check where it stands at any time: https:\/\/acme\.github\.io\/catalog\/status\/\?n=7/);
+  const off = resolveSettings({ site: { modules: { status: false } }, repository: REPO });
+  assert.doesNotMatch(
+    render('draft_ready', { number: 7, pr_url: 'https://github.com/acme/catalog/pull/8' }, off),
+    /check where it stands/,
+    'no status link while the page is off'
+  );
 });
 
 test('a paragraph whose placeholders are all empty is dropped, an unknown one is kept as written', () => {
@@ -171,17 +177,17 @@ test('site URL and status page follow pages.yml and the status switches', () => 
   assert.equal(siteUrl({ repository: REPO, configUrl: 'https://x.org/' }), 'https://x.org/catalog');
   assert.equal(siteUrl({}), '');
 
-  assert.deepEqual(statusPage({}), { enabled: false, path: '/status/' });
+  assert.deepEqual(statusPage({}), { enabled: true, path: '/status/' });
   assert.deepEqual(statusPage({ modules: { status: true } }), { enabled: true, path: '/status/' });
-  assert.deepEqual(statusPage({ status: { enabled: true, path: 'track' } }), {
-    enabled: true,
-    path: '/track/',
-  });
-  assert.equal(statusPage({ modules: { status: true }, status: { enabled: false } }).enabled, false);
+  assert.deepEqual(statusPage({ modules: { status: false } }), { enabled: false, path: '/status/' });
 
   assert.equal(statusUrl(settingsWithStatus(), '#9'), 'https://acme.github.io/catalog/status/?n=9');
   assert.equal(statusUrl(settingsWithStatus(), 'x'), '');
-  assert.equal(statusUrl(resolveSettings({ repository: REPO }), 9), '');
+  assert.equal(
+    statusUrl(resolveSettings({ repository: REPO }), 9),
+    'https://acme.github.io/catalog/status/?n=9'
+  );
+  assert.equal(statusUrl(resolveSettings({ repository: REPO, site: { modules: { status: false } } }), 9), '');
 });
 
 test('an explicit empty status_url leaves the status link out', () => {
