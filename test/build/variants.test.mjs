@@ -850,12 +850,17 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
   }
 
   test(
-    'shipped: /submit/ offers "Email it instead" to submit.fallback_email',
-    { skip: needs('shipped') },
+    'all-modules: /submit/ offers "Email it instead" to submit.fallback_email',
+    { skip: needs('all-modules') },
     () => {
-      const { dir, siteDir } = built.get('shipped');
+      // Not the shipped variant: a deployment may switch email off in its own site.yml.
+      const { dir, siteDir } = built.get('all-modules');
       const site = yaml.load(fs.readFileSync(path.join(dir, '_data', 'site.yml'), 'utf8'));
-      assert.ok(site.submit.fallback_email, 'precondition: the shipped site.yml sets submit.fallback_email');
+      assert.equal(
+        site.submit.fallback_email,
+        'submissions@example.org',
+        'precondition: the variant sets it'
+      );
       assert.deepEqual(emailRoutes(siteDir), {
         address: site.submit.fallback_email,
         button: true,

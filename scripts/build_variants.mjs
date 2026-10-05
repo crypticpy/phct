@@ -115,12 +115,14 @@ export const VARIANTS = [
     demoMessage:
       'Entries here are provisional until the [review panel](https://example.org/review-panel) signs them off.',
     newestEntry: { stripMedia: true, attachDeck: true },
+    submitFallbackEmail: 'submissions@example.org',
     entries: 'keep',
     build: true,
     expectFrontMatter: 'pass',
     why:
       'events, cohorts and resources are off in the shipped config, so their layouts never render in CI; ' +
-      'it also carries a custom demo banner, a newest entry with no picture and an attached deck',
+      'it also carries a custom demo banner, a newest entry with no picture, an attached deck ' +
+      'and its own submit.fallback_email, so the email route is tested whatever the shipped site.yml says',
   },
   ...['ai-use-cases', 'cohort-portal', 'resource-library', 'blank'].map((preset) => ({
     id: preset,
