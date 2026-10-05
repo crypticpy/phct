@@ -8,6 +8,13 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.4] — 2026-10-05
+
+Fourth candidate. rc.3's live BCHC update stopped before opening a pull request
+on a test that read the template's sample issue; #86 fixes it and a second test
+that would have failed once a deployment switched email submission off. This candidate also runs
+only the content check on a submission's pull request (#87).
+
 ### Changed
 
 - A submission's pull request now runs only the content check. Every code
@@ -1489,7 +1496,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.3...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.4...HEAD
+[1.11.0-rc.4]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.3...v1.11.0-rc.4
 [1.11.0-rc.3]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.2...v1.11.0-rc.3
 [1.11.0-rc.2]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.1...v1.11.0-rc.2
 [1.11.0-rc.1]: https://github.com/crypticpy/phct/compare/v1.10.0...v1.11.0-rc.1
