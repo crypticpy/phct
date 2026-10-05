@@ -18,7 +18,7 @@ body:
 
         What it is, who built it, and what it changed.
   - type: input
-    id: title
+    id: entry_title
     attributes:
       label: Title
       description: What is it called? Specific enough that someone scanning a list of names knows what it is.
@@ -251,18 +251,24 @@ body:
       placeholder: "Evaluation report | https://drive.google.com/…"
     validations:
       required: false
+  - type: markdown
+    attributes:
+      value: "**Screenshots:** Drag images into this box to upload them, or paste one image URL per line — optionally as `URL | alt text`."
   - type: textarea
     id: screenshots
     attributes:
       label: Screenshots
-      description: "Screenshots of it in use. Up to eight PNG, JPEG, GIF or WebP images of the tool in use (15 MB total). Make sure no personal or protected information is visible. Drag images into this box to upload them, or paste one image URL per line — optionally as `URL | alt text`."
+      description: "Screenshots of it in use. Up to eight PNG, JPEG, GIF or WebP images of the tool in use (15 MB total). Make sure no personal or protected information is visible."
     validations:
       required: false
+  - type: markdown
+    attributes:
+      value: "**Slide deck or one-pager (PDF):** Over 25 MB, or kept in a shared workspace? Paste a link in “Other resources” instead."
   - type: upload
     id: deck_pdf
     attributes:
       label: Slide deck or one-pager (PDF)
-      description: "Slide deck or one-pager. Attach the slide deck here. A thumbnail is generated from its first page. Attach the file here and the automation commits it with the entry. Over 25 MB, or kept in a shared workspace? Paste a link in “Other resources” instead."
+      description: Slide deck or one-pager. Attach the slide deck here. A thumbnail is generated from its first page. Attach the file here and the automation commits it with the entry.
     validations:
       required: false
       accept: .pdf
@@ -314,11 +320,14 @@ body:
       placeholder: The prompt set and the evaluation harness are plain Python; the retrieval layer uses Azure AI Search and would need replacing.
     validations:
       required: false
+  - type: markdown
+    attributes:
+      value: "**Adapted from:** One per line, or separated by commas."
   - type: textarea
     id: reused_from
     attributes:
       label: Adapted from
-      description: "Did you adapt this from another entry in this catalog? Name the source by its slug — the last part of its URL. The entry you name will say it was adopted by yours. One per line, or separated by commas."
+      description: Did you adapt this from another entry in this catalog? Name the source by its slug — the last part of its URL. The entry you name will say it was adopted by yours.
       placeholder: service-request-routing
     validations:
       required: false
@@ -406,11 +415,14 @@ body:
         ### Data & access
 
         What data it touches and who sees the output.
+  - type: markdown
+    attributes:
+      value: "**No PII/PHI in the shared material:** Do you confirm that no personal or protected health information appears in the resource, its documentation, example data or screenshots?"
   - type: dropdown
     id: no_pii_attestation
     attributes:
       label: No PII/PHI in the shared material
-      description: "Do you confirm that no personal or protected health information appears in the resource, its documentation, example data or screenshots? The community's baseline for anything published here. Reviewers spot-check; if the answer is no, redact before submitting."
+      description: "The community's baseline for anything published here. Reviewers spot-check; if the answer is no, redact before submitting."
       options:
         - "Yes"
         - "No"
@@ -488,11 +500,14 @@ body:
       placeholder: "jordan.lee@city.gov"
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: "**GitHub username:** Your GitHub username (optional)"
   - type: input
     id: submitter_github
     attributes:
       label: GitHub username
-      description: "Your GitHub username (optional) Used once a year: when this entry is due to be re-confirmed the reminder mentions you, so the request reaches the person who wrote it. Leave it blank and the reminder goes to the maintainers alone."
+      description: "Used once a year: when this entry is due to be re-confirmed the reminder mentions you, so the request reaches the person who wrote it. Leave it blank and the reminder goes to the maintainers alone."
       placeholder: jordan-lee
     validations:
       required: false
@@ -503,7 +518,7 @@ body:
 
         Problem, approach, what it took, results and lessons.
   - type: textarea
-    id: body
+    id: entry_body
     attributes:
       label: Full write-up
       description: "What's the story? Markdown is supported. Suggested headings: Problem, Approach, Time and resources (data, staffing, cost), Results, Lessons learned, How to reuse."

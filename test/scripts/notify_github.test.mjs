@@ -1,0 +1,536 @@
+/**
+ * The GitHub side of the submitter notifications (scripts/lib/notify_github.mjs),
+ * against an in-memory stand-in for github-script's Octokit: comments at most
+ * once, one status label at a time, the draft mention, closing a declined
+ * submission, the held-edit hand-over, the "now live" announcement, and the
+ * missing-label workflow's script run as written.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import YAML from 'yaml';
+
+import {
+  addTriageLabel,
+  announcePublished,
+  handleStageEvent,
+  holdEdit,
+  notifyIssue,
+  submitter,
+} from '../../scripts/lib/notify_github.mjs';
+import { ENTRY_LABEL, REVIEW_LABELS, STATUS, hasMarker, marker } from '../../scripts/lib/notify.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const OWNER = 'acme';
+const REPO = 'catalog';
+
+// The settings files the module reads, kept out of this repository's own
+// _data/ so the wording under test is the default.
+const WORKSPACE = fs.mkdtempSync(path.join(os.tmpdir(), 'notify-github-'));
+fs.mkdirSync(path.join(WORKSPACE, '_data'));
+fs.writeFileSync(path.join(WORKSPACE, '_data', 'site.yml'), 'name: Acme\nstatus:\n  enabled: true\n');
+fs.writeFileSync(
+  path.join(WORKSPACE, '_data', 'schema.yml'),
+  'fields:\n  - key: title\n    label: Title\n    type: text\n  - key: summary\n    label: Summary\n    type: textarea\n'
+);
+const savedWorkspace = process.env.GITHUB_WORKSPACE;
+process.env.GITHUB_WORKSPACE = WORKSPACE;
+test.after(() => {
+  if (savedWorkspace === undefined) delete process.env.GITHUB_WORKSPACE;
+  else process.env.GITHUB_WORKSPACE = savedWorkspace;
+  fs.rmSync(WORKSPACE, { recursive: true, force: true });
+});
+
+const httpError = (status) => Object.assign(new Error(`HTTP ${status}`), { status });
+
+/**
+ * An in-memory repository behind the slice of Octokit the module uses.
+ * @param {{issues?: Record<number, object>, labels?: string[], pulls?: object[],
+ *   files?: Record<number, object[]>, associated?: object[]}} [seed]
+ */
+function fakeGitHub(seed = {}) {
+  const issues = structuredClone(seed.issues ?? {});
+  for (const issue of Object.values(issues)) {
+    issue.labels = (issue.labels ?? []).map((name) => ({ name }));
+    issue.state ??= 'open';
+    issue.comments ??= [];
+  }
+  const repoLabels = new Set(seed.labels ?? []);
+  const calls = [];
+  const find = (number) => {
+    if (!issues[number]) throw httpError(404);
+    return issues[number];
+  };
+  const rest = {
+    issues: {
+      get: async ({ issue_number }) => ({ data: find(issue_number) }),
+      listComments: async ({ issue_number }) => ({ data: find(issue_number).comments }),
+      createComment: async ({ issue_number, body }) => {
+        calls.push(['comment', issue_number, body]);
+        find(issue_number).comments.push({ user: { type: 'Bot' }, body });
+        return { data: {} };
+      },
+      createLabel: async ({ name }) => {
+        if (repoLabels.has(name)) throw httpError(422);
+        calls.push(['createLabel', name]);
+        repoLabels.add(name);
+        return { data: {} };
+      },
+      addLabels: async ({ issue_number, labels }) => {
+        calls.push(['addLabels', issue_number, labels]);
+        const issue = find(issue_number);
+        for (const name of labels)
+          if (!issue.labels.some((l) => l.name === name)) issue.labels.push({ name });
+        return { data: {} };
+      },
+      removeLabel: async ({ issue_number, name }) => {
+        const issue = find(issue_number);
+        if (!issue.labels.some((l) => l.name === name)) throw httpError(404);
+        calls.push(['removeLabel', issue_number, name]);
+        issue.labels = issue.labels.filter((l) => l.name !== name);
+        return { data: {} };
+      },
+      update: async ({ issue_number, state, state_reason }) => {
+        calls.push(['update', issue_number, state, state_reason]);
+        Object.assign(find(issue_number), { state, state_reason });
+        return { data: {} };
+      },
+    },
+    pulls: {
+      list: async ({ head }) => ({
+        data: (seed.pulls ?? []).filter((pull) => `${OWNER}:${pull.head}` === head),
+      }),
+      listFiles: async ({ pull_number }) => ({ data: seed.files?.[pull_number] ?? [] }),
+    },
+    repos: {
+      listPullRequestsAssociatedWithCommit: async () => ({ data: seed.associated ?? [] }),
+    },
+  };
+  return {
+    rest,
+    paginate: async (method, params) => (await method(params)).data,
+    calls,
+    issues,
+    labelsOf: (number) => issues[number].labels.map((l) => l.name),
+    commentsOn: (number) =>
+      calls.filter((call) => call[0] === 'comment' && call[1] === number).map((call) => call[2]),
+  };
+}
+
+const context = (overrides = {}) => ({
+  repo: { owner: OWNER, repo: REPO },
+  issue: { number: 41 },
+  runId: 1000,
+  serverUrl: 'https://github.com',
+  payload: {},
+  ...overrides,
+});
+const logs = () => {
+  const lines = [];
+  return {
+    lines,
+    info: (m) => lines.push(['info', m]),
+    warning: (m) => lines.push(['warning', m]),
+    notice() {},
+  };
+};
+
+test('a message is posted with its marker, and only once per run', async () => {
+  const github = fakeGitHub({ issues: { 41: {} } });
+  const first = await notifyIssue({ github, context: context(), kind: 'triage_ack' });
+  const again = await notifyIssue({ github, context: context(), kind: 'triage_ack' });
+  assert.deepEqual([first.posted, again.posted], [true, false]);
+  const [body] = github.commentsOn(41);
+  assert.ok(hasMarker(body, 'triage_ack:1000'));
+  assert.match(body, /\*\*#41\*\*/);
+  assert.match(body, /https:\/\/acme\.github\.io\/catalog\/status\/\?n=41/);
+
+  // A later run posts its own copy of a per-run message...
+  await notifyIssue({ github, context: context({ runId: 1001 }), kind: 'triage_ack' });
+  assert.equal(github.commentsOn(41).length, 2);
+});
+
+test('a once-only message is posted once ever, and a marker typed by a person does not count', async () => {
+  const github = fakeGitHub({ issues: { 41: {} } });
+  github.issues[41].comments.push({ user: { type: 'User' }, body: marker('paused') });
+  await notifyIssue({ github, context: context(), kind: 'paused', once: true });
+  await notifyIssue({ github, context: context({ runId: 2 }), kind: 'paused', once: true });
+  assert.equal(github.commentsOn(41).length, 1);
+});
+
+test('the status moves to exactly one label, creating it when the repository lacks it', async () => {
+  const github = fakeGitHub({
+    issues: { 41: { labels: ['content:new-entry', STATUS.received] } },
+    labels: [STATUS.received],
+  });
+  const result = await notifyIssue({ github, context: context(), status: STATUS.inReview });
+  assert.deepEqual(result, { posted: false, changed: true });
+  assert.deepEqual(github.labelsOf(41), ['content:new-entry', STATUS.inReview]);
+  assert.ok(github.calls.some((call) => call[0] === 'createLabel' && call[1] === STATUS.inReview));
+  assert.equal(github.commentsOn(41).length, 0, 'no kind, no comment');
+});
+
+test('a label that cannot be set is a warning, and the reply still goes out', async () => {
+  const github = fakeGitHub({ issues: { 41: {} } });
+  github.rest.issues.addLabels = async () => {
+    throw httpError(403);
+  };
+  const core = logs();
+  const result = await notifyIssue({
+    github,
+    context: context(),
+    core,
+    kind: 'triage_ack',
+    status: STATUS.received,
+  });
+  assert.equal(result.posted, true);
+  assert.ok(
+    core.lines.some(
+      ([level, m]) => level === 'warning' && /Could not set status:received on #41 \(403\)/.test(m)
+    )
+  );
+});
+
+test('onlyOnStatusChange: a second request for the same changes sends no second email', async () => {
+  const github = fakeGitHub({ issues: { 41: { labels: [STATUS.inReview] } } });
+  const options = {
+    kind: 'changes_requested',
+    status: STATUS.changesRequested,
+    onlyOnStatusChange: true,
+    vars: { notes_url: 'https://n' },
+  };
+  const first = await notifyIssue({ github, context: context(), ...options });
+  const second = await notifyIssue({ github, context: context({ runId: 2 }), ...options });
+  assert.deepEqual([first.posted, second.posted], [true, false]);
+  assert.match(github.commentsOn(41)[0], /\*\*Where to find their notes:\*\* https:\/\/n/);
+});
+
+test('close shuts an open issue as not planned, and leaves a closed one alone', async () => {
+  const github = fakeGitHub({ issues: { 41: {}, 42: { state: 'closed' } } });
+  await notifyIssue({
+    github,
+    context: context(),
+    kind: 'declined',
+    close: true,
+    vars: { pr_url: 'https://github.com/acme/catalog/pull/50' },
+  });
+  await notifyIssue({ github, context: context(), issueNumber: 42, status: STATUS.declined, close: true });
+  assert.deepEqual(
+    github.calls.filter((call) => call[0] === 'update'),
+    [['update', 41, 'closed', 'not_planned']]
+  );
+  assert.match(github.commentsOn(41)[0], /\*\*If you disagree:\*\*/);
+});
+
+test('the submitter is mentioned on the draft once, never on a rebuild', async () => {
+  const github = fakeGitHub({ issues: { 41: {}, 50: {} } });
+  const prUrl = 'https://github.com/acme/catalog/pull/50';
+  await notifyIssue({
+    github,
+    context: context(),
+    kind: 'draft_ready',
+    status: STATUS.inReview,
+    prUrl,
+    mention: 'jane-doe',
+  });
+  await notifyIssue({
+    github,
+    context: context({ runId: 2 }),
+    kind: 'draft_updated',
+    status: STATUS.inReview,
+    prUrl,
+    mention: 'jane-doe',
+  });
+  const onDraft = github.commentsOn(50);
+  assert.equal(onDraft.length, 1);
+  assert.match(onDraft[0], /^@jane-doe this is the draft of your submission \*\*#41\*\*/);
+  assert.equal(github.commentsOn(41).length, 2);
+
+  // No mention for a login that is not one.
+  const other = fakeGitHub({ issues: { 41: {}, 50: {} } });
+  await notifyIssue({
+    github: other,
+    context: context(),
+    kind: 'draft_ready',
+    prUrl,
+    mention: 'not a login',
+  });
+  assert.equal(other.commentsOn(50).length, 0);
+});
+
+test('submitter() is the issue author, unless a bot opened it', () => {
+  assert.equal(submitter({ payload: { issue: { user: { login: 'jane', type: 'User' } } } }), 'jane');
+  assert.equal(submitter({ payload: { issue: { user: { login: 'app[bot]', type: 'Bot' } } } }), '');
+  assert.equal(submitter({}), '');
+});
+
+test('addTriageLabel creates needs-triage when missing and adds it', async () => {
+  const github = fakeGitHub({ issues: { 41: {} } });
+  await addTriageLabel({ github, context: context() });
+  assert.deepEqual(github.labelsOf(41), ['needs-triage']);
+});
+
+/** A draft pull request event for submission-status.yml. */
+function stageContext({ eventName = 'pull_request', action, label, merged = false, state = 'open', review }) {
+  return context({
+    eventName,
+    payload: {
+      action,
+      label: label ? { name: label } : undefined,
+      review,
+      sender: { type: 'User' },
+      repository: { full_name: `${OWNER}/${REPO}` },
+      pull_request: {
+        body: 'Draft of the submission.\n\nCloses #41',
+        html_url: 'https://github.com/acme/catalog/pull/50',
+        merged,
+        state,
+        labels: [{ name: ENTRY_LABEL }],
+        head: { repo: { full_name: `${OWNER}/${REPO}` } },
+      },
+    },
+  });
+}
+
+test('handleStageEvent: changes requested, then back in review, then declined and closed', async () => {
+  const github = fakeGitHub({ issues: { 41: { labels: [ENTRY_LABEL, STATUS.inReview] } } });
+  await handleStageEvent({
+    github,
+    context: stageContext({ action: 'labeled', label: REVIEW_LABELS.revisions }),
+  });
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.changesRequested]);
+  assert.match(github.commentsOn(41)[0], /Your reviewer has a few requests before \*\*#41\*\*/);
+
+  // The review that asked for the same changes arrives with the label: one email.
+  await handleStageEvent({
+    github,
+    context: stageContext({
+      eventName: 'pull_request_review',
+      action: 'submitted',
+      review: { state: 'changes_requested', html_url: 'https://r' },
+    }),
+  });
+  assert.equal(github.commentsOn(41).length, 1);
+
+  await handleStageEvent({
+    github,
+    context: stageContext({ action: 'unlabeled', label: REVIEW_LABELS.revisions }),
+  });
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.inReview]);
+  assert.equal(github.commentsOn(41).length, 1, 'moving back to review is silent');
+
+  await handleStageEvent({ github, context: stageContext({ action: 'closed', state: 'closed' }) });
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.declined]);
+  assert.equal(github.issues[41].state, 'closed');
+  assert.equal(github.issues[41].state_reason, 'not_planned');
+  assert.match(github.commentsOn(41)[1], /we are not able to publish it/);
+});
+
+test('handleStageEvent: a merge marks the issue published, silently; nothing pulls it back', async () => {
+  const github = fakeGitHub({ issues: { 41: { labels: [ENTRY_LABEL, STATUS.inReview] } } });
+  await handleStageEvent({
+    github,
+    context: stageContext({ action: 'closed', state: 'closed', merged: true }),
+  });
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.published]);
+  assert.equal(github.commentsOn(41).length, 0, 'pages.yml says "now live" once it deploys');
+
+  const decision = await handleStageEvent({
+    github,
+    context: stageContext({ action: 'labeled', label: REVIEW_LABELS.committee }),
+  });
+  assert.match(decision.skip, /already status:published/);
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.published]);
+});
+
+test('handleStageEvent never closes or relabels an issue that is not a submission', async () => {
+  const github = fakeGitHub({ issues: { 41: { labels: ['bug'] } } });
+  const decision = await handleStageEvent({
+    github,
+    context: stageContext({ action: 'labeled', label: REVIEW_LABELS.declined }),
+  });
+  assert.match(decision.skip, /not a submission issue/);
+  assert.deepEqual(github.calls, []);
+
+  const pr = fakeGitHub({ issues: { 41: { labels: [ENTRY_LABEL], pull_request: {} } } });
+  assert.match(
+    (await handleStageEvent({ github: pr, context: stageContext({ action: 'closed', state: 'closed' }) }))
+      .skip,
+    /not a submission/
+  );
+});
+
+test('holdEdit tells the reviewer what changed and the submitter that the edit arrived', async () => {
+  const github = fakeGitHub({
+    issues: { 41: { labels: [ENTRY_LABEL, STATUS.inReview] }, 50: {} },
+    pulls: [{ number: 50, head: 'entry/water-routing', html_url: 'https://github.com/acme/catalog/pull/50' }],
+  });
+  const ctx = context({
+    payload: {
+      issue: {
+        number: 41,
+        title: '[Entry] Water routing v2',
+        body: '### Title\n\nWater routing v2\n\n### Summary\n\nNew summary',
+      },
+      changes: {
+        body: { from: '### Title\n\nWater routing\n\n### Summary\n\nOld summary' },
+        title: { from: '[Entry] Water routing' },
+      },
+    },
+  });
+  const result = await holdEdit({
+    github,
+    context: ctx,
+    branch: 'entry/water-routing',
+    schema: true,
+    root: WORKSPACE,
+  });
+  assert.deepEqual(result, { changes: 3, pr: 50 });
+  const [summary] = github.commentsOn(50);
+  assert.match(summary, /did not rebuild the branch/);
+  assert.match(summary, /Summary/);
+  assert.match(summary, /Old summary/);
+  assert.match(summary, /New summary/);
+  assert.match(summary, /Issue title/);
+  assert.match(github.commentsOn(41)[0], /Your reviewer had already made edits to the draft/);
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.inReview]);
+});
+
+test('holdEdit says nothing when the edit changed no answer', async () => {
+  const github = fakeGitHub({ issues: { 41: {} } });
+  const body = '### Title\n\nSame';
+  const ctx = context({
+    payload: { issue: { number: 41, title: 'T', body }, changes: { body: { from: body } } },
+  });
+  assert.deepEqual(await holdEdit({ github, context: ctx, branch: 'b', root: WORKSPACE }), {
+    changes: 0,
+    pr: null,
+  });
+  assert.deepEqual(github.calls, []);
+});
+
+test('announcePublished: the entry page, once, and only for submissions', async () => {
+  const merged = (number, body) => ({ number, body, merged_at: '2026-10-01T00:00:00Z' });
+  const github = fakeGitHub({
+    issues: {
+      41: { labels: [ENTRY_LABEL, STATUS.inReview] },
+      42: { labels: ['bug'] },
+      43: { labels: [STATUS.inReview] },
+    },
+    associated: [
+      merged(50, 'Closes #41'),
+      merged(51, 'Fixes #42'),
+      merged(52, 'Closes #43'),
+      { number: 53, body: 'Closes #41', merged_at: null },
+    ],
+    files: {
+      50: [{ filename: 'catalog/water-routing/index.md', status: 'added' }],
+      51: [{ filename: 'docs/readme.md', status: 'modified' }],
+      52: [{ filename: '_data/events.yml', status: 'modified' }],
+    },
+  });
+  const ctx = context({ sha: 'abc' });
+  const told = await announcePublished({
+    github,
+    context: ctx,
+    pageUrl: 'https://acme.github.io/catalog/',
+    entryPath: 'catalog',
+  });
+  assert.deepEqual(told, [41, 43]);
+  assert.equal(github.commentsOn(41).length, 1);
+  assert.match(
+    github.commentsOn(41)[0],
+    /^Your entry is now live at https:\/\/acme\.github\.io\/catalog\/catalog\/water-routing\//
+  );
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.published]);
+  assert.deepEqual(
+    github.labelsOf(42),
+    ['bug'],
+    'a maintainer pull request closing a bug is not a submission'
+  );
+  assert.deepEqual(github.labelsOf(43), [STATUS.published]);
+  assert.equal(github.commentsOn(43).length, 0, 'no page, no "now live" comment');
+
+  await announcePublished({
+    github,
+    context: ctx,
+    pageUrl: 'https://acme.github.io/catalog',
+    entryPath: 'catalog',
+  });
+  assert.equal(github.commentsOn(41).length, 1, 'a re-run deploy does not announce twice');
+});
+
+/**
+ * Run missing-label.yml's github-script step as written, with its `env:`.
+ * @param {{title: string, body?: string, association?: string}} issue
+ */
+async function runMissingLabel({ title, body = '', association = 'NONE' }) {
+  const workflow = YAML.parse(
+    fs.readFileSync(path.join(ROOT, '.github/workflows/missing-label.yml'), 'utf8')
+  );
+  const step = workflow.jobs.explain.steps.find((s) => /github-script/.test(s.uses ?? ''));
+  const github = fakeGitHub({ issues: { 41: {} } });
+  const env = {
+    ...process.env,
+    GITHUB_WORKSPACE: ROOT,
+    ISSUE_TITLE: title,
+    ISSUE_BODY: body,
+    AUTHOR_ASSOCIATION: association,
+  };
+  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+  const run = new AsyncFunction('github', 'context', 'core', 'require', 'process', step.with.script);
+  // The real module reads site.yml from GITHUB_WORKSPACE at call time.
+  const saved = process.env.GITHUB_WORKSPACE;
+  process.env.GITHUB_WORKSPACE = WORKSPACE;
+  try {
+    await run(github, context(), logs(), createRequire(import.meta.url), { env });
+  } finally {
+    process.env.GITHUB_WORKSPACE = saved;
+  }
+  return github;
+}
+
+test("missing-label: an outsider's form submission without its label gets the rescue message, received and needs-triage", async () => {
+  const github = await runMissingLabel({
+    title: '[Use case] Water routing',
+    body: '### Title\n\nWater routing',
+  });
+  const [comment] = github.commentsOn(41);
+  assert.match(comment, /It looks like a \*\*New entry\*\* submission/);
+  assert.match(comment, /add the `content:new-entry` label/);
+  assert.match(comment, /\*\*#41\*\*/);
+  assert.deepEqual(github.labelsOf(41).sort(), ['needs-triage', STATUS.received]);
+});
+
+test("missing-label: a maintainer's form submission gets the message but no status or triage label", async () => {
+  const github = await runMissingLabel({ title: 'Event: Kickoff', association: 'OWNER' });
+  assert.match(github.commentsOn(41)[0], /\*\*Add event details\*\*/);
+  assert.deepEqual(github.labelsOf(41), []);
+});
+
+test('missing-label: any other outsider issue is acknowledged; a bug report gets no status', async () => {
+  const question = await runMissingLabel({ title: 'How do I submit?' });
+  assert.match(question.commentsOn(41)[0], /Thank you for getting in touch!/);
+  assert.match(question.commentsOn(41)[0], /status\/\?n=41/);
+  assert.deepEqual(question.labelsOf(41).sort(), ['needs-triage', STATUS.received]);
+
+  const bug = await runMissingLabel({ title: '[Bug] Search is broken' });
+  assert.doesNotMatch(bug.commentsOn(41)[0], /status\/\?n=/);
+  assert.deepEqual(bug.labelsOf(41), ['needs-triage']);
+
+  const hand = await runMissingLabel({ title: '[RFC] Rename the site', body: 'Plain text' });
+  assert.match(
+    hand.commentsOn(41)[0],
+    /Thank you for getting in touch!/,
+    'a bracketed title without a form body is not a form'
+  );
+});
+
+test("missing-label: a maintainer's own issue gets no comment at all", async () => {
+  const github = await runMissingLabel({ title: 'Plan the next release', association: 'MEMBER' });
+  assert.deepEqual(github.calls, []);
+});
