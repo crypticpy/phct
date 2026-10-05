@@ -660,6 +660,114 @@ test('handleStageEvent: closing a duplicate draft while another is open is not a
   assert.match(last.commentsOn(41)[0], /we are not able to publish it/);
 });
 
+test('handleStageEvent: a draft from any intake form closed unmerged declines its issue, unless another carries on', async () => {
+  const label = 'content:new-event';
+  const seed = {
+    issues: { 41: { labels: [label, STATUS.inReview] } },
+    roles: { maintainer: 'write' },
+    pulls: [draftPull(50, { ref: 'event/2026-kickoff', labels: [label], state: 'closed' })],
+  };
+  const github = fakeGitHub(seed);
+  const decision = await handleStageEvent({
+    github,
+    context: stageContextFor({ action: 'closed', state: 'closed' }, { labels: [label] }),
+  });
+  assert.equal(decision.status, STATUS.declined);
+  assert.deepEqual(github.labelsOf(41), [label, STATUS.declined]);
+  assert.equal(github.issues[41].state, 'closed');
+  assert.equal(github.issues[41].state_reason, 'not_planned');
+  assert.equal(github.commentsOn(41).length, 1);
+  assert.match(github.commentsOn(41)[0], /we are not able to publish it/);
+
+  // A re-run does not post the decline twice.
+  await handleStageEvent({
+    github,
+    context: stageContextFor({ action: 'closed', state: 'closed' }, { labels: [label] }),
+  });
+  assert.equal(github.commentsOn(41).length, 1);
+
+  // A schedule edit opens a new timestamped draft; closing the old one while
+  // the new one is open is housekeeping. Only drafts of the same form count.
+  const schedule = 'content:schedule';
+  const superseded = fakeGitHub({
+    issues: { 41: { labels: [schedule, STATUS.inReview] } },
+    roles: { maintainer: 'write' },
+    pulls: [
+      draftPull(50, { ref: 'schedule/2026-20261001000000', labels: [schedule], state: 'closed' }),
+      draftPull(60, { ref: 'entry/water-routing-41', labels: [ENTRY_LABEL] }),
+      draftPull(61, { ref: 'schedule/2026-20261002000000', labels: [schedule] }),
+    ],
+  });
+  const skipped = await handleStageEvent({
+    github: superseded,
+    context: stageContextFor({ action: 'closed', state: 'closed' }, { labels: [schedule] }),
+  });
+  assert.match(skipped.skip, /still has an open draft, #61/);
+  assert.deepEqual(superseded.labelsOf(41), [schedule, STATUS.inReview]);
+  assert.equal(superseded.commentsOn(41).length, 0);
+
+  // A merge is published, silently (pages.yml's announce job covers the rest).
+  const merged = fakeGitHub({
+    ...seed,
+    pulls: [draftPull(50, { ref: 'event/2026-kickoff', labels: [label], state: 'closed', merged: true })],
+  });
+  await handleStageEvent({
+    github: merged,
+    context: stageContextFor({ action: 'closed', state: 'closed', merged: true }, { labels: [label] }),
+  });
+  assert.deepEqual(merged.labelsOf(41), [label, STATUS.published]);
+  assert.equal(merged.commentsOn(41).length, 0);
+});
+
+test('handleStageEvent: an intake draft only decides an issue of its own form', async () => {
+  const label = 'content:site-config';
+  const closedDraft = [draftPull(50, { ref: 'setup/apply-41', labels: [label], state: 'closed' })];
+  const close = () => stageContextFor({ action: 'closed', state: 'closed' }, { labels: [label] });
+  for (const issueLabels of [
+    ['bug'],
+    // Another form's submission: the draft's "Closes #N" points at the wrong issue.
+    [ENTRY_LABEL, STATUS.inReview],
+    ['content:new-event', STATUS.inReview],
+  ]) {
+    const github = fakeGitHub({
+      issues: { 41: { labels: issueLabels } },
+      roles: { maintainer: 'write' },
+      pulls: closedDraft,
+    });
+    const decision = await handleStageEvent({ github, context: close() });
+    assert.match(decision.skip ?? '', /not a .*submission/, JSON.stringify(issueLabels));
+    assert.deepEqual(github.labelsOf(41), issueLabels);
+    assert.equal(github.issues[41].state, 'open');
+    assert.equal(github.commentsOn(41).length, 0);
+  }
+
+  // A status label alone (the form label was removed by hand) still counts.
+  const relabelled = fakeGitHub({
+    issues: { 41: { labels: [STATUS.inReview] } },
+    roles: { maintainer: 'write' },
+    pulls: closedDraft,
+  });
+  await handleStageEvent({ github: relabelled, context: close() });
+  assert.deepEqual(relabelled.labelsOf(41), [STATUS.declined]);
+
+  // Review labels on a non-entry draft change nothing.
+  const reviewed = fakeGitHub({
+    issues: { 41: { labels: [label, STATUS.inReview] } },
+    roles: { maintainer: 'write' },
+    pulls: [draftPull(50, { ref: 'setup/apply-41', labels: [label, REVIEW_LABELS.declined] })],
+  });
+  const ignored = await handleStageEvent({
+    github: reviewed,
+    context: stageContextFor(
+      { action: 'labeled', label: REVIEW_LABELS.declined },
+      { labels: [label, REVIEW_LABELS.declined] }
+    ),
+  });
+  assert.match(ignored.skip, /only closing/);
+  assert.deepEqual(reviewed.labelsOf(41), [label, STATUS.inReview]);
+  assert.equal(reviewed.commentsOn(41).length, 0);
+});
+
 test('handleStageEvent: a run that waited reads the labels as they are now, one comment per transition', async () => {
   // Committee and revisions labels went on together; this is the committee
   // label's run, and the revisions run never got its own.

@@ -61,6 +61,26 @@ export const TRIAGE_LABEL = 'needs-triage';
 /** The intake label that marks an entry submission and its draft pull request. */
 export const ENTRY_LABEL = 'content:new-entry';
 
+/**
+ * Every submission form's intake label. The form puts it on the issue, and the
+ * form's workflow puts the same label on the draft pull request it opens and
+ * sets the issue's status. Closing any of these drafts without a merge is a
+ * decline (submission-status.yml); the review stages in between are tracked
+ * for entries only. All start with `content:`, the prefix the workflow's `if`
+ * filters on (test/scripts/notify_workflows.test.mjs checks both, and that
+ * bootstrap-labels.yml creates exactly these).
+ */
+export const INTAKE_LABELS = Object.freeze([
+  ENTRY_LABEL,
+  'content:new-event',
+  'content:new-year',
+  'content:schedule',
+  'content:event-attachments',
+  'content:refresh',
+  'content:also-deployed-by',
+  'content:site-config',
+]);
+
 /** Review-tier labels the stage workflow (submission-status.yml) acts on. */
 export const REVIEW_LABELS = Object.freeze({
   revisions: 'review:revisions-requested',
@@ -522,7 +542,11 @@ export const MAINTAINER_ASSOCIATIONS = Object.freeze(['OWNER', 'MEMBER', 'COLLAB
 const NO_TRIAGE_ROLES = new Set(['read', 'none']);
 
 /**
- * What one event on an entry's draft pull request means for its issue.
+ * What one event on a submission's draft pull request means for its issue.
+ *
+ * Closing a draft, merged or not, counts for every intake form's draft (one
+ * carrying a label in INTAKE_LABELS). The review stages (review labels, a
+ * review asking for changes) count for entry drafts only.
  *
  * The event says what woke the run; the pull request's labels and state say
  * where the submission stands. Runs for one pull request queue behind each
@@ -539,7 +563,7 @@ const NO_TRIAGE_ROLES = new Set(['read', 'none']);
  *   just now: `pull`, the pull request (its labels, state and body win over
  *   the payload's snapshot); `senderRole`, the sender's role on the repository
  *   (`role_name` from the collaborator permission API), when it could be read
- * @returns {{skip: string} | {issue: number, status: string, kind?: string,
+ * @returns {{skip: string} | {issue: number, intake: string, status: string, kind?: string,
  *   once?: boolean, onlyOnStatusChange?: boolean, close?: boolean,
  *   supersedable?: boolean, also?: Array<{kind: string, once: true, vars: Record<string, string>}>,
  *   vars?: Record<string, string>}}
@@ -549,6 +573,7 @@ const NO_TRIAGE_ROLES = new Set(['read', 'none']);
  *   `supersedable`: a close without `review:declined`, which is a decline only
  *   if no other draft for the issue is still open (the caller checks).
  *   `also`: once-only messages for review labels already on the draft.
+ *   `intake`: the draft's intake label; the caller checks the issue carries it.
  */
 export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}) {
   const pr = payload?.pull_request;
@@ -562,7 +587,9 @@ export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}
   if (!pull && label && action === 'labeled') labels.add(label);
   if (!pull && label && action === 'unlabeled') labels.delete(label);
 
-  if (!labels.has(ENTRY_LABEL)) return { skip: `the pull request is not labelled ${ENTRY_LABEL}` };
+  // An entry draft is an entry draft whatever else it carries.
+  const intake = INTAKE_LABELS.find((name) => labels.has(name));
+  if (!intake) return { skip: "the pull request is not labelled with a submission form's intake label" };
   const repo = payload.repository?.full_name;
   if (!repo || pr.head?.repo?.full_name !== repo) return { skip: 'the pull request comes from a fork' };
   const issue = linkedIssue(state.body);
@@ -570,6 +597,11 @@ export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}
 
   const isPull = eventName === 'pull_request';
   const isReview = eventName === 'pull_request_review';
+  if (intake !== ENTRY_LABEL && !(isPull && action === 'closed')) {
+    return {
+      skip: `only closing a ${intake} draft changes its issue's status; review stages are for entries`,
+    };
+  }
   const relevant =
     (isPull && action === 'closed') ||
     isReview ||
@@ -600,6 +632,7 @@ export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}
   const prUrl = String(pr.html_url ?? '');
   const declined = {
     issue,
+    intake,
     status: STATUS.declined,
     kind: 'declined',
     once: true,
@@ -608,7 +641,7 @@ export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}
   };
 
   if (isPull && action === 'closed') {
-    if (state.merged) return { issue, status: STATUS.published };
+    if (state.merged) return { issue, intake, status: STATUS.published };
     return labels.has(REVIEW_LABELS.declined) ? declined : { ...declined, supersedable: true };
   }
   if (state.state === 'closed') {
@@ -635,6 +668,7 @@ export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}
   if (labels.has(REVIEW_LABELS.revisions) || isReview) {
     return {
       issue,
+      intake,
       status: STATUS.changesRequested,
       kind: 'changes_requested',
       onlyOnStatusChange: true,
@@ -646,6 +680,7 @@ export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}
     const rest = tiers.filter((tier) => tier !== triggered);
     return {
       issue,
+      intake,
       status: STATUS.inReview,
       kind: triggered.kind,
       once: true,
@@ -653,5 +688,5 @@ export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}
       ...also(rest),
     };
   }
-  return { issue, status: STATUS.inReview, ...also(tiers) };
+  return { issue, intake, status: STATUS.inReview, ...also(tiers) };
 }

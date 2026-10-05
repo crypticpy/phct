@@ -188,10 +188,13 @@ jobs:
           } > /tmp/pr-body.md
 
           # An `issues: edited` re-run reuses the pull request that already
-          # points at this branch instead of failing.
+          # points at this branch instead of failing. The draft carries the
+          # form's label, like every intake draft, so closing it unmerged tells
+          # the submitter (submission-status.yml); the label exists, because
+          # this job only runs for an issue that has it.
           url="$(gh pr view "$BRANCH" --json url --jq .url 2>/dev/null || true)"
           if [ -n "$url" ]; then
-            gh pr edit "$BRANCH" --title "$PR_TITLE" --body-file /tmp/pr-body.md
+            gh pr edit "$BRANCH" --title "$PR_TITLE" --body-file /tmp/pr-body.md --add-label content:site-config
             {
               echo "url=$url"
               echo "reused=true"
@@ -201,6 +204,7 @@ jobs:
               --base "${GITHUB_REF_NAME}" \
               --head "$BRANCH" \
               --title "$PR_TITLE" \
+              --label content:site-config \
               --body-file /tmp/pr-body.md)"
             echo "url=$url" >> "$GITHUB_OUTPUT"
           fi

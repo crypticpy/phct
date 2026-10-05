@@ -5,6 +5,14 @@ name: Submission status
 # page reads it). The submitter is subscribed to their issue, not to the draft
 # pull request, so this is how review news reaches their inbox.
 #
+# Every table row is for an entry draft (`content:new-entry`). The drafts the
+# other forms open (events, cohort years, schedules, attachments, refreshes,
+# "also deployed by", setup) carry their form's `content:*` label and get the
+# last three rows only: closed unmerged is a decline, merged is published.
+# Their issue must carry the same form label (or, failing any form label, a
+# status label), so a draft whose "Closes #N" names another form's issue
+# changes nothing.
+#
 #   On the entry's draft pull request          On its issue
 #   ---------------------------------------    -------------------------------------
 #   `review:revisions-requested` added, or a   comment: what to do;
@@ -56,21 +64,25 @@ permissions: {}
 
 jobs:
   notify:
-    # Cheap filters first, so most label changes never start a runner. The
-    # label list matches REVIEW_LABELS in scripts/lib/notify.mjs, and the
-    # review authors MAINTAINER_ASSOCIATIONS there
-    # (test/scripts/notify_workflows.test.mjs keeps them equal).
+    # Cheap filters first, so most label changes never start a runner. A
+    # close passes for any draft with a `content:*` label (every intake label
+    # in INTAKE_LABELS in scripts/lib/notify.mjs starts with it; stageDecision
+    # checks the exact list); label and review events only for an entry draft.
+    # The label list matches REVIEW_LABELS there, and the review authors
+    # MAINTAINER_ASSOCIATIONS (test/scripts/notify_workflows.test.mjs keeps
+    # them equal).
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository
-      && contains(github.event.pull_request.labels.*.name, 'content:new-entry')
-      && (github.event.action == 'closed'
-          || (github.event_name == 'pull_request'
-              && contains(fromJSON('["review:revisions-requested","review:committee","review:partner","review:declined"]'), github.event.label.name))
-          || (github.event_name == 'pull_request_review'
-              && github.event.review.state == 'changes_requested'
-              && (github.event.review.author_association == 'OWNER'
-                  || github.event.review.author_association == 'MEMBER'
-                  || github.event.review.author_association == 'COLLABORATOR')))
+      && ((github.event.action == 'closed'
+           && contains(join(github.event.pull_request.labels.*.name, ' '), 'content:'))
+          || (contains(github.event.pull_request.labels.*.name, 'content:new-entry')
+              && ((github.event_name == 'pull_request'
+                   && contains(fromJSON('["review:revisions-requested","review:committee","review:partner","review:declined"]'), github.event.label.name))
+                  || (github.event_name == 'pull_request_review'
+                      && github.event.review.state == 'changes_requested'
+                      && (github.event.review.author_association == 'OWNER'
+                          || github.event.review.author_association == 'MEMBER'
+                          || github.event.review.author_association == 'COLLABORATOR')))))
     # One run at a time per pull request, none cancelled: a label and a review
     # arriving together are handled in turn, and the duplicate-comment check
     # reads what the previous run posted. On the job, not the workflow, so a

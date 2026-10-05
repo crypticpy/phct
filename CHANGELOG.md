@@ -44,8 +44,11 @@ the generated issue form changes, to `entry_<key>`, so regenerate and commit
   committee or a partner, or declines it (closing the issue as not planned,
   with the appeal route). Only a review by the owner, an organization member
   or a collaborator counts, and closing a draft while another for the same
-  issue is open (without `review:declined`) is not a decline. The deploy's
-  "now live" comment is unchanged.
+  issue is open (without `review:declined`) is not a decline. Drafts from the
+  other forms (events, cohort years, schedules, attachments, refreshes, "also
+  deployed by", setup) are covered when closed: unmerged is a decline, merged
+  is published; the Apply setup draft now carries `content:site-config` like
+  the rest. The deploy's "now live" comment is unchanged.
 - One status label on every submission issue: `status:received`,
   `status:in-review`, `status:changes-requested`, `status:published`,
   `status:declined`, for the `/status/` page.

@@ -25,7 +25,7 @@ import process from 'node:process';
 import { answerChanges, formatChanges } from './answer_changes.mjs';
 import { draftsForIssue } from './drafts.mjs';
 import {
-  ENTRY_LABEL,
+  INTAKE_LABELS,
   NOTIFY_LABELS,
   STATUS,
   TRIAGE_LABEL,
@@ -327,7 +327,7 @@ async function readCurrent(github, core, { owner, repo }, eventName, payload) {
 }
 
 /**
- * submission-status.yml: one event on an entry's draft pull request.
+ * submission-status.yml: one event on a submission's draft pull request.
  * @param {{github: object, context: object, core?: object}} options
  * @returns {Promise<object>} the decision, for the log and the tests
  */
@@ -351,9 +351,12 @@ export async function handleStageEvent({ github, context, core = quietCore }) {
   const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: decision.issue });
   const labels = labelNames(issue.labels);
   // "Closes #N" is free text a maintainer can mistype; never close or relabel
-  // an issue that is not a submission.
-  if (issue.pull_request || (!labels.includes(ENTRY_LABEL) && !currentStatus(labels))) {
+  // an issue that is not a submission, or that another form's draft serves.
+  if (issue.pull_request || (!labels.includes(decision.intake) && !currentStatus(labels))) {
     return skipped(`#${decision.issue} is not a submission issue`);
+  }
+  if (!labels.includes(decision.intake) && labels.some((name) => INTAKE_LABELS.includes(name))) {
+    return skipped(`#${decision.issue} is not a ${decision.intake} submission`);
   }
   const previous = currentStatus(labels);
   if (!mayMoveTo(previous, decision.status)) return skipped(`#${decision.issue} is already ${previous}`);
@@ -372,7 +375,7 @@ export async function handleStageEvent({ github, context, core = quietCore }) {
     const others = draftsForIssue(pulls, {
       issue: decision.issue,
       repository: `${owner}/${repo}`,
-      label: ENTRY_LABEL,
+      label: decision.intake,
       exclude: payload.pull_request?.number,
     });
     if (others.length > 0) {

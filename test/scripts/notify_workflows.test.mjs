@@ -12,7 +12,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
-import { MAINTAINER_ASSOCIATIONS, NOTIFY_LABELS, REVIEW_LABELS } from '../../scripts/lib/notify.mjs';
+import {
+  ENTRY_LABEL,
+  INTAKE_LABELS,
+  MAINTAINER_ASSOCIATIONS,
+  NOTIFY_LABELS,
+  REVIEW_LABELS,
+} from '../../scripts/lib/notify.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DIR = path.join(ROOT, '.github', 'workflows');
@@ -110,6 +116,66 @@ test('submission-status.yml listens for exactly the review labels notify.mjs act
   const workflow = parse('submission-status.yml');
   const labels = JSON.parse(/fromJSON\('(\[[^']*\])'\)/.exec(workflow.jobs.notify.if)[1]);
   assert.deepEqual(labels.sort(), Object.values(REVIEW_LABELS).sort());
+});
+
+/** The `content:*` label a workflow's job `if` requires on the issue. */
+const formLabel = (name) => {
+  const labels = Object.values(parse(name).jobs).flatMap((job) => [
+    ...String(job.if ?? '').matchAll(
+      /contains\(github\.event\.issue\.labels\.\*\.name, '(content:[a-z-]+)'\)/g
+    ),
+  ]);
+  return [...new Set(labels.map((m) => m[1]))];
+};
+
+/** The labels a workflow puts on the pull request it opens or reuses. */
+const draftLabels = (name) =>
+  Object.values(parse(name).jobs).flatMap((job) =>
+    (job.steps ?? []).flatMap((step) => {
+      if (/peter-evans\/create-pull-request@/.test(step.uses ?? '')) return [String(step.with?.labels ?? '')];
+      const run = String(step.run ?? '');
+      if (!/\bgh pr (create|edit)\b/.test(run)) return [];
+      return [...run.matchAll(/--(?:add-)?label (content:[a-z-]+)/g)].map((m) => m[1]);
+    })
+  );
+
+test('every intake workflow labels its draft with its form label, and INTAKE_LABELS lists exactly those', () => {
+  const seen = [];
+  for (const name of INTAKE) {
+    const [form, ...others] = formLabel(name);
+    assert.ok(form && others.length === 0, `${name} runs for ${others.length + (form ? 1 : 0)} form labels`);
+    const onDraft = draftLabels(name);
+    assert.ok(onDraft.length > 0, `${name} opens its draft without a label`);
+    for (const label of onDraft) assert.equal(label, form, `${name} labels its draft ${label}, not ${form}`);
+    seen.push(form);
+  }
+  assert.deepEqual([...seen].sort(), [...INTAKE_LABELS].sort());
+  assert.ok(INTAKE_LABELS.includes(ENTRY_LABEL));
+  const bootstrapped = [...source('bootstrap-labels.yml').matchAll(/^\s*create "(content:[a-z-]+)"/gm)].map(
+    (m) => m[1]
+  );
+  assert.deepEqual(
+    bootstrapped.sort(),
+    [...INTAKE_LABELS].sort(),
+    'bootstrap-labels.yml creates another set'
+  );
+});
+
+test('submission-status.yml lets a close through for every intake label, and review events for entries only', () => {
+  const condition = parse('submission-status.yml').jobs.notify.if;
+  // The pre-filter is the `content:` prefix; stageDecision checks the exact list.
+  for (const label of INTAKE_LABELS) assert.ok(label.startsWith('content:'), label);
+  assert.match(
+    condition,
+    /\(github\.event\.action == 'closed'\s*&& contains\(join\(github\.event\.pull_request\.labels\.\*\.name, ' '\), 'content:'\)\)/
+  );
+  assert.match(
+    condition,
+    new RegExp(
+      `\\|\\| \\(contains\\(github\\.event\\.pull_request\\.labels\\.\\*\\.name, '${ENTRY_LABEL}'\\)\\s*&& \\(\\(github\\.event_name == 'pull_request'`
+    ),
+    'label and review events need the entry label'
+  );
 });
 
 test('submission-status.yml runs only default-branch code, for pull requests from this repository', () => {

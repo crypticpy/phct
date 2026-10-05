@@ -435,6 +435,101 @@ test('stageDecision: a plain close may be superseded by another draft; review:de
   );
 });
 
+/** The labels the other intake workflows put on their drafts (the forms' issue labels). */
+const OTHER_INTAKE = [
+  'content:new-event',
+  'content:new-year',
+  'content:schedule',
+  'content:event-attachments',
+  'content:refresh',
+  'content:also-deployed-by',
+  'content:site-config',
+];
+
+test('stageDecision: closing any intake form draft unmerged declines its issue; review stages stay entry-only', () => {
+  for (const label of OTHER_INTAKE) {
+    const closed = stageDecision(
+      'pull_request',
+      payload({ action: 'closed', state: 'closed', labels: [label] })
+    );
+    assert.equal(closed.issue, 41, label);
+    assert.equal(closed.status, STATUS.declined, label);
+    assert.equal(closed.kind, 'declined', label);
+    assert.equal(closed.once, true, label);
+    assert.equal(closed.close, true, label);
+    assert.equal(closed.supersedable, true, `${label}: another open draft still carries the issue`);
+    assert.equal(closed.intake, label, `${label}: the caller checks the issue against the draft's label`);
+
+    const declinedClose = stageDecision(
+      'pull_request',
+      payload({ action: 'closed', state: 'closed', labels: [label, REVIEW_LABELS.declined] })
+    );
+    assert.equal(declinedClose.status, STATUS.declined, label);
+    assert.equal(declinedClose.supersedable, undefined, `${label}: review:declined is always a decline`);
+
+    const merged = stageDecision(
+      'pull_request',
+      payload({ action: 'closed', state: 'closed', merged: true, labels: [label] })
+    );
+    assert.equal(merged.status, STATUS.published, label);
+    assert.equal(merged.intake, label, label);
+
+    assert.ok(
+      stageDecision('pull_request', payload({ action: 'closed', state: 'closed', labels: [label] }), {
+        senderRole: 'read',
+      }).skip,
+      `${label}: a read-only sender cannot decline`
+    );
+    for (const review of Object.values(REVIEW_LABELS)) {
+      assert.match(
+        stageDecision('pull_request', payload({ action: 'labeled', label: review, labels: [label, review] }))
+          .skip ?? '',
+        /only closing/,
+        `${label} ${review}`
+      );
+    }
+    assert.match(
+      stageDecision(
+        'pull_request_review',
+        payload({
+          action: 'submitted',
+          labels: [label],
+          review: { state: 'changes_requested', html_url: 'https://r', author_association: 'MEMBER' },
+        })
+      ).skip ?? '',
+      /only closing/,
+      `${label}: a review asking for changes`
+    );
+  }
+
+  // Entries keep every stage, and say which intake they are.
+  assert.equal(
+    stageDecision('pull_request', payload({ action: 'closed', state: 'closed' })).intake,
+    ENTRY_LABEL
+  );
+  assert.equal(
+    stageDecision('pull_request', payload({ action: 'labeled', label: REVIEW_LABELS.committee })).intake,
+    ENTRY_LABEL
+  );
+  assert.equal(
+    stageDecision(
+      'pull_request',
+      payload({ action: 'labeled', label: REVIEW_LABELS.committee, labels: ['content:refresh', ENTRY_LABEL] })
+    ).kind,
+    'with_committee',
+    'a draft carrying the entry label is an entry draft'
+  );
+
+  // A closed pull request without an intake label is no submission's draft.
+  for (const labels of [[], ['bug'], ['content:unknown'], ['status:in-review']]) {
+    assert.match(
+      stageDecision('pull_request', payload({ action: 'closed', state: 'closed', labels })).skip ?? '',
+      /intake label/,
+      JSON.stringify(labels)
+    );
+  }
+});
+
 test('stageDecision: the status follows the labels on the pull request as it is now', () => {
   const now = (labels, state = 'open') => ({
     pull: { body: 'Closes #41', state, merged: false, labels: labels.map((name) => ({ name })) },
