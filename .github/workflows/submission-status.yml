@@ -8,16 +8,28 @@ name: Submission status
 #   On the entry's draft pull request          On its issue
 #   ---------------------------------------    -------------------------------------
 #   `review:revisions-requested` added, or a   comment: what to do;
-#   review that requests changes               status:changes-requested
+#   maintainer's review that requests changes  status:changes-requested
 #   `review:revisions-requested` removed       status:in-review (no comment)
 #   `review:committee` / `review:partner`      short comment, once; status:in-review
 #   `review:declined`, or closed unmerged      comment with the appeal route, once;
 #                                              status:declined; issue closed as not planned
+#   closed unmerged while another draft for    nothing: the issue's other draft carries on
+#   the same issue is open, no review:declined
 #   merged                                     status:published (pages.yml's announce
 #                                              job posts "now live" once it deploys)
 #
-# The message text is scripts/lib/notify.mjs, overridable under
-# `notifications:` in _data/site.yml; the rules are `stageDecision` there.
+# The status comes from the draft's labels as they are when the job runs, not
+# only from the event that started it: while `review:revisions-requested` is
+# on the draft the issue reads changes-requested, so swap it for the tier label
+# when the changes land (docs/admin-guide.md). The message text is
+# scripts/lib/notify.mjs, overridable under `notifications:` in _data/site.yml;
+# the rules are `stageDecision` there.
+#
+# Who counts: a review only from the repository's owner, an organization
+# member or a collaborator (`author_association`), checked here and again in
+# `stageDecision`, because anyone can review a pull request on a public
+# repository. Labelling and closing already need triage access; the job also
+# reads the sender's role and ignores a read-only one.
 #
 # Security: `pull_request`, not `pull_request_target`. Entry drafts are opened
 # from a branch of this repository, so `pull_request` runs here with a token
@@ -42,25 +54,33 @@ on:
 
 permissions: {}
 
-# One run at a time per pull request, none cancelled: a label and a review
-# arriving together must be handled in order, and the duplicate-comment check
-# reads what the previous run posted.
-concurrency:
-  group: submission-status-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   notify:
     # Cheap filters first, so most label changes never start a runner. The
-    # label list matches REVIEW_LABELS in scripts/lib/notify.mjs
+    # label list matches REVIEW_LABELS in scripts/lib/notify.mjs, and the
+    # review authors MAINTAINER_ASSOCIATIONS there
     # (test/scripts/notify_workflows.test.mjs keeps them equal).
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository
       && contains(github.event.pull_request.labels.*.name, 'content:new-entry')
       && (github.event.action == 'closed'
-          || (github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested')
           || (github.event_name == 'pull_request'
-              && contains(fromJSON('["review:revisions-requested","review:committee","review:partner","review:declined"]'), github.event.label.name)))
+              && contains(fromJSON('["review:revisions-requested","review:committee","review:partner","review:declined"]'), github.event.label.name))
+          || (github.event_name == 'pull_request_review'
+              && github.event.review.state == 'changes_requested'
+              && (github.event.review.author_association == 'OWNER'
+                  || github.event.review.author_association == 'MEMBER'
+                  || github.event.review.author_association == 'COLLABORATOR')))
+    # One run at a time per pull request, none cancelled: a label and a review
+    # arriving together are handled in turn, and the duplicate-comment check
+    # reads what the previous run posted. On the job, not the workflow, so a
+    # run this `if` skips (another label, an approving review) never takes a
+    # place in the queue. GitHub still keeps only the newest waiting run, so a
+    # burst can drop one; the run that does go reads the labels as they are
+    # then, and posts what the dropped one would have.
+    concurrency:
+      group: submission-status-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: read

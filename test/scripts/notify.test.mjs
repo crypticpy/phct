@@ -9,6 +9,7 @@ import {
   DEFAULT_APPEAL,
   DEFAULT_MESSAGES,
   ENTRY_LABEL,
+  MAINTAINER_ASSOCIATIONS,
   NOTIFY_LABELS,
   REVIEW_LABELS,
   STATUS,
@@ -264,7 +265,13 @@ test('stageDecision: the transition table in submission-status.yml', () => {
       { status: STATUS.changesRequested, kind: 'changes_requested', only: true },
     ],
     [
-      ['pull_request_review', { action: 'submitted', review: { state: 'CHANGES_REQUESTED', html_url: 'u' } }],
+      [
+        'pull_request_review',
+        {
+          action: 'submitted',
+          review: { state: 'CHANGES_REQUESTED', html_url: 'u', author_association: 'MEMBER' },
+        },
+      ],
       { status: STATUS.changesRequested, kind: 'changes_requested', only: true },
     ],
     [['pull_request', { action: 'unlabeled', label: REVIEW_LABELS.revisions }], { status: STATUS.inReview }],
@@ -301,7 +308,10 @@ test('stageDecision: the transition table in submission-status.yml', () => {
   assert.equal(
     stageDecision(
       'pull_request_review',
-      payload({ action: 'submitted', review: { state: 'CHANGES_REQUESTED', html_url: 'https://r' } })
+      payload({
+        action: 'submitted',
+        review: { state: 'CHANGES_REQUESTED', html_url: 'https://r', author_association: 'MEMBER' },
+      })
     ).vars.notes_url,
     'https://r'
   );
@@ -339,5 +349,178 @@ test('a placeholder the caller does not pass drops its paragraph instead of show
     render('published', { number: 2, page_url: 'https://x' }, override),
     'Live at {pgae_url}',
     'a typo stays visible'
+  );
+});
+
+test('stageDecision: a review asks for changes only when a maintainer wrote it', () => {
+  assert.deepEqual([...MAINTAINER_ASSOCIATIONS].sort(), ['COLLABORATOR', 'MEMBER', 'OWNER']);
+  const review = (association) =>
+    stageDecision(
+      'pull_request_review',
+      payload({
+        action: 'submitted',
+        review: {
+          state: 'changes_requested',
+          html_url: 'https://evil.example/r',
+          author_association: association,
+        },
+      })
+    );
+  for (const outsider of [
+    'NONE',
+    'CONTRIBUTOR',
+    'FIRST_TIMER',
+    'FIRST_TIME_CONTRIBUTOR',
+    'MANNEQUIN',
+    '',
+    undefined,
+  ]) {
+    assert.match(review(outsider).skip ?? '', /not a maintainer/, String(outsider));
+  }
+  for (const maintainer of MAINTAINER_ASSOCIATIONS) {
+    const decision = review(maintainer);
+    assert.equal(decision.status, STATUS.changesRequested, maintainer);
+    assert.equal(decision.vars.notes_url, 'https://evil.example/r');
+  }
+});
+
+test('stageDecision: a sender who cannot triage moves nothing; bots keep the merge and close path', () => {
+  const declinedLabel = payload({ action: 'labeled', label: REVIEW_LABELS.declined });
+  declinedLabel.sender.login = 'stranger';
+  assert.match(
+    stageDecision('pull_request', declinedLabel, { senderRole: 'read' }).skip,
+    /stranger cannot label/
+  );
+  assert.ok(stageDecision('pull_request', declinedLabel, { senderRole: 'none' }).skip);
+  assert.ok(
+    stageDecision('pull_request', payload({ action: 'closed', state: 'closed' }), { senderRole: 'read' }).skip
+  );
+  for (const role of ['triage', 'write', 'maintain', 'admin', 'content-reviewer', undefined]) {
+    assert.equal(
+      stageDecision('pull_request', declinedLabel, { senderRole: role }).status,
+      STATUS.declined,
+      String(role)
+    );
+  }
+  // An app's token merging or closing the draft is never asked for a role.
+  const merged = payload({ action: 'closed', state: 'closed', merged: true, sender: 'Bot' });
+  assert.equal(stageDecision('pull_request', merged, { senderRole: 'read' }).status, STATUS.published);
+  const closed = payload({ action: 'closed', state: 'closed', sender: 'Bot' });
+  assert.equal(stageDecision('pull_request', closed, { senderRole: 'none' }).status, STATUS.declined);
+});
+
+test('stageDecision: a plain close may be superseded by another draft; review:declined may not', () => {
+  const plain = stageDecision('pull_request', payload({ action: 'closed', state: 'closed' }));
+  assert.equal(plain.status, STATUS.declined);
+  assert.equal(plain.supersedable, true);
+  const labelled = stageDecision(
+    'pull_request',
+    payload({ action: 'closed', state: 'closed', labels: [ENTRY_LABEL, REVIEW_LABELS.declined] })
+  );
+  assert.equal(labelled.status, STATUS.declined);
+  assert.equal(labelled.supersedable, undefined);
+  assert.equal(
+    stageDecision('pull_request', payload({ action: 'labeled', label: REVIEW_LABELS.declined })).supersedable,
+    undefined
+  );
+  assert.equal(
+    stageDecision('pull_request', payload({ action: 'closed', state: 'closed', merged: true })).supersedable,
+    undefined
+  );
+});
+
+test('stageDecision: the status follows the labels on the pull request as it is now', () => {
+  const now = (labels, state = 'open') => ({
+    pull: { body: 'Closes #41', state, merged: false, labels: labels.map((name) => ({ name })) },
+  });
+  const pick = (d) => ({
+    status: d.status,
+    kind: d.kind,
+    also: (d.also ?? []).map((m) => m.kind),
+    skip: d.skip,
+  });
+
+  // A committee label lands while revisions are still requested: the request stands.
+  assert.deepEqual(
+    pick(
+      stageDecision(
+        'pull_request',
+        payload({ action: 'labeled', label: REVIEW_LABELS.committee }),
+        now([ENTRY_LABEL, REVIEW_LABELS.committee, REVIEW_LABELS.revisions])
+      )
+    ),
+    { status: STATUS.changesRequested, kind: 'changes_requested', also: ['with_committee'], skip: undefined }
+  );
+  // The revisions label was removed again before this run started.
+  assert.deepEqual(
+    pick(
+      stageDecision(
+        'pull_request',
+        payload({ action: 'labeled', label: REVIEW_LABELS.revisions }),
+        now([ENTRY_LABEL])
+      )
+    ),
+    { status: STATUS.inReview, kind: undefined, also: [], skip: undefined }
+  );
+  // Two tiers at once: the event's tier is the message, the other comes along once.
+  const both = stageDecision(
+    'pull_request',
+    payload({ action: 'labeled', label: REVIEW_LABELS.partner }),
+    now([ENTRY_LABEL, REVIEW_LABELS.committee, REVIEW_LABELS.partner])
+  );
+  assert.deepEqual(pick(both), {
+    status: STATUS.inReview,
+    kind: 'with_partner',
+    also: ['with_committee'],
+    skip: undefined,
+  });
+  assert.equal(both.once, true);
+  assert.ok(both.also.every((m) => m.once === true && m.vars.pr_url));
+  // Removing revisions while a tier label is on: back in review, the tier note once.
+  assert.deepEqual(
+    pick(
+      stageDecision(
+        'pull_request',
+        payload({ action: 'unlabeled', label: REVIEW_LABELS.revisions }),
+        now([ENTRY_LABEL, REVIEW_LABELS.committee])
+      )
+    ),
+    { status: STATUS.inReview, kind: undefined, also: ['with_committee'], skip: undefined }
+  );
+  // review:declined on the draft wins over whatever woke the run.
+  assert.equal(
+    stageDecision(
+      'pull_request',
+      payload({ action: 'labeled', label: REVIEW_LABELS.committee }),
+      now([ENTRY_LABEL, REVIEW_LABELS.committee, REVIEW_LABELS.declined])
+    ).status,
+    STATUS.declined
+  );
+  // The intake label was taken off since: not a submission draft any more.
+  assert.match(
+    stageDecision('pull_request', payload({ action: 'labeled', label: REVIEW_LABELS.committee }), now([]))
+      .skip,
+    /not labelled/
+  );
+  // Closed since: only review:declined still decides, and only from a person.
+  const closedNow = now([ENTRY_LABEL, REVIEW_LABELS.declined], 'closed');
+  assert.equal(
+    stageDecision('pull_request', payload({ action: 'labeled', label: REVIEW_LABELS.declined }), closedNow)
+      .status,
+    STATUS.declined
+  );
+  assert.ok(
+    stageDecision(
+      'pull_request',
+      payload({ action: 'labeled', label: REVIEW_LABELS.declined, sender: 'Bot' }),
+      closedNow
+    ).skip
+  );
+  assert.ok(
+    stageDecision(
+      'pull_request',
+      payload({ action: 'labeled', label: REVIEW_LABELS.committee }),
+      now([ENTRY_LABEL, REVIEW_LABELS.committee], 'closed')
+    ).skip
   );
 });

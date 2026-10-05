@@ -102,10 +102,10 @@ Submitters are not subscribed to the draft pull request, but GitHub emails them 
 | The issue is opened | (the acknowledgement follows with the draft) | `status:received` |
 | The draft pull request is opened or rebuilt | Number, what happens next, turnaround, draft link | `status:in-review` |
 | Scaffolding fails, or the pull request cannot be opened | What went wrong and how to retry | `status:received` |
-| `review:revisions-requested` added, or a review requesting changes | Where your notes are and how to update; once per round | `status:changes-requested` |
+| `review:revisions-requested` added, or a review requesting changes by the owner, an organization member or a collaborator | Where your notes are and how to update; once per round | `status:changes-requested` |
 | `review:revisions-requested` removed | None | `status:in-review` |
 | `review:committee` / `review:partner` added | A short "it moved on" note, once | `status:in-review` |
-| `review:declined` added, or the pull request closed unmerged | Your reason is on the draft, and how to appeal; the issue is closed as not planned | `status:declined` |
+| `review:declined` added, or the pull request closed unmerged (unless another draft for the issue is still open and `review:declined` is not on the closed one) | Your reason is on the draft, and how to appeal; the issue is closed as not planned | `status:declined` |
 | Merged | "Your entry is now live at …" once the deploy finishes | `status:published` |
 
 Every content form (events, schedules, cohort years, refreshes, "also deployed by", Apply setup) acknowledges the same way. An issue that arrives with no `content:*` label gets an answer too: one that looks like a form submission gets the "label is missing" instructions, and anything else from someone outside the project gets a short acknowledgement and `needs-triage`. Issues opened by owners, members and collaborators that no form claimed are left alone.
@@ -114,9 +114,11 @@ The wording is in `scripts/lib/notify.mjs` and can be changed under `notificatio
 
 **Declining.** Rare, and always with a reason the submitter can act on. A comment that has worked:
 
-> Thanks for submitting this. We are not going to publish it as it stands, because *[the specific reason — e.g. the shared material includes patient-level data and the attestation cannot be made honestly; or there is no working link or reachable contact, so a reader could not evaluate it]*. If *[what would change the outcome]*, please reopen by editing the issue and we will take another look. You can also ask for this decision to go to the full Governance Committee by replying here.
+> Thanks for submitting this. We are not going to publish it as it stands, because *[the specific reason — e.g. the shared material includes patient-level data and the attestation cannot be made honestly; or there is no working link or reachable contact, so a reader could not evaluate it]*. If *[what would change the outcome]*, you are welcome to revise it and submit it again through the form. If you disagree with the decision, reply on your submission issue and ask for it to go to the full Governance Committee.
 
-Add `review:declined` and close the pull request without merging. The automation then comments on the submitter's issue (which is where their email comes from), pointing at your reason on the pull request and at the appeal route, and closes the issue as not planned. It does this once, whichever of the two you do first.
+Add `review:declined` and close the pull request without merging. The automation then comments on the submitter's issue (which is where their email comes from), pointing at your reason on the pull request and at the appeal route, and closes the issue as not planned. It does this once, whichever of the two you do first. A closed issue is not rebuilt by an edit, so the way back is the one the comment gives: reply on the issue to appeal, or submit again.
+
+Closing a draft *without* `review:declined` while another draft for the same issue is still open (an older duplicate, or one you replaced by hand) is treated as housekeeping: the submitter hears nothing and the open draft carries on. An edit to the issue always updates the draft that is already open, even when the new title would name a different branch.
 
 ### Review checklist
 

@@ -23,6 +23,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { answerChanges, formatChanges } from './answer_changes.mjs';
+import { draftsForIssue } from './drafts.mjs';
 import {
   ENTRY_LABEL,
   NOTIFY_LABELS,
@@ -291,32 +292,96 @@ export async function notifyIssue({
 }
 
 /**
+ * The pull request as it is now, and the sender's role on the repository.
+ * Both are best effort: the payload is a snapshot that is usually still right,
+ * and GitHub already requires triage access to label or close a pull request,
+ * so a read that fails costs a warning, never the submitter's update.
+ * @returns {Promise<{pull?: object, senderRole?: string}>}
+ */
+async function readCurrent(github, core, { owner, repo }, eventName, payload) {
+  const current = {};
+  const number = payload.pull_request?.number;
+  if (number) {
+    try {
+      ({ data: current.pull } = await github.rest.pulls.get({ owner, repo, pull_number: number }));
+    } catch (error) {
+      core.warning(
+        `Could not re-read pull request #${number} (${error?.status ?? error?.message}); using the event's copy.`
+      );
+    }
+  }
+  const sender = payload.sender;
+  if (eventName === 'pull_request' && sender?.type !== 'Bot' && sender?.login) {
+    try {
+      const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+        owner,
+        repo,
+        username: sender.login,
+      });
+      current.senderRole = String(data?.role_name || data?.permission || '');
+    } catch (error) {
+      core.warning(`Could not read ${sender.login}'s role (${error?.status ?? error?.message}).`);
+    }
+  }
+  return current;
+}
+
+/**
  * submission-status.yml: one event on an entry's draft pull request.
  * @param {{github: object, context: object, core?: object}} options
  * @returns {Promise<object>} the decision, for the log and the tests
  */
 export async function handleStageEvent({ github, context, core = quietCore }) {
-  const decision = stageDecision(context.eventName, context.payload);
-  if ('skip' in decision) {
-    core.info(`Nothing to do: ${decision.skip}.`);
-    return decision;
-  }
+  const skipped = (skip) => {
+    core.info(`Nothing to do: ${skip}.`);
+    return { skip };
+  };
+  const { eventName, payload } = context;
+  const first = stageDecision(eventName, payload);
+  if ('skip' in first) return skipped(first.skip);
   const { owner, repo } = context.repo;
+  // Decide again on what is true now: this run may have waited behind another.
+  const decision = stageDecision(
+    eventName,
+    payload,
+    await readCurrent(github, core, { owner, repo }, eventName, payload)
+  );
+  if ('skip' in decision) return skipped(decision.skip);
+
   const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number: decision.issue });
   const labels = labelNames(issue.labels);
   // "Closes #N" is free text a maintainer can mistype; never close or relabel
   // an issue that is not a submission.
   if (issue.pull_request || (!labels.includes(ENTRY_LABEL) && !currentStatus(labels))) {
-    const skip = `#${decision.issue} is not a submission issue`;
-    core.info(`Nothing to do: ${skip}.`);
-    return { skip };
+    return skipped(`#${decision.issue} is not a submission issue`);
   }
   const previous = currentStatus(labels);
-  if (!mayMoveTo(previous, decision.status)) {
-    const skip = `#${decision.issue} is already ${previous}`;
-    core.info(`Nothing to do: ${skip}.`);
-    return { skip };
+  if (!mayMoveTo(previous, decision.status)) return skipped(`#${decision.issue} is already ${previous}`);
+
+  // Closing one draft while another for the same issue is still open (a
+  // duplicate, or one replaced by hand) is housekeeping, not a decision.
+  // `review:declined` on the closed one says otherwise, and stageDecision does
+  // not mark that case supersedable.
+  if (decision.supersedable) {
+    const pulls = await github.paginate(github.rest.pulls.list, {
+      owner,
+      repo,
+      state: 'open',
+      per_page: 100,
+    });
+    const others = draftsForIssue(pulls, {
+      issue: decision.issue,
+      repository: `${owner}/${repo}`,
+      label: ENTRY_LABEL,
+      exclude: payload.pull_request?.number,
+    });
+    if (others.length > 0) {
+      return skipped(
+        `#${decision.issue} still has an open draft, #${others[0].number}, so this close is not a decline`
+      );
+    }
   }
+
   await notifyIssue({
     github,
     context,
@@ -331,6 +396,17 @@ export async function handleStageEvent({ github, context, core = quietCore }) {
     prUrl: decision.vars?.pr_url ?? '',
     labels,
   });
+  for (const message of decision.also ?? []) {
+    await notifyIssue({
+      github,
+      context,
+      core,
+      issueNumber: decision.issue,
+      kind: message.kind,
+      vars: message.vars,
+      once: true,
+    });
+  }
   return decision;
 }
 

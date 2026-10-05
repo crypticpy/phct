@@ -101,13 +101,29 @@ function fakeGitHub(seed = {}) {
       },
     },
     pulls: {
-      list: async ({ head }) => ({
-        data: (seed.pulls ?? []).filter((pull) => `${OWNER}:${pull.head}` === head),
+      // `head` is a branch name in the older seeds and a REST-shaped object in
+      // the draft seeds; without `head`, every pull request in `state`.
+      list: async ({ head, state }) => ({
+        data: (seed.pulls ?? []).filter((pull) =>
+          head
+            ? `${OWNER}:${typeof pull.head === 'string' ? pull.head : pull.head?.ref}` === head
+            : !state || (pull.state ?? 'open') === state
+        ),
       }),
+      get: async ({ pull_number }) => {
+        const found = (seed.pulls ?? []).find((pull) => pull.number === pull_number);
+        if (!found) throw httpError(404);
+        calls.push(['getPull', pull_number]);
+        return { data: found };
+      },
       listFiles: async ({ pull_number }) => ({ data: seed.files?.[pull_number] ?? [] }),
     },
     repos: {
       listPullRequestsAssociatedWithCommit: async () => ({ data: seed.associated ?? [] }),
+      getCollaboratorPermissionLevel: async ({ username }) => {
+        if (!Object.hasOwn(seed.roles ?? {}, username)) throw httpError(403);
+        return { data: { role_name: seed.roles[username] } };
+      },
     },
   };
   return {
@@ -311,7 +327,7 @@ test('handleStageEvent: changes requested, then back in review, then declined an
     context: stageContext({
       eventName: 'pull_request_review',
       action: 'submitted',
-      review: { state: 'changes_requested', html_url: 'https://r' },
+      review: { state: 'changes_requested', html_url: 'https://r', author_association: 'MEMBER' },
     }),
   });
   assert.equal(github.commentsOn(41).length, 1);
@@ -533,4 +549,153 @@ test('missing-label: any other outsider issue is acknowledged; a bug report gets
 test("missing-label: a maintainer's own issue gets no comment at all", async () => {
   const github = await runMissingLabel({ title: 'Plan the next release', association: 'MEMBER' });
   assert.deepEqual(github.calls, []);
+});
+
+/** A draft as the REST API returns it, for the tests that read the pull request again. */
+function draftPull(
+  number,
+  { ref = `entry/water-routing-41`, labels = [ENTRY_LABEL], state = 'open', merged = false } = {}
+) {
+  return {
+    number,
+    state,
+    merged,
+    body: 'Scaffolded from issue #41.\n\nCloses #41',
+    html_url: `https://github.com/${OWNER}/${REPO}/pull/${number}`,
+    labels: labels.map((name) => ({ name })),
+    head: { ref, repo: { full_name: `${OWNER}/${REPO}` } },
+  };
+}
+
+/** stageContext for pull request #50, sent by `login`. */
+function stageContextFor(options, { number = 50, login = 'maintainer', labels } = {}) {
+  const built = stageContext(options);
+  built.payload.pull_request.number = number;
+  built.payload.sender.login = login;
+  if (labels) built.payload.pull_request.labels = labels.map((name) => ({ name }));
+  return built;
+}
+
+test('handleStageEvent: a review from outside the project changes nothing and emails nobody', async () => {
+  const github = fakeGitHub({ issues: { 41: { labels: [ENTRY_LABEL, STATUS.inReview] } } });
+  const decision = await handleStageEvent({
+    github,
+    context: stageContext({
+      eventName: 'pull_request_review',
+      action: 'submitted',
+      review: { state: 'changes_requested', html_url: 'https://evil.example', author_association: 'NONE' },
+    }),
+  });
+  assert.match(decision.skip, /not a maintainer/);
+  assert.deepEqual(github.calls, []);
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.inReview]);
+});
+
+test('handleStageEvent: a read-only sender moves nothing; an unreadable role is left to GitHub', async () => {
+  const seed = { issues: { 41: { labels: [ENTRY_LABEL, STATUS.inReview] } }, roles: { stranger: 'read' } };
+  const github = fakeGitHub(seed);
+  const decision = await handleStageEvent({
+    github,
+    context: stageContextFor({ action: 'labeled', label: REVIEW_LABELS.declined }, { login: 'stranger' }),
+  });
+  assert.match(decision.skip, /stranger cannot label or close/);
+  assert.equal(github.issues[41].state, 'open');
+  assert.equal(github.commentsOn(41).length, 0);
+
+  // The permission API refused (403): GitHub already required triage to add
+  // the label, so the update goes ahead, with a warning in the log.
+  const trusted = fakeGitHub(seed);
+  const core = logs();
+  await handleStageEvent({
+    github: trusted,
+    core,
+    context: stageContextFor({ action: 'labeled', label: REVIEW_LABELS.declined }, { login: 'triager' }),
+  });
+  assert.deepEqual(trusted.labelsOf(41), [ENTRY_LABEL, STATUS.declined]);
+  assert.ok(core.lines.some(([level, m]) => level === 'warning' && /Could not read triager's role/.test(m)));
+});
+
+test('handleStageEvent: closing a duplicate draft while another is open is not a decline', async () => {
+  const seed = {
+    issues: { 41: { labels: [ENTRY_LABEL, STATUS.inReview] } },
+    roles: { maintainer: 'write' },
+    pulls: [
+      draftPull(50, { ref: 'entry/old-title-41', state: 'closed' }),
+      draftPull(61, { ref: 'entry/new-title-41' }),
+    ],
+  };
+  const github = fakeGitHub(seed);
+  const decision = await handleStageEvent({
+    github,
+    context: stageContextFor({ action: 'closed', state: 'closed' }),
+  });
+  assert.match(decision.skip, /still has an open draft, #61/);
+  assert.equal(github.issues[41].state, 'open');
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.inReview]);
+  assert.equal(github.commentsOn(41).length, 0);
+
+  // review:declined on the closed draft is a decision, whatever else is open.
+  const declined = fakeGitHub({
+    ...seed,
+    pulls: [
+      draftPull(50, {
+        ref: 'entry/old-title-41',
+        state: 'closed',
+        labels: [ENTRY_LABEL, REVIEW_LABELS.declined],
+      }),
+      draftPull(61, { ref: 'entry/new-title-41' }),
+    ],
+  });
+  await handleStageEvent({
+    github: declined,
+    context: stageContextFor({ action: 'closed', state: 'closed' }),
+  });
+  assert.deepEqual(declined.labelsOf(41), [ENTRY_LABEL, STATUS.declined]);
+  assert.equal(declined.issues[41].state, 'closed');
+
+  // The last open draft closed without a merge is still a decline.
+  const last = fakeGitHub({ ...seed, pulls: [draftPull(50, { state: 'closed' })] });
+  await handleStageEvent({ github: last, context: stageContextFor({ action: 'closed', state: 'closed' }) });
+  assert.deepEqual(last.labelsOf(41), [ENTRY_LABEL, STATUS.declined]);
+  assert.match(last.commentsOn(41)[0], /we are not able to publish it/);
+});
+
+test('handleStageEvent: a run that waited reads the labels as they are now, one comment per transition', async () => {
+  // Committee and revisions labels went on together; this is the committee
+  // label's run, and the revisions run never got its own.
+  const seed = {
+    issues: { 41: { labels: [ENTRY_LABEL, STATUS.inReview] } },
+    roles: { maintainer: 'triage' },
+    pulls: [draftPull(50, { labels: [ENTRY_LABEL, REVIEW_LABELS.committee, REVIEW_LABELS.revisions] })],
+  };
+  const github = fakeGitHub(seed);
+  await handleStageEvent({
+    github,
+    context: stageContextFor({ action: 'labeled', label: REVIEW_LABELS.committee }),
+  });
+  assert.ok(
+    github.calls.some((call) => call[0] === 'getPull' && call[1] === 50),
+    'the pull request is read again'
+  );
+  assert.deepEqual(github.labelsOf(41), [ENTRY_LABEL, STATUS.changesRequested]);
+  const comments = github.commentsOn(41);
+  assert.equal(comments.length, 2);
+  assert.match(comments[0], /Your reviewer has a few requests/);
+  assert.match(comments[1], /now with the review committee/);
+
+  // The revisions label comes off once the changes land: back in review,
+  // silently, and the committee note is not repeated.
+  const pulls = [draftPull(50, { labels: [ENTRY_LABEL, REVIEW_LABELS.committee] })];
+  const later = fakeGitHub({ ...seed, pulls });
+  later.issues[41] = github.issues[41];
+  await handleStageEvent({
+    github: later,
+    context: stageContextFor({ action: 'unlabeled', label: REVIEW_LABELS.revisions }),
+  });
+  assert.deepEqual(later.labelsOf(41), [ENTRY_LABEL, STATUS.inReview]);
+  assert.equal(
+    later.commentsOn(41).length,
+    0,
+    'no second committee note, no comment for going back to review'
+  );
 });

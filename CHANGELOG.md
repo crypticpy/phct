@@ -42,7 +42,10 @@ the generated issue form changes, to `entry_<key>`, so regenerate and commit
   review; and a new **Submission status** workflow (`submission-status.yml`)
   comments when a reviewer asks for changes, moves a submission to the
   committee or a partner, or declines it (closing the issue as not planned,
-  with the appeal route). The deploy's "now live" comment is unchanged.
+  with the appeal route). Only a review by the owner, an organization member
+  or a collaborator counts, and closing a draft while another for the same
+  issue is open (without `review:declined`) is not a decline. The deploy's
+  "now live" comment is unchanged.
 - One status label on every submission issue: `status:received`,
   `status:in-review`, `status:changes-requested`, `status:published`,
   `status:declined`, for the `/status/` page.
@@ -60,8 +63,16 @@ the generated issue form changes, to `entry_<key>`, so regenerate and commit
   workflows rebuilt and force-pushed the draft branch on every edit; now a
   branch with any commit not made by the automation (or a merge from **Update
   branch**) is left alone, the reviewer gets a comment on the draft listing
-  which answers changed, and the submitter is told their edit arrived. The
-  workflows that push themselves use `--force-with-lease`.
+  which answers changed, and the submitter is told their edit arrived. Every
+  intake workflow whose draft branch can already exist pushes it itself with
+  `--force-with-lease`, so a reviewer push during a run makes the push fail
+  instead of vanishing; new-event and new-year no longer go through
+  create-pull-request, which force-pushes over what it fetched.
+- An edit that changed a submission's title (or another answer its branch name
+  comes from) opened a second draft, and closing the stale one declined the
+  submission while the other was still open. The entry, event, "also deployed
+  by" and refresh workflows now update the draft already open for the issue,
+  on its branch.
 - The write-up of an entry was not prefilled from `/submit/`: GitHub's
   new-issue page reads `?body=` as the plain issue body, so the question whose
   id was `body` showed its default text instead. Field keys GitHub reserves

@@ -43,9 +43,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          # create-pull-request pushes with its own `token:`, so the checkout
-          # does not need to leave credentials in .git/config.
-          persist-credentials: false
+          # The push below needs credentials; the checkout keeps them on purpose.
+          # zizmor: ignore[artipacked]
+          token: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -120,6 +120,29 @@ jobs:
             await notify.notifyIssue({ github, context, core, kind: 'scaffold_failed', vars: { reason: detail } });
             core.setFailed(detail);
 
+      # The branch is event/<year>-<event id>, and the id comes from the title
+      # unless the form names one, so an edited title proposes a new branch.
+      # One issue keeps one draft: an open draft for this issue keeps its
+      # branch, which is rebuilt (or held, below) with the new folder. See
+      # scripts/lib/drafts.mjs.
+      - name: Find the draft already open for this issue
+        id: draft
+        if: steps.scaffold.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROPOSED: ${{ steps.scaffold.outputs.branch }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const drafts = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/lib/drafts.mjs`).href);
+            const { branch } = await drafts.findDraftBranch({
+              github, context, core,
+              proposed: process.env.PROPOSED,
+              label: 'content:new-event',
+              prefix: 'event/'
+            });
+            core.setOutput('branch', branch);
+
       # An edit to the issue re-runs this job, which rebuilds the branch and
       # force-pushes it. Once a reviewer has committed to it that would erase
       # their work, so it is only rebuilt while every commit on it is the
@@ -128,38 +151,85 @@ jobs:
         id: guard
         if: steps.scaffold.outcome == 'success'
         env:
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: node scripts/branch_guard.mjs
 
       - name: Hand the edit to the reviewer
         if: steps.guard.outputs.held == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         with:
           script: |
             const { pathToFileURL } = require('node:url');
             const notify = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/lib/notify_github.mjs`).href);
             await notify.holdEdit({ github, context, core, branch: process.env.BRANCH });
 
-      - name: Create pull request
+      # This job pushes the branch itself rather than through
+      # peter-evans/create-pull-request, which re-fetches the branch and
+      # force-pushes over whatever it found, so a reviewer push between the
+      # guard and that fetch would be lost. Here the lease is the
+      # remote-tracking ref the guard read: a reviewer push since then makes
+      # the push fail instead of vanishing.
+      - name: Commit the event on its branch
+        id: commit
         if: steps.scaffold.outcome == 'success' && steps.guard.outputs.held != 'true'
-        id: cpr
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
-        with:
+        env:
+          BRANCH: ${{ steps.draft.outputs.branch }}
+          SLUG: ${{ steps.scaffold.outputs.slug }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          # `git add -A` is safe only because this step is gated on the
+          # scaffolder having succeeded, and it is what create-pull-request
+          # committed before: everything the scaffolder wrote.
+          git add -A
+          if git diff --cached --quiet; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "The scaffolder produced no changes." >&2
+            exit 0
+          fi
+          git commit -m "feat: add event $SLUG"
+          # The branch is machine-generated, so an `issues: edited` re-run
+          # replaces its contents rather than merging.
+          git push --force-with-lease origin "HEAD:refs/heads/$BRANCH"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open the pull request
+        id: pr
+        if: steps.commit.outputs.created == 'true'
+        env:
           # With CONTENT_BOT_TOKEN the pull request has a real author and the
           # normal `pull_request` triggers fire; without it the step below
           # dispatches the checks by hand.
-          token: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.scaffold.outputs.branch }}
-          commit-message: "feat: add event ${{ steps.scaffold.outputs.slug }}"
-          title: "Add event: ${{ steps.scaffold.outputs.year }} ${{ steps.scaffold.outputs.slug }}"
-          body: |
-            Generated from issue #${{ github.event.issue.number }}.
-
-            Closes #${{ github.event.issue.number }}
-          labels: content:new-event
-          delete-branch: true
+          GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
+          SLUG: ${{ steps.scaffold.outputs.slug }}
+          YEAR: ${{ steps.scaffold.outputs.year }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          printf 'Generated from issue #%s.\n\nCloses #%s\n' "$ISSUE_NUMBER" "$ISSUE_NUMBER" > /tmp/pr-body.md
+          title="Add event: $YEAR $SLUG"
+          # An `issues: edited` re-run reuses the open pull request on this
+          # branch. `--state open` matters: a closed or merged one must not be
+          # edited in place of opening the draft.
+          url="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)"
+          if [ -n "$url" ]; then
+            gh pr edit "$url" --title "$title" --body-file /tmp/pr-body.md --add-label content:new-event
+            echo "operation=updated" >> "$GITHUB_OUTPUT"
+          else
+            url="$(gh pr create \
+              --base "${GITHUB_REF_NAME}" \
+              --head "$BRANCH" \
+              --title "$title" \
+              --label content:new-event \
+              --body-file /tmp/pr-body.md)"
+            echo "operation=created" >> "$GITHUB_OUTPUT"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
       # A pull request opened with GITHUB_TOKEN does not trigger `pull_request`
       # workflows; GitHub parks them behind "Approve and run". `workflow_dispatch`
@@ -167,11 +237,11 @@ jobs:
       # SHA — the pull request's head SHA — so they appear in its Checks tab.
       # See .github/workflows/new-entry.yml for the long version.
       - name: Run the content checks on the new branch
-        if: steps.cpr.outputs.pull-request-number != ''
+        if: steps.pr.outputs.url != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOT_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN }}
-          BRANCH: ${{ steps.cpr.outputs.pull-request-branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: |
           set -euo pipefail
           if [ -n "$BOT_TOKEN" ]; then
@@ -188,11 +258,11 @@ jobs:
           done
 
       - name: Link the pull request from the issue
-        if: steps.cpr.outputs.pull-request-number != ''
+        if: steps.pr.outputs.url != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          PR_URL: ${{ steps.cpr.outputs.pull-request-url }}
-          PR_OPERATION: ${{ steps.cpr.outputs.pull-request-operation }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          PR_OPERATION: ${{ steps.pr.outputs.operation }}
         with:
           script: |
             const { pathToFileURL } = require('node:url');

@@ -519,28 +519,96 @@ export function pullNumber(url) {
 }
 
 /**
+ * Who may ask a submitter for changes with a review: the repository's owner,
+ * members of the organization that owns it, and its collaborators. On a public
+ * repository anyone can submit a review that "requests changes", and it would
+ * otherwise email the submitter a link to a stranger's comment.
+ */
+export const MAINTAINER_ASSOCIATIONS = Object.freeze(['OWNER', 'MEMBER', 'COLLABORATOR']);
+
+/**
+ * Repository roles that cannot label or close a pull request. GitHub already
+ * requires triage access for both, so this is a second check, not the only
+ * one: any other role (triage and up, or an organization's custom role) passes.
+ */
+const NO_TRIAGE_ROLES = new Set(['read', 'none']);
+
+/**
  * What one event on an entry's draft pull request means for its issue.
+ *
+ * The event says what woke the run; the pull request's labels and state say
+ * where the submission stands. Runs for one pull request queue behind each
+ * other and GitHub keeps only the newest waiting one, so a run can stand in
+ * for an event that never got its own. So the status comes from the labels:
+ * `review:declined` on the draft means declined, `review:revisions-requested`
+ * means changes requested (or a maintainer's review asking for changes, which
+ * leaves no label), anything else means in review. `review:committee` and
+ * `review:partner` each tell the submitter once, whichever run sees them first.
  *
  * @param {string} eventName `pull_request` or `pull_request_review`
  * @param {object} payload the webhook payload
+ * @param {{pull?: object, senderRole?: string}} [current] what the caller read
+ *   just now: `pull`, the pull request (its labels, state and body win over
+ *   the payload's snapshot); `senderRole`, the sender's role on the repository
+ *   (`role_name` from the collaborator permission API), when it could be read
  * @returns {{skip: string} | {issue: number, status: string, kind?: string,
  *   once?: boolean, onlyOnStatusChange?: boolean, close?: boolean,
+ *   supersedable?: boolean, also?: Array<{kind: string, once: true, vars: Record<string, string>}>,
  *   vars?: Record<string, string>}}
  *   `once`: post at most one such comment per issue. `onlyOnStatusChange`:
  *   post only when the status actually moves (a label and a review asking for
  *   the same changes arrive together; the submitter needs one email).
+ *   `supersedable`: a close without `review:declined`, which is a decline only
+ *   if no other draft for the issue is still open (the caller checks).
+ *   `also`: once-only messages for review labels already on the draft.
  */
-export function stageDecision(eventName, payload = {}) {
+export function stageDecision(eventName, payload = {}, { pull, senderRole } = {}) {
   const pr = payload?.pull_request;
   if (!pr) return { skip: 'not a pull request event' };
-  const labels = (pr.labels ?? []).map((label) => (typeof label === 'string' ? label : label?.name));
-  if (!labels.includes(ENTRY_LABEL)) return { skip: `the pull request is not labelled ${ENTRY_LABEL}` };
+  const state = pull ?? pr;
+  const action = String(payload.action ?? '');
+  const label = String(payload.label?.name ?? '');
+  const names = (state.labels ?? []).map((item) => (typeof item === 'string' ? item : item?.name));
+  // Without a fresh read, the event's own label is the newest fact there is.
+  const labels = new Set(names);
+  if (!pull && label && action === 'labeled') labels.add(label);
+  if (!pull && label && action === 'unlabeled') labels.delete(label);
+
+  if (!labels.has(ENTRY_LABEL)) return { skip: `the pull request is not labelled ${ENTRY_LABEL}` };
   const repo = payload.repository?.full_name;
   if (!repo || pr.head?.repo?.full_name !== repo) return { skip: 'the pull request comes from a fork' };
-  const issue = linkedIssue(pr.body);
+  const issue = linkedIssue(state.body);
   if (!issue) return { skip: 'the pull request body names no "Closes #N" issue' };
 
-  const action = String(payload.action ?? '');
+  const isPull = eventName === 'pull_request';
+  const isReview = eventName === 'pull_request_review';
+  const relevant =
+    (isPull && action === 'closed') ||
+    isReview ||
+    (isPull && action === 'labeled' && Object.values(REVIEW_LABELS).includes(label)) ||
+    (isPull && action === 'unlabeled' && label === REVIEW_LABELS.revisions);
+  if (!relevant) {
+    if (isPull && action === 'labeled')
+      return { skip: `the ${label || 'unnamed'} label does not change the status` };
+    if (isPull && action === 'unlabeled')
+      return { skip: `removing ${label || 'a label'} does not change the status` };
+    return { skip: `${eventName} ${action} does not change the status` };
+  }
+
+  if (isReview) {
+    if (String(payload.review?.state ?? '').toLowerCase() !== 'changes_requested') {
+      return { skip: 'the review did not request changes' };
+    }
+    const association = String(payload.review?.author_association ?? '');
+    if (!MAINTAINER_ASSOCIATIONS.includes(association)) {
+      return { skip: `the review is by ${association || 'someone'} outside the project, not a maintainer` };
+    }
+  }
+  const bot = payload.sender?.type === 'Bot';
+  if (isPull && !bot && NO_TRIAGE_ROLES.has(String(senderRole ?? '').toLowerCase())) {
+    return { skip: `${payload.sender?.login || 'the sender'} cannot label or close pull requests here` };
+  }
+
   const prUrl = String(pr.html_url ?? '');
   const declined = {
     issue,
@@ -551,46 +619,51 @@ export function stageDecision(eventName, payload = {}) {
     vars: { pr_url: prUrl },
   };
 
-  if (eventName === 'pull_request' && action === 'closed') {
-    return pr.merged ? { issue, status: STATUS.published } : declined;
+  if (isPull && action === 'closed') {
+    if (state.merged) return { issue, status: STATUS.published };
+    return labels.has(REVIEW_LABELS.declined) ? declined : { ...declined, supersedable: true };
   }
-  if (pr.state === 'closed') return { skip: 'the pull request is already closed' };
-  if (payload.sender?.type === 'Bot') return { skip: 'a bot made this change' };
+  if (state.state === 'closed') {
+    // "Add review:declined and close the pull request", in either order: when
+    // the label comes second, its run may be the one standing in for the close.
+    if (!bot && action === 'labeled' && label === REVIEW_LABELS.declined && !state.merged) return declined;
+    return { skip: 'the pull request is already closed' };
+  }
+  if (bot) return { skip: 'a bot made this change' };
+  if (labels.has(REVIEW_LABELS.declined)) return declined;
 
-  if (eventName === 'pull_request_review') {
-    if (String(payload.review?.state ?? '').toLowerCase() !== 'changes_requested') {
-      return { skip: 'the review did not request changes' };
-    }
+  // Each tier label tells the submitter once; `postOnce` finds a repeat.
+  const tiers = [
+    [REVIEW_LABELS.committee, 'with_committee'],
+    [REVIEW_LABELS.partner, 'with_partner'],
+  ]
+    .filter(([name]) => labels.has(name))
+    .map(([name, kind]) => ({ name, kind }));
+  const triggered = isPull && action === 'labeled' ? tiers.find((tier) => tier.name === label) : undefined;
+  const also = (list) =>
+    list.length > 0 ? { also: list.map(({ kind }) => ({ kind, once: true, vars: { pr_url: prUrl } })) } : {};
+
+  // A review reaching this line asked for changes and is a maintainer's.
+  if (labels.has(REVIEW_LABELS.revisions) || isReview) {
     return {
       issue,
       status: STATUS.changesRequested,
       kind: 'changes_requested',
       onlyOnStatusChange: true,
-      vars: { notes_url: String(payload.review?.html_url || prUrl), pr_url: prUrl },
+      vars: { notes_url: String((isReview && payload.review?.html_url) || prUrl), pr_url: prUrl },
+      ...also(tiers),
     };
   }
-
-  const label = String(payload.label?.name ?? '');
-  if (eventName === 'pull_request' && action === 'labeled') {
-    if (label === REVIEW_LABELS.revisions) {
-      return {
-        issue,
-        status: STATUS.changesRequested,
-        kind: 'changes_requested',
-        onlyOnStatusChange: true,
-        vars: { notes_url: prUrl, pr_url: prUrl },
-      };
-    }
-    if (label === REVIEW_LABELS.committee || label === REVIEW_LABELS.partner) {
-      const kind = label === REVIEW_LABELS.committee ? 'with_committee' : 'with_partner';
-      return { issue, status: STATUS.inReview, kind, once: true, vars: { pr_url: prUrl } };
-    }
-    if (label === REVIEW_LABELS.declined) return declined;
-    return { skip: `the ${label || 'unnamed'} label does not change the status` };
+  if (triggered) {
+    const rest = tiers.filter((tier) => tier !== triggered);
+    return {
+      issue,
+      status: STATUS.inReview,
+      kind: triggered.kind,
+      once: true,
+      vars: { pr_url: prUrl },
+      ...also(rest),
+    };
   }
-  if (eventName === 'pull_request' && action === 'unlabeled') {
-    if (label === REVIEW_LABELS.revisions) return { issue, status: STATUS.inReview };
-    return { skip: `removing ${label || 'a label'} does not change the status` };
-  }
-  return { skip: `${eventName} ${action} does not change the status` };
+  return { issue, status: STATUS.inReview, ...also(tiers) };
 }

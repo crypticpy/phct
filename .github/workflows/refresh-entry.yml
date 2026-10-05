@@ -169,18 +169,42 @@ jobs:
               core.warning(`Could not add the review:refresh-changes label (${error.status}). Run Bootstrap labels once from the Actions tab.`);
             }
 
+      # The branch is refresh/<entry slug>-<issue>, and the entry is an answer
+      # the submitter can edit, so an edit can propose a new name. One issue
+      # keeps one draft: an open draft for this issue keeps its branch, both
+      # for the rebuild below and for closing a stale confirmation. See
+      # scripts/lib/drafts.mjs.
+      - name: Find the draft already open for this issue
+        id: draft
+        if: steps.refresh.outcome == 'success' && (steps.refresh.outputs.outcome == 'changes' || steps.refresh.outputs.outcome == 'confirmed')
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROPOSED: ${{ steps.refresh.outputs.branch }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const drafts = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/lib/drafts.mjs`).href);
+            const { branch } = await drafts.findDraftBranch({
+              github, context, core,
+              proposed: process.env.PROPOSED,
+              label: 'content:refresh',
+              prefix: 'refresh/',
+              numbered: true
+            });
+            core.setOutput('branch', branch);
+
       # A submitter can answer "yes" — opening the confirmation pull request
       # below — then edit this same issue to answer "no" instead. Without
       # this, that pull request stays open and mergeable, and merging it
       # would stamp `verified:` after the submitter retracted the answer.
-      # `BRANCH` here is the same name a "yes" answer on this issue would
-      # have used (scripts/refresh_entry_from_issue.mjs), so it finds exactly
-      # that pull request and nothing another issue opened.
+      # `BRANCH` here is this issue's open draft when it has one, otherwise
+      # the name a "yes" answer would have used (scripts/refresh_entry_from_issue.mjs),
+      # so it finds exactly that pull request and nothing another issue opened.
       - name: Close a stale confirmation pull request
         if: steps.refresh.outcome == 'success' && steps.refresh.outputs.outcome == 'changes'
         env:
           GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-          BRANCH: ${{ steps.refresh.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: |
           set -euo pipefail
           # `--state open` matters: a closed or merged pull request must never
@@ -199,14 +223,14 @@ jobs:
         id: guard
         if: steps.refresh.outputs.outcome == 'confirmed'
         env:
-          BRANCH: ${{ steps.refresh.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: node scripts/branch_guard.mjs
 
       - name: Hand the edit to the reviewer
         if: steps.guard.outputs.held == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          BRANCH: ${{ steps.refresh.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         with:
           script: |
             const { pathToFileURL } = require('node:url');
@@ -217,7 +241,7 @@ jobs:
         id: commit
         if: steps.refresh.outputs.outcome == 'confirmed' && steps.guard.outputs.held != 'true'
         env:
-          BRANCH: ${{ steps.refresh.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
           ENTRY_FILE: ${{ steps.refresh.outputs.file }}
           SLUG: ${{ steps.refresh.outputs.slug }}
         run: |
@@ -244,7 +268,7 @@ jobs:
         if: steps.commit.outputs.created == 'true'
         env:
           GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-          BRANCH: ${{ steps.refresh.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
           SLUG: ${{ steps.refresh.outputs.slug }}
           ENTRY_FILE: ${{ steps.refresh.outputs.file }}
           VERIFIED_DATE: ${{ steps.refresh.outputs.date }}
@@ -298,7 +322,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOT_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN }}
-          BRANCH: ${{ steps.refresh.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: |
           set -euo pipefail
           if [ -n "$BOT_TOKEN" ]; then

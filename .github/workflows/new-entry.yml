@@ -27,8 +27,9 @@ name: New entry from issue
 # site can override under `notifications:` in _data/site.yml) and keeps one
 # `status:*` label on the issue: received when it opens, in-review once the
 # draft exists. submission-status.yml moves it on from there. An edit to the
-# issue never rebuilds a draft a reviewer has committed to: see the "Check the
-# draft branch" step.
+# issue never opens a second draft (see "Find the draft already open") and
+# never rebuilds a draft a reviewer has committed to (see "Check the draft
+# branch").
 
 on:
   issues:
@@ -128,6 +129,32 @@ jobs:
         continue-on-error: true
         run: node scripts/derive_images.mjs
 
+      # The scaffolder names the branch entry/<slug>-<issue>, and the slug comes
+      # from the title, so an edited title proposes a new name. One issue keeps
+      # one draft: when a draft for this issue is already open, its branch is
+      # the one rebuilt (or held, below), whatever the new name would be. The
+      # rebuild starts from the default branch, so the entry folder follows the
+      # current title (or "### Slug" answer) as it always has, and the old
+      # folder does not linger. See scripts/lib/drafts.mjs.
+      - name: Find the draft already open for this issue
+        id: draft
+        if: steps.scaffold.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROPOSED: ${{ steps.scaffold.outputs.branch }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const drafts = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/lib/drafts.mjs`).href);
+            const { branch } = await drafts.findDraftBranch({
+              github, context, core,
+              proposed: process.env.PROPOSED,
+              label: 'content:new-entry',
+              prefix: 'entry/',
+              numbered: true
+            });
+            core.setOutput('branch', branch);
+
       # An edit to the issue re-runs this job, which rebuilds the branch from
       # the default branch and force-pushes it. Once a reviewer has committed to
       # the draft (or pressed "Update branch") that would erase their work, so
@@ -137,7 +164,7 @@ jobs:
         id: guard
         if: steps.scaffold.outcome == 'success'
         env:
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: node scripts/branch_guard.mjs
 
       # The branch is the reviewer's now: tell them what the submitter changed,
@@ -146,7 +173,7 @@ jobs:
         if: steps.guard.outputs.held == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         with:
           script: |
             const { pathToFileURL } = require('node:url');
@@ -157,7 +184,7 @@ jobs:
         id: commit
         if: steps.scaffold.outcome == 'success' && steps.guard.outputs.held != 'true'
         env:
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
           SLUG: ${{ steps.scaffold.outputs.slug }}
         run: |
           set -euo pipefail
@@ -186,7 +213,7 @@ jobs:
         if: steps.commit.outputs.created == 'true'
         env:
           GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
           ENTRY_DIR: ${{ steps.scaffold.outputs.entry_dir }}
           ENTRY_TITLE: ${{ steps.scaffold.outputs.title }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -236,8 +263,10 @@ jobs:
           # The label is safe to pass unconditionally: this job only runs for an
           # issue that already carries `content:new-entry`, so the label exists.
           # It is what makes generated submissions filterable in the pull
-          # request list, where nothing else distinguishes them.
-          url="$(gh pr view "$BRANCH" --json url --jq .url 2>/dev/null || true)"
+          # request list, where nothing else distinguishes them. `--state open`
+          # matters: a closed pull request for this branch must not be edited
+          # in place of opening the draft (see refresh-entry.yml).
+          url="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)"
           if [ -n "$url" ]; then
             gh pr edit "$BRANCH" --title "Add entry: $ENTRY_TITLE" --body-file /tmp/pr-body.md \
               --add-label content:new-entry
@@ -269,7 +298,7 @@ jobs:
         if: steps.commit.outputs.created == 'true'
         env:
           GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
           ESCALATE: ${{ steps.scaffold.outputs.escalate }}
         run: |
           set -euo pipefail
@@ -309,7 +338,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOT_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN }}
-          BRANCH: ${{ steps.scaffold.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: |
           set -euo pipefail
           if [ -n "$BOT_TOKEN" ]; then

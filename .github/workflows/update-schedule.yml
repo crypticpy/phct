@@ -189,6 +189,11 @@ jobs:
         id: cpr
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
+          # create-pull-request force-pushes over whatever it fetches. That is
+          # safe here only because the branch name carries a timestamp, so it
+          # is new on every run and holds no reviewer's work (see
+          # scripts/branch_guard.mjs). A stable name needs the self-push
+          # pattern new-entry.yml uses.
           # With CONTENT_BOT_TOKEN the pull request has a real author and the
           # normal `pull_request` triggers fire; without it the step below
           # dispatches the checks by hand.

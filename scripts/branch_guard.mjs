@@ -9,10 +9,24 @@
  *               $GITHUB_STEP_SUMMARY  the reason, for the run page
  *
  * Reads only refs the checkout already fetched (`fetch-depth: 0` brings every
- * branch as refs/remotes/origin/*), so it needs no credentials. The workflows
- * that push themselves use `--force-with-lease`, whose lease is that same
- * remote-tracking ref: a reviewer who pushes after this check makes the push
- * fail rather than vanish.
+ * branch as refs/remotes/origin/*), so it needs no credentials.
+ *
+ * What a reviewer's push is protected by, per workflow:
+ *   - new-entry, new-event, new-year, also-deployed-by, refresh-entry and
+ *     apply-setup push the draft branch themselves with `--force-with-lease`,
+ *     whose lease is that same remote-tracking ref. A reviewer commit already
+ *     on the branch holds it here; one pushed after the checkout fetched makes
+ *     the push fail rather than vanish. No window.
+ *   - update-schedule and update-event-attachments go through
+ *     peter-evans/create-pull-request, which re-fetches the branch and
+ *     force-pushes against its own fetch, so it would overwrite a push made
+ *     between this check and that fetch. Their branch names carry a timestamp
+ *     (scripts/update_schedule_from_issue.rb,
+ *     scripts/update_event_attachments_from_issue.mjs), so every run builds a
+ *     branch that did not exist before and there is no reviewer work on it to
+ *     lose; this check always finds the branch new there. Giving either a
+ *     stable branch name means moving it to the self-push pattern first
+ *     (test/scripts/notify_workflows.test.mjs enforces this).
  *
  * Fails safe. If git cannot answer, the branch is reported as held: a missed
  * rebuild costs a reviewer one manual edit, an unwanted one costs their work.

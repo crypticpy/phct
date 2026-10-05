@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
-import { NOTIFY_LABELS, REVIEW_LABELS } from '../../scripts/lib/notify.mjs';
+import { MAINTAINER_ASSOCIATIONS, NOTIFY_LABELS, REVIEW_LABELS } from '../../scripts/lib/notify.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DIR = path.join(ROOT, '.github', 'workflows');
@@ -154,4 +154,99 @@ test('Bootstrap labels creates the status and triage labels exactly as the notif
   }
   for (const label of created)
     assert.ok(label.description.length <= 100, `${label.name}: over GitHub's 100-character limit`);
+});
+
+test('submission-status.yml queues runs per pull request on the job, so skipped runs never take a place', () => {
+  const workflow = parse('submission-status.yml');
+  assert.equal(
+    workflow.concurrency,
+    undefined,
+    'a workflow-level group lets filtered runs cancel the pending one'
+  );
+  const job = workflow.jobs.notify;
+  assert.equal(job.concurrency.group, 'submission-status-${{ github.event.pull_request.number }}');
+  assert.equal(job.concurrency['cancel-in-progress'], false);
+});
+
+test('submission-status.yml acts on a review only from the associations notify.mjs trusts', () => {
+  const condition = parse('submission-status.yml').jobs.notify.if;
+  const named = [...condition.matchAll(/github\.event\.review\.author_association == '([A-Z_]+)'/g)].map(
+    (m) => m[1]
+  );
+  assert.deepEqual(named.sort(), [...MAINTAINER_ASSOCIATIONS].sort());
+  assert.match(
+    condition,
+    /github\.event\.review\.state == 'changes_requested'\s*&& \(github\.event\.review\.author_association/
+  );
+});
+
+/** Intake workflows whose branch name comes from answers a submitter can edit. */
+const EDITABLE_BRANCH = {
+  'new-entry.yml': { label: 'content:new-entry', prefix: 'entry/', numbered: true },
+  'new-event.yml': { label: 'content:new-event', prefix: 'event/', numbered: false },
+  'also-deployed-by.yml': { label: 'content:also-deployed-by', prefix: 'also-deployed/', numbered: true },
+  'refresh-entry.yml': { label: 'content:refresh', prefix: 'refresh/', numbered: true },
+};
+
+test('an edit that renames the proposed branch goes to the draft already open for the issue', () => {
+  for (const [name, expected] of Object.entries(EDITABLE_BRANCH)) {
+    const workflow = parse(name);
+    const [job] = Object.values(workflow.jobs).filter((j) =>
+      (j.steps ?? []).some((step) => step.id === 'guard')
+    );
+    const steps = job.steps;
+    const draftIndex = steps.findIndex((step) => step.id === 'draft');
+    assert.ok(draftIndex >= 0, `${name} has no draft lookup`);
+    const draft = steps[draftIndex];
+    const script = draft.with?.script ?? '';
+    assert.match(script, /scripts\/lib\/drafts\.mjs/, name);
+    assert.match(script, /findDraftBranch\(/, name);
+    assert.match(script, new RegExp(`label: '${expected.label}'`), `${name} looks for the wrong label`);
+    assert.match(script, new RegExp(`prefix: '${expected.prefix.replace('/', '\\/')}'`), `${name} prefix`);
+    assert.equal(/numbered: true/.test(script), expected.numbered, `${name} numbered`);
+    assert.match(String(job.if), new RegExp(`'${expected.label}'`), `${name} runs for another label`);
+    assert.match(script, /core\.setOutput\('branch', branch\)/, name);
+
+    const proposed = draft.env?.PROPOSED;
+    assert.match(String(proposed), /^\$\{\{ steps\.\w+\.outputs\.branch \}\}$/, `${name} proposes nothing`);
+    const guardIndex = steps.findIndex((step) => step.id === 'guard');
+    assert.ok(draftIndex < guardIndex, `${name} looks for the draft after the guard`);
+    const branchSteps = steps.filter(
+      (step) => step.env?.BRANCH !== undefined || step.with?.branch !== undefined
+    );
+    assert.ok(branchSteps.length >= 3, `${name}: only ${branchSteps.length} steps name a branch`);
+    for (const step of branchSteps) {
+      assert.equal(
+        step.env?.BRANCH ?? step.with?.branch,
+        '${{ steps.draft.outputs.branch }}',
+        `${name} "${step.name}" uses the proposed name, not the draft's`
+      );
+      const index = steps.indexOf(step);
+      assert.ok(index > draftIndex, `${name} "${step.name}" runs before the draft lookup`);
+    }
+  }
+});
+
+test('create-pull-request only builds branches that are new on every run', () => {
+  const usesCpr = INTAKE.filter((name) =>
+    Object.values(parse(name).jobs).some((job) =>
+      (job.steps ?? []).some((step) => /peter-evans\/create-pull-request@/.test(step.uses ?? ''))
+    )
+  );
+  assert.deepEqual(usesCpr.sort(), ['update-event-attachments.yml', 'update-schedule.yml']);
+  const timestamped = {
+    'update-schedule.yml': ['scripts/update_schedule_from_issue.rb', /branch = "schedule\/[^"\n]*Time\.now/],
+    'update-event-attachments.yml': [
+      'scripts/update_event_attachments_from_issue.mjs',
+      /setOutput\('branch', `event-attachments\/[^`]*\$\{Date\.now\(\)\}`\)/,
+    ],
+  };
+  for (const name of usesCpr) {
+    const [script, pattern] = timestamped[name];
+    assert.match(
+      fs.readFileSync(path.join(ROOT, script), 'utf8'),
+      pattern,
+      `${script} must name a new branch every run`
+    );
+  }
 });

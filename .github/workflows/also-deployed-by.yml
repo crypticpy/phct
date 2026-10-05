@@ -130,6 +130,30 @@ jobs:
             const reason = process.env.NO_CHANGE_REASON || 'The entry could not be found, or it already listed this organization.';
             await notify.notifyIssue({ github, context, core, kind: 'no_change', vars: { reason } });
 
+      # The branch is also-deployed/<entry slug>-<issue>, and the entry is an
+      # answer the submitter can edit, so an edit can propose a new name. One
+      # issue keeps one draft: an open draft for this issue keeps its branch,
+      # which is rebuilt (or held, below) with the new answers. See
+      # scripts/lib/drafts.mjs.
+      - name: Find the draft already open for this issue
+        id: draft
+        if: steps.deployment.outputs.outcome == 'added'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PROPOSED: ${{ steps.deployment.outputs.branch }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const drafts = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/lib/drafts.mjs`).href);
+            const { branch } = await drafts.findDraftBranch({
+              github, context, core,
+              proposed: process.env.PROPOSED,
+              label: 'content:also-deployed-by',
+              prefix: 'also-deployed/',
+              numbered: true
+            });
+            core.setOutput('branch', branch);
+
       # An edit to the issue re-runs this job, which rebuilds the branch and
       # force-pushes it. Once a reviewer has committed to it that would erase
       # their work, so it is only rebuilt while every commit on it is the
@@ -138,14 +162,14 @@ jobs:
         id: guard
         if: steps.deployment.outputs.outcome == 'added'
         env:
-          BRANCH: ${{ steps.deployment.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: node scripts/branch_guard.mjs
 
       - name: Hand the edit to the reviewer
         if: steps.guard.outputs.held == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          BRANCH: ${{ steps.deployment.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         with:
           script: |
             const { pathToFileURL } = require('node:url');
@@ -156,7 +180,7 @@ jobs:
         id: commit
         if: steps.deployment.outputs.outcome == 'added' && steps.guard.outputs.held != 'true'
         env:
-          BRANCH: ${{ steps.deployment.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
           ENTRY_FILE: ${{ steps.deployment.outputs.file }}
           SLUG: ${{ steps.deployment.outputs.slug }}
         run: |
@@ -185,7 +209,7 @@ jobs:
         if: steps.commit.outputs.created == 'true'
         env:
           GH_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
-          BRANCH: ${{ steps.deployment.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
           SLUG: ${{ steps.deployment.outputs.slug }}
           ORG: ${{ steps.deployment.outputs.org }}
           ENTRY_FILE: ${{ steps.deployment.outputs.file }}
@@ -271,7 +295,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOT_TOKEN: ${{ secrets.CONTENT_BOT_TOKEN }}
-          BRANCH: ${{ steps.deployment.outputs.branch }}
+          BRANCH: ${{ steps.draft.outputs.branch }}
         run: |
           set -euo pipefail
           if [ -n "$BOT_TOKEN" ]; then
