@@ -8,6 +8,19 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- `/status/` answered a draft pull request's number with "isn't a submission. It
+  belongs to something else on GitHub", a dead end for a submitter who copied
+  the number they saw most often. It now reads the draft's `Closes #N` (or
+  `Fixes #N`, `Resolves #N`) line and shows that submission, saying "#101 is the
+  draft for submission #97." A pull request that links nothing, or links an
+  issue that is not a submission, still gets "isn't a submission", now worded to
+  ask for the number of the submission itself rather than of its draft. The page
+  makes at most one follow-up request, with the same timeout, rate-limit
+  fallback and handling of overlapping lookups as the first. See
+  [Status page](docs/configuration.md#status-page).
+
 ## [1.11.0-rc.4] — 2026-10-05
 
 Fourth candidate. rc.3's live BCHC update stopped before opening a pull request

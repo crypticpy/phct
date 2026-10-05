@@ -222,8 +222,14 @@ blank or missing key uses the wording shown.
   page works it out from the issue and says it is a best guess: open is
   Received, closed as completed is Published, closed as not planned or
   duplicate is Not published, and closed with no reason is Closed. Only
-  issues with a `content:*` label count as submissions; a pull request or any
-  other issue gets "isn't a submission".
+  issues with a `content:*` label count as submissions.
+- **A draft's number.** A reader who types the number of a submission's draft
+  pull request is shown the submission it closes, read from the first
+  `Closes #N`, `Fixes #N` or `Resolves #N` in the pull request's body, with a
+  line saying so ("#101 is the draft for submission #97."). The page follows
+  that link once. A pull request that links nothing, or links an issue that is
+  not a submission, and any other issue get "isn't a submission" with a pointer
+  to the submission's own number.
 - **When GitHub can't answer.** GitHub allows about 60 unauthenticated lookups
   an hour per reader. When that runs out, when the network fails, or when
   JavaScript is off, the page offers a plain link to the issue on GitHub
