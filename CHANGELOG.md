@@ -11,7 +11,8 @@ major version, and each entry says so when it happens.
 ## [1.11.0-rc.4] — 2026-10-05
 
 Fourth candidate. rc.3's live BCHC update stopped before opening a pull request
-on two tests that read the template's own data (#86). This candidate also runs
+on a test that read the template's sample issue; #86 fixes it and a second test
+that would have failed once a deployment switched email submission off. This candidate also runs
 only the content check on a submission's pull request (#87).
 
 ### Changed
