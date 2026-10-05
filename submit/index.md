@@ -9,6 +9,7 @@ scripts:
   - "/assets/js/submit/repeatable.js"
   - "/assets/js/submit/preview.js"
   - "/assets/js/submit/draft.js"
+  - "/assets/js/configurator/issue-form-ids.js"
   - "/assets/js/submit/handoff.js"
   - "/assets/js/submit/review.js"
   - "/assets/js/submit/steps.js"
@@ -19,7 +20,9 @@ scripts:
   The submission form. Every control is generated from _data/schema.yml — no
   field key appears below. `prompt` is the visible question, `label` is the
   heading the GitHub issue form uses (and the one the scaffolder reads back),
-  and `f.key` is the query-parameter name shared by both.
+  and `f.key | issue_form_id` is the query-parameter name shared by both: the
+  key itself, or `entry_<key>` for a key GitHub's new-issue page reads as its
+  own parameter (`body`, `title`, ...). See assets/js/configurator/issue-form-ids.js.
 
   Data attributes read by assets/js/submit*.js:
     [data-submit-form]        the form; carries repo/template/copy configuration
@@ -237,8 +240,9 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
 
   {%- comment -%}
     `action`/`method` are the no-JS route: GitHub's issue form reads the query
-    string, and every control's `name` is the schema key, which is also the
-    issue-form input id. With scripts on, the submit handler calls
+    string, and every control's `name` is the field's issue-form id (the schema
+    key, or `entry_<key>` for a reserved one), the same id the generated form
+    gives that question. With scripts on, the submit handler calls
     preventDefault() and builds the same URL itself (so it can validate first
     and drop anything GitHub cannot prefill). `novalidate` is *not* set here —
     assets/js/submit.js sets it at boot, so the browser's own required-field
@@ -353,7 +357,7 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
               <p class="field-help mt-1" id="{{ fid }}-help">{{ f.description }}</p>
               {%- if f.type == 'select' and f.options.size > 6 -%}
                 {%- comment -%} A legend does not name a <select>; point the control at it explicitly. {%- endcomment -%}
-                <select class="field-input mt-2" id="{{ fid }}" name="{{ f.key }}" aria-labelledby="{{ fid }}-legend" aria-describedby="{{ describedby }}" {% if f.required %}required{% endif %}>
+                <select class="field-input mt-2" id="{{ fid }}" name="{{ f.key | issue_form_id }}" aria-labelledby="{{ fid }}-legend" aria-describedby="{{ describedby }}" {% if f.required %}required{% endif %}>
                   <option value="">Choose one…</option>
                   {%- for o in f.options -%}{%- assign om = f | option_meta: o -%}
                   <option value="{{ o | escape }}" data-option-index="{{ forloop.index0 }}" data-short="{{ om.short | escape }}">{{ o }}</option>
@@ -365,7 +369,7 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
                   <label class="field-option">
                     <input class="{% if f.type == 'select' %}radio{% else %}checkbox{% endif %}"
                            type="{% if f.type == 'select' %}radio{% else %}checkbox{% endif %}"
-                           id="{{ fid }}-{{ forloop.index0 }}" name="{{ f.key }}" value="{{ o | escape }}"
+                           id="{{ fid }}-{{ forloop.index0 }}" name="{{ f.key | issue_form_id }}" value="{{ o | escape }}"
                            data-option-index="{{ forloop.index0 }}" data-short="{{ om.short | escape }}"
                            {% comment %}HTML has no way to say "tick at least one", so a required multiselect keeps aria-required and is checked by script only.{% endcomment %}
                            {% if f.required %}{% if f.type == 'select' %}required{% else %}aria-required="true"{% endif %}{% endif %} aria-describedby="{{ describedby }}">
@@ -378,7 +382,7 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
                   {%- endcomment -%}
                   {%- if f.type == 'select' and f.required != true -%}
                   <label class="field-option">
-                    <input class="radio" type="radio" name="{{ f.key }}" value="" data-clear>
+                    <input class="radio" type="radio" name="{{ f.key | issue_form_id }}" value="" data-clear>
                     <span><span class="font-medium">Skip this one</span></span>
                   </label>
                   {%- endif -%}
@@ -409,7 +413,7 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
             <label class="field-label" for="{{ fid }}">{{ question }}{% unless f.required %}<span class="font-normal text-brand-muted"> (optional)</span>{% endunless %}</label>
             <p class="field-help" id="{{ fid }}-help">{{ f.description }}</p>
             <p class="field-note" id="{{ fid }}-note">You can drag image files straight into the GitHub issue on the next screen. If your images are already online, paste their addresses here instead — one per line, optionally followed by <code>| alt text</code>. PNG, JPEG, GIF and WebP images are copied into the repository; anything else is left as a link for a maintainer.</p>
-            <textarea class="field-input min-h-[6rem]" id="{{ fid }}" name="{{ f.key }}" rows="3"
+            <textarea class="field-input min-h-[6rem]" id="{{ fid }}" name="{{ f.key | issue_form_id }}" rows="3"
                       aria-describedby="{{ describedby }} {{ fid }}-note" {% if f.required %}required{% endif %}
                       placeholder="https://example.org/screenshot.png | The daily brief queue"></textarea>
             <ul class="image-previews" data-image-previews hidden></ul>
@@ -417,20 +421,20 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
           {%- when 'markdown' -%}
             <label class="field-label" for="{{ fid }}">{{ question }}{% unless f.required %}<span class="font-normal text-brand-muted"> (optional)</span>{% endunless %}</label>
             <p class="field-help" id="{{ fid }}-help">{{ f.description }}{% unless f.description contains 'arkdown' %} Markdown is supported — use <code>##</code> for headings.{% endunless %}</p>
-            <textarea class="field-input min-h-[18rem] font-mono text-sm" id="{{ fid }}" name="{{ f.key }}" rows="16"
+            <textarea class="field-input min-h-[18rem] font-mono text-sm" id="{{ fid }}" name="{{ f.key | issue_form_id }}" rows="16"
                       aria-describedby="{{ describedby }}" {% if f.required %}required{% endif %}>{{ f.placeholder }}</textarea>
 
           {%- when 'textarea' -%}
             <label class="field-label" for="{{ fid }}">{{ question }}{% unless f.required %}<span class="font-normal text-brand-muted"> (optional)</span>{% endunless %}</label>
             <p class="field-help" id="{{ fid }}-help">{{ f.description }}</p>
-            <textarea class="field-input min-h-[6rem]" id="{{ fid }}" name="{{ f.key }}" rows="3"
+            <textarea class="field-input min-h-[6rem]" id="{{ fid }}" name="{{ f.key | issue_form_id }}" rows="3"
                       aria-describedby="{{ describedby }}" {% if f.required %}required{% endif %}
                       placeholder="{{ f.placeholder | escape }}"></textarea>
 
           {%- when 'list' -%}
             <label class="field-label" for="{{ fid }}">{{ question }}{% unless f.required %}<span class="font-normal text-brand-muted"> (optional)</span>{% endunless %}</label>
             <p class="field-help" id="{{ fid }}-help">{{ f.description }} One per line, or separated by commas.</p>
-            <textarea class="field-input min-h-[5rem]" id="{{ fid }}" name="{{ f.key }}" rows="3"
+            <textarea class="field-input min-h-[5rem]" id="{{ fid }}" name="{{ f.key | issue_form_id }}" rows="3"
                       aria-describedby="{{ describedby }}" {% if f.required %}required{% endif %}
                       placeholder="{{ f.placeholder | escape }}"></textarea>
 
@@ -441,7 +445,7 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
 
           {%- when 'boolean' -%}
             <label class="field-option">
-              <input class="checkbox" type="checkbox" id="{{ fid }}" name="{{ f.key }}" value="true" aria-describedby="{{ describedby }}">
+              <input class="checkbox" type="checkbox" id="{{ fid }}" name="{{ f.key | issue_form_id }}" value="true" aria-describedby="{{ describedby }}">
               <span><span class="font-medium">{{ question }}</span>{% if f.description %}<span class="field-option-desc">{{ f.description }}</span>{% endif %}</span>
             </label>
             <p class="sr-only" id="{{ fid }}-help">{{ f.description }}</p>
@@ -454,7 +458,7 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
             {%- if f.type == 'number' -%}{%- assign input_type = 'number' -%}{%- endif -%}
             <label class="field-label" for="{{ fid }}">{{ question }}{% unless f.required %}<span class="font-normal text-brand-muted"> (optional)</span>{% endunless %}</label>
             <p class="field-help" id="{{ fid }}-help">{{ f.description }}</p>
-            <input class="field-input" type="{{ input_type }}" id="{{ fid }}" name="{{ f.key }}"
+            <input class="field-input" type="{{ input_type }}" id="{{ fid }}" name="{{ f.key | issue_form_id }}"
                    aria-describedby="{{ describedby }}" {% if f.required %}required{% endif %}
                    {% if input_type == 'email' %}autocomplete="email"{% endif %}
                    placeholder="{{ f.placeholder | escape }}">

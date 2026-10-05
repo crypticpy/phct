@@ -1,0 +1,95 @@
+name: Submission status
+
+# Tells a submitter what happened to their entry, on their issue, as the review
+# moves along, and keeps the issue's `status:*` label in step (the /status/
+# page reads it). The submitter is subscribed to their issue, not to the draft
+# pull request, so this is how review news reaches their inbox.
+#
+#   On the entry's draft pull request          On its issue
+#   ---------------------------------------    -------------------------------------
+#   `review:revisions-requested` added, or a   comment: what to do;
+#   review that requests changes               status:changes-requested
+#   `review:revisions-requested` removed       status:in-review (no comment)
+#   `review:committee` / `review:partner`      short comment, once; status:in-review
+#   `review:declined`, or closed unmerged      comment with the appeal route, once;
+#                                              status:declined; issue closed as not planned
+#   merged                                     status:published (pages.yml's announce
+#                                              job posts "now live" once it deploys)
+#
+# The message text is scripts/lib/notify.mjs, overridable under
+# `notifications:` in _data/site.yml; the rules are `stageDecision` there.
+#
+# Security: `pull_request`, not `pull_request_target`. Entry drafts are opened
+# from a branch of this repository, so `pull_request` runs here with a token
+# that can write issues; a pull request from a fork gets a read-only token and
+# is skipped outright. Under `pull_request_target` a fork's author could write
+# "Closes #N" into their own pull request, close it, and have this job close
+# and relabel any issue. The checkout is the default branch, named explicitly,
+# so code from a pull request is never run; nothing from the event reaches a
+# shell. Events caused by the automation's own GITHUB_TOKEN do not start
+# workflows at all, and labels, reviews and closes by people run without the
+# "Approve and run" gate (that gate only covers opened/synchronize/reopened).
+
+on:
+  pull_request:
+    types:
+      - labeled
+      - unlabeled
+      - closed
+  pull_request_review:
+    types:
+      - submitted
+
+permissions: {}
+
+# One run at a time per pull request, none cancelled: a label and a review
+# arriving together must be handled in order, and the duplicate-comment check
+# reads what the previous run posted.
+concurrency:
+  group: submission-status-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    # Cheap filters first, so most label changes never start a runner. The
+    # label list matches REVIEW_LABELS in scripts/lib/notify.mjs
+    # (test/scripts/notify_workflows.test.mjs keeps them equal).
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && contains(github.event.pull_request.labels.*.name, 'content:new-entry')
+      && (github.event.action == 'closed'
+          || (github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested')
+          || (github.event_name == 'pull_request'
+              && contains(fromJSON('["review:revisions-requested","review:committee","review:partner","review:declined"]'), github.event.label.name)))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ".node-version"
+          cache: npm
+
+      - name: Select exact npm
+        run: node scripts/install_exact_npm.mjs
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Update the submitter
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const notify = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/lib/notify_github.mjs`).href);
+            await notify.handleStageEvent({ github, context, core });
