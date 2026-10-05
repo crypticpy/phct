@@ -8,6 +8,25 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- A "Check your submission" page at `/status/` (new `status` module, on by
+  default). A submitter types the number GitHub gave their submission, or
+  follows a `/status/?n=<number>` link, and sees its title, the date it was
+  sent, a step indicator and what happens next. The stage comes from the
+  issue's `status:received`, `status:in-review`, `status:changes-requested`,
+  `status:published` or `status:declined` label, and from the open/closed
+  state when there is none. It reads GitHub's public API with no token; when
+  GitHub refuses, the network fails or JavaScript is off it offers a plain
+  link to the issue instead. Copy is in the new optional `status:` block of
+  `_data/site.yml`. A `site.yml` with no `modules.status` key builds the page
+  too; set it to `false` if your repository is private, since GitHub's API
+  cannot see private issues.
+- The submit page's "what happens next" and its confirmation panel now tell
+  people their submission gets a number, to keep it, that GitHub emails them
+  about it, and (when the status module is on) where to check on it. The
+  footer gains a *Check a submission* link.
+
 ## [1.10.0] — 2026-09-28
 
 Stable release. Records-only promotion of the accepted `v1.10.0-rc.2`
