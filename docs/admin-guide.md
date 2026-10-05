@@ -278,7 +278,7 @@ The whole diff is one list in one entry's front matter. What to check before you
 - [ ] **The note reads as information, not promotion.** One or two sentences about what they adapted, or would warn the next team about, is the point; a vendor pitch is not.
 - [ ] **The diff is that one list and nothing else.**
 
-Decline by closing the issue with a sentence about why — the submitter gets the notification, and nothing about the entry has changed. Nothing reaches the site until you merge. Setting `SUBMISSIONS_OPEN` to `false` stops outside submissions becoming pull requests at all; the issue gets a comment saying a maintainer will add it by hand.
+Decline by closing the pull request without merging, with a sentence about why on the pull request. The automation then comments on the submitter's issue, pointing at your reason, marks it `status:declined` and closes it as not planned ([What the submitter is told](#what-the-submitter-is-told)), and nothing about the entry has changed. Closing only the issue is not a decline: the pull request stays open, the status stays `status:in-review`, and merging it later would still publish the listing. Nothing reaches the site until you merge. Setting `SUBMISSIONS_OPEN` to `false` stops outside submissions becoming pull requests at all; the issue gets a comment saying a maintainer will add it by hand.
 
 A maintainer can always do it by hand instead — the field is an ordinary [`links` list](content-model.md#links) whose items may carry the optional `email` and `note` keys:
 

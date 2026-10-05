@@ -84,7 +84,19 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
 {%- assign chip_field = chip_fields | first -%}
 {%- assign line_fields = ff | card_fields: 'line' -%}
 {%- assign icon_fields = ff | card_fields: 'icon' -%}
+{%- comment -%}
+  The "Email it instead" address, and with it every email route on this page:
+  the button, the mailto links and the sentences that mention them all test
+  `fallback_email != ''`. A blank or missing `submit.fallback_email` falls back
+  to `organization.contact_email`. `false` is the off switch for a site that
+  keeps a contact email but wants everyone through GitHub; it needs its own
+  test, because `default` treats `false` as empty and would fall through.
+{%- endcomment -%}
+{%- if cfg.submit.fallback_email == false -%}
+{%- assign fallback_email = '' -%}
+{%- else -%}
 {%- assign fallback_email = cfg.submit.fallback_email | default: cfg.organization.contact_email | default: '' -%}
+{%- endif -%}
 {%- comment -%}
   The catalog's repository, and with it the whole GitHub route: the form's
   no-script action, the prefilled issue, the "press Submit new issue" step. A

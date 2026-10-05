@@ -28,6 +28,19 @@ major version, and each entry says so when it happens.
   listed under the answers to bring across by hand. Deployments get the fix
   through the PHCT updater: its pull request regenerates `new-entry.yml` from
   your schema. Nothing in the schema or existing entries changes.
+- A deployment that kept `organization.contact_email` had no way to turn off
+  the "Email it instead" route on `/submit/`. A blank `submit.fallback_email`
+  falls back to the contact email, and so did `false`, because Liquid's
+  `default` treats `false` as empty. `submit.fallback_email: false` now removes
+  every email route from the page: the button, the `mailto:` links, the "Email
+  the maintainers" line on the paused notice, and the sentences that point at
+  *Email it instead*. A blank or missing value works as before.
+- The admin guide said to decline an "also deployed by" submission by closing
+  the issue. Nothing runs when an issue is closed, so that left the pull
+  request open, the status at `status:in-review`, and the listing one merge
+  away from the site. The guide now says to close the pull request without
+  merging. That is the decline: the submitter gets the comment on their issue,
+  the status becomes `status:declined`, and the issue is closed as not planned.
 
 ## [1.11.0-rc.2] — 2026-10-05
 
