@@ -8,6 +8,27 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Changed
+
+- A submission's pull request now runs only the content check. Every code
+  check used to run on it as well (lint, unit and Ruby tests, coverage, the
+  preset build matrix, Quality, Supply chain, CodeQL, Performance and scale,
+  workflow lint), so a reviewer could meet a red code check that said nothing
+  about the entry, and a missing required field showed up inside **Lint, test
+  and build**. A pull request whose every changed file is entry content (inside
+  `<entry.path>/<slug>/`, of a type a submission produces, or
+  `_data/derivatives.json`) now runs **Content: entries and site build**, a new
+  job in **Validate Content** that validates the front matter and data files,
+  checks the image derivatives, builds the site and checks its links. The code
+  jobs are skipped with `if:`, which GitHub counts as passed, so required checks
+  never wait; the bots' dispatched runs follow the same rule and post the
+  content check as a commit status. A pull request that touches any other file,
+  including every PHCT update, runs everything as before. The rule lives in
+  `scripts/lib/content_only.mjs` and the shared `content-only.yml` job; see
+  [which checks a submission runs](docs/admin-guide.md#which-checks-a-submission-runs).
+  Add **Content: entries and site build** to your branch ruleset's required
+  checks so a red content check blocks the merge.
+
 ### Fixed
 
 - rc.3's live BCHC update stopped before opening a pull request: a new test
