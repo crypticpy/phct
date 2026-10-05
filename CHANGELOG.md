@@ -8,6 +8,13 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- The showcase landing linked to `/status/` without building it when
+  `site.yml` predates the status module (no `modules.status` key), which
+  failed the deployment's build matrix. The landing now switches off every
+  module `_data/modules.yml` declares.
+
 ## [1.11.0-rc.1] — 2026-10-05
 
 **Upgrading a deployment.** Run **Bootstrap labels** once after updating: it
