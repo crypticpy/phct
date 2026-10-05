@@ -8,6 +8,11 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.3] — 2026-10-05
+
+Third candidate. rc.2 went live in BCHC, where a practice run showed `/submit/`
+losing every dropdown answer on the way to GitHub.
+
 ### Fixed
 
 - Every submission sent from `/submit/` lost its select, multiselect and
@@ -1453,7 +1458,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.2...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.3...HEAD
+[1.11.0-rc.3]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.2...v1.11.0-rc.3
 [1.11.0-rc.2]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.1...v1.11.0-rc.2
 [1.11.0-rc.1]: https://github.com/crypticpy/phct/compare/v1.10.0...v1.11.0-rc.1
 [1.10.0]: https://github.com/crypticpy/phct/compare/v1.10.0-rc.2...v1.10.0
