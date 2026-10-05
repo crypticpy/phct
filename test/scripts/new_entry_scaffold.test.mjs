@@ -255,20 +255,24 @@ test('an answer that is not an option is left out of the front matter and listed
 });
 
 test('an issue in the old dropdown rendering still scaffolds every choice answer', () => {
-  // test/fixtures/issue-basic.md was written by the dropdown form: exact option
-  // text, multi-selects comma-joined, one multiselect still as checkboxes.
+  // The dropdown form wrote exact option text, comma-joined multi-selects
+  // (options may themselves hold commas) and, for checkbox questions, ticked
+  // task-list lines. Built from this repository's schema, not a fixture, so a
+  // deployment with its own options runs the same check.
   const schema = repoSchema();
-  const stdout = dryRunOutput(ROOT);
-  const fm = dryRun(ROOT);
-  const answered = [...asked(schema, 'select'), ...asked(schema, 'multiselect')].filter((field) =>
-    new RegExp(`^### ${field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\n(?!_No response_)`, 'm').test(
-      ISSUE_BODY
-    )
-  );
-  assert.ok(answered.length >= 4, 'the fixture answers several choice questions');
-  for (const field of answered) {
-    const values = [fm[field.key]].flat();
-    assert.ok(values.length > 0 && values.every((v) => field.options.includes(v)), `${field.key}: ${values}`);
-  }
+  const multis = asked(schema, 'multiselect');
+  const ticked = multis[0];
+  const body = bodyFor(schema, (field) => {
+    if (field.type === 'boolean') return 'Yes';
+    if (field.type === 'select') return String(field.options[0]);
+    const picks = field.options.slice(0, 2).map(String);
+    return field === ticked ? picks.map((o) => `- [X] ${o}`).join('\n') : picks.join(', ');
+  });
+  const stdout = dryRunOutput(ROOT, body);
+  const fm = dryRun(ROOT, body);
+  assert.ok(multis.length > 0, 'the repository schema asks at least one multiselect');
+  for (const field of asked(schema, 'select')) assert.equal(fm[field.key], field.options[0], field.key);
+  for (const field of multis) assert.deepEqual(fm[field.key], field.options.slice(0, 2), field.key);
+  for (const field of asked(schema, 'boolean')) assert.equal(fm[field.key], true, field.key);
   assert.doesNotMatch(stdout, /Answers to fix/);
 });

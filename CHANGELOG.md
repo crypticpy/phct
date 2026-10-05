@@ -8,6 +8,16 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- rc.3's live BCHC update stopped before opening a pull request: a new test
+  checked the old dropdown rendering against the template's sample issue, whose
+  questions differ from a deployment's own schema. The test now builds that
+  issue from the repository's schema, so it runs the same check anywhere.
+- The build test for `/submit/`'s email route read the deployment's own
+  `site.yml`, so a deployment that sets `submit.fallback_email: false` would
+  fail its next update. It now runs on a build variant that sets its own address.
+
 ## [1.11.0-rc.3] — 2026-10-05
 
 Third candidate. rc.2 went live in BCHC, where a practice run showed `/submit/`
