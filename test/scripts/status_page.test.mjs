@@ -324,6 +324,22 @@ test('a slow answer to an earlier lookup never replaces a newer one', async () =
   assert.match(live(ctx.doc), /^Submission #2, Second/);
 });
 
+test('a slow answer never lands over a later invalid entry', async () => {
+  let releaseFirst;
+  const ctx = await boot({
+    respond: () =>
+      new Promise((resolve) => {
+        releaseFirst = () => resolve(answer(200, issue({ number: 1, title: 'First' })));
+      }),
+  });
+  check(ctx, '1');
+  check(ctx, 'abc');
+  releaseFirst();
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(result(ctx.doc).querySelector('h2'), null, 'the stale answer was rendered');
+  assert.equal(ctx.doc.querySelector('input[name=n]').getAttribute('aria-invalid'), 'true');
+});
+
 test('without a repository the script leaves the page alone', async () => {
   const ctx = await boot({
     url: 'https://example.org/status/?n=42',

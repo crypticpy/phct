@@ -268,6 +268,10 @@ const STEP_STATE_WORDS = { done: 'Done: ', current: 'Current stage: ', upcoming:
   async function lookup(raw, { fromReader }) {
     const number = parseIssueNumber(raw);
     if (number === null) {
+      // Retire any lookup still running, so its answer can't land over the error.
+      latest += 1;
+      if (inFlight) inFlight.abort();
+      inFlight = null;
       showInvalid(
         String(raw).trim() === ''
           ? 'Enter your submission number, like 42.'
