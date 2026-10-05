@@ -24,6 +24,9 @@ name: Edit request
 # bootstrapped, missing-label.yml tells the maintainer to add the label and
 # then edit the issue, and that edit is what starts this job. The comment is
 # posted once and an existing status is left alone, so later edits are quiet.
+# The status check reads the issue's labels from the API, not the event
+# payload: an `edited` run can wait in the queue below while the request is
+# published or declined, and its payload would still show no status.
 #
 # Trust model (see SECURITY.md): anyone can open the issue that starts this job.
 #   * Issue content is NEVER interpolated into a `run:` script. It reaches the

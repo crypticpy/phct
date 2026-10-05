@@ -16,7 +16,12 @@ import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
 import { issueFormProblems } from '../../assets/js/configurator/issue-form-limits.js';
-import { FIELD, entryExists, readEditRequestSlug } from '../../scripts/lib/edit_request.mjs';
+import {
+  FIELD,
+  acknowledgeEditRequest,
+  entryExists,
+  readEditRequestSlug,
+} from '../../scripts/lib/edit_request.mjs';
 import {
   EDIT_REQUEST_LABEL,
   INTAKE_LABELS,
@@ -173,14 +178,22 @@ function fakeGitHub(issue = {}) {
 
 /**
  * Run edit-request.yml's github-script step as written, with its `env:`.
- * @param {{body: string, labels?: string[], comments?: object[], action?: string}} issue
+ * `labels` is the event payload's copy; `liveLabels` (default: the same) is what
+ * the API returns now, for a run that waited in the queue while the issue moved on.
+ * @param {{body: string, labels?: string[], liveLabels?: string[], comments?: object[], action?: string}} issue
  */
-async function runWorkflow({ body, labels = [EDIT_REQUEST_LABEL], comments = [], action = 'opened' }) {
+async function runWorkflow({
+  body,
+  labels = [EDIT_REQUEST_LABEL],
+  liveLabels = labels,
+  comments = [],
+  action = 'opened',
+}) {
   const workflow = YAML.parse(fs.readFileSync(WORKFLOW_FILE, 'utf8'));
   const [job] = Object.values(workflow.jobs);
   const step = job.steps.find((s) => /github-script/.test(s.uses ?? ''));
   assert.equal(step.env.ISSUE_BODY, '${{ github.event.issue.body }}');
-  const github = fakeGitHub({ labels, comments });
+  const github = fakeGitHub({ labels: liveLabels, comments });
   const context = {
     repo: { owner: 'acme', repo: 'catalog' },
     issue: { number: 41 },
@@ -250,6 +263,59 @@ test('edit-request.yml: an edit to the issue neither repeats the comment nor dra
   });
   assert.deepEqual(again.comments(), []);
   assert.deepEqual(again.calls, [], 'a published request keeps status:published');
+});
+
+test('edit-request.yml: a queued edit reads the live labels, not the payload, before marking received', async () => {
+  // The `edited` run waited in the per-issue queue; meanwhile the request was
+  // published. The payload still shows no status label, the issue has one.
+  const first = await runWorkflow({ body: issueBody() });
+  const stale = await runWorkflow({
+    body: issueBody(),
+    action: 'edited',
+    labels: [EDIT_REQUEST_LABEL],
+    liveLabels: [EDIT_REQUEST_LABEL, STATUS.published],
+    comments: first.state.comments,
+  });
+  assert.deepEqual(stale.calls, [], 'nothing is added next to status:published');
+  assert.deepEqual(stale.state.labels, [EDIT_REQUEST_LABEL, STATUS.published]);
+
+  // Not yet acknowledged either: the comment still goes out, the status stays.
+  const unacknowledged = await runWorkflow({
+    body: issueBody(),
+    action: 'edited',
+    labels: [EDIT_REQUEST_LABEL],
+    liveLabels: [EDIT_REQUEST_LABEL, STATUS.declined],
+  });
+  assert.equal(unacknowledged.comments().length, 1);
+  assert.deepEqual(
+    unacknowledged.calls.filter((call) => call[0] !== 'comment'),
+    [],
+    'a declined request keeps status:declined'
+  );
+});
+
+test('acknowledgeEditRequest: when the labels cannot be re-read, it still replies and leaves the status alone', async () => {
+  const github = fakeGitHub({ labels: [EDIT_REQUEST_LABEL] });
+  github.rest.issues.get = async () => {
+    throw Object.assign(new Error('Bad gateway'), { status: 502 });
+  };
+  const warnings = [];
+  const result = await acknowledgeEditRequest({
+    github,
+    context: {
+      repo: { owner: 'acme', repo: 'catalog' },
+      issue: { number: 41 },
+      runId: 1000,
+      payload: { action: 'edited', issue: { number: 41, labels: [{ name: EDIT_REQUEST_LABEL }] } },
+    },
+    core: { info() {}, notice() {}, warning: (message) => warnings.push(message) },
+    body: issueBody(),
+    root: WORKSPACE,
+  });
+  assert.equal(result.posted, true);
+  assert.equal(github.comments().length, 1);
+  assert.deepEqual(github.state.labels, [EDIT_REQUEST_LABEL], 'no status from a stale payload');
+  assert.ok(warnings.some((message) => /re-read #41/.test(message)));
 });
 
 test('edit-request.yml: the wording can be replaced under notifications.messages', async () => {

@@ -82,9 +82,33 @@ export function unknownEntryNote(settings, { slug, found }) {
   return fill(template, { entry: echoable(slug) ? `\`${slug}\`` : 'the entry you named' });
 }
 
+/** @param {Array<string|{name?: string}>} labels @returns {string[]} */
+const labelNames = (labels) =>
+  (labels ?? []).map((label) => (typeof label === 'string' ? label : String(label?.name ?? '')));
+
+/**
+ * The issue's labels as they are now. The event payload is a snapshot: an
+ * `edited` run can wait in the per-issue queue while the request is published
+ * or declined, and its copy would then show no status at all.
+ * @returns {Promise<string[]|null>} null when the issue could not be re-read
+ */
+async function liveLabels(github, core, { owner, repo, issue_number }) {
+  try {
+    const { data } = await github.rest.issues.get({ owner, repo, issue_number });
+    return labelNames(data.labels);
+  } catch (error) {
+    core?.warning?.(
+      `Could not re-read #${issue_number}'s labels (${error?.status ?? error?.message}); leaving its status alone.`
+    );
+    return null;
+  }
+}
+
 /**
  * Acknowledge the event's edit request, once, and mark it received unless it
- * already has a status (an edit to an issue that has moved on leaves it be).
+ * currently has a status (an edit to an issue that has moved on leaves it be).
+ * The labels are re-read from the API, not taken from the event payload; when
+ * that read fails the comment still goes out and the status is left alone.
  *
  * @param {object} options
  * @param {object} options.github Octokit from github-script
@@ -104,9 +128,7 @@ export async function acknowledgeEditRequest({
   const { owner, repo } = context.repo;
   const slug = readEditRequestSlug(body);
   const found = entryExists(root, slug);
-  const labels = (context.payload?.issue?.labels ?? []).map((label) =>
-    typeof label === 'string' ? label : String(label?.name ?? '')
-  );
+  const labels = await liveLabels(github, core, { owner, repo, issue_number: Number(context.issue.number) });
   const settings = await loadSettings({ root, repository: `${owner}/${repo}`, core });
   const { posted } = await notifyIssue({
     github,
@@ -114,10 +136,10 @@ export async function acknowledgeEditRequest({
     core,
     kind: 'edit_request',
     once: true,
-    status: currentStatus(labels) ? '' : STATUS.received,
+    status: labels && !currentStatus(labels) ? STATUS.received : '',
     vars: { entry_note: unknownEntryNote(settings, { slug, found }) },
     settings,
-    labels,
+    labels: labels ?? undefined,
   });
   return { slug, found, posted };
 }
