@@ -125,17 +125,22 @@ export function isSubmission(issue) {
 }
 
 /**
- * The submission a draft pull request is for, read from the first "Closes #N" (or
+ * The submission a draft pull request is for, read from the first usable "Closes #N" (or
  * "Fixes #N", "Resolves #N", in any case) in its body. Every draft the automation opens
  * says this, so a reader who typed the draft's number can still be shown the submission.
- * The same pattern as `linkedIssue` in scripts/lib/notify.mjs, which reads that line on
- * the server side.
+ * The references are read in order and one `parseIssueNumber` refuses (`#0`, a number too
+ * large) is skipped for the next. The same pattern as `linkedIssue` in
+ * scripts/lib/notify.mjs, which reads that line on the server side.
  * @param {unknown} body a pull request's body, as the issues API returns it
  * @returns {number|null} the linked issue number, or null when nothing usable is linked.
  */
 export function linkedSubmissionNumber(body) {
-  const match = /(?:^|\s)(?:closes|fixes|resolves)\s+#(\d+)\b/i.exec(typeof body === 'string' ? body : '');
-  return match ? parseIssueNumber(match[1]) : null;
+  const text = typeof body === 'string' ? body : '';
+  for (const match of text.matchAll(/(?:^|\s)(?:closes|fixes|resolves)\s+#(\d+)\b/gi)) {
+    const number = parseIssueNumber(match[1]);
+    if (number !== null) return number;
+  }
+  return null;
 }
 
 /**

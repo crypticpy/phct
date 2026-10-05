@@ -224,7 +224,7 @@ blank or missing key uses the wording shown.
   duplicate is Not published, and closed with no reason is Closed. Only
   issues with a `content:*` label count as submissions.
 - **A draft's number.** A reader who types the number of a submission's draft
-  pull request is shown the submission it closes, read from the first
+  pull request is shown the submission it closes, read from the first usable
   `Closes #N`, `Fixes #N` or `Resolves #N` in the pull request's body, with a
   line saying so ("#101 is the draft for submission #97."). The page follows
   that link once. A pull request that links nothing, or links an issue that is

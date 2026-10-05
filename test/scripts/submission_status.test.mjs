@@ -274,6 +274,17 @@ test('the submission a pull request links: the first Closes, Fixes or Resolves #
   assert.equal(linkedSubmissionNumber('Refs #4, then Fixes #8'), 8, 'only a closing keyword links');
 });
 
+test('an out-of-range closing reference is skipped for the next one that is usable', () => {
+  assert.equal(linkedSubmissionNumber('Closes #0\nCloses #97'), 97, 'an invalid first reference');
+  assert.equal(
+    linkedSubmissionNumber(`Fixes #${MAX_ISSUE_NUMBER + 1}, resolves #12`),
+    12,
+    'a number too large'
+  );
+  assert.equal(linkedSubmissionNumber('Closes #97\nCloses #98'), 97, 'two valid references: the first');
+  assert.equal(linkedSubmissionNumber('Closes #0 and Fixes #0'), null, 'none usable');
+});
+
 test('a pull request body that links nothing usable gives no submission number', () => {
   for (const body of [
     null,
