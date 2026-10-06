@@ -95,7 +95,7 @@ The labels are a convention the workflow does not enforce; if your process has d
 
 ### What the submitter is told
 
-Submitters are not subscribed to the draft pull request, but GitHub emails them every comment on their own issue. So the automation reports each step there, and keeps one `status:*` label on the issue for the `/status/` page:
+Submitters are not subscribed to the draft pull request, but GitHub emails them every comment on their own issue. So the automation reports each step there, and keeps one `status:*` label on the issue for the `/status/` page (a submitter who types the draft pull request's number there is shown the submission its `Closes #N` line names):
 
 | What happens | Comment on the issue | Status |
 |---|---|---|

@@ -10,6 +10,16 @@ major version, and each entry says so when it happens.
 
 ### Fixed
 
+- `/status/` answered a draft pull request's number with "isn't a submission. It
+  belongs to something else on GitHub", a dead end for a submitter who copied
+  the number they saw most often. It now reads the draft's `Closes #N` (or
+  `Fixes #N`, `Resolves #N`) line and shows that submission, saying "#101 is the
+  draft for submission #97." A pull request that links nothing, or links an
+  issue that is not a submission, still gets "isn't a submission", now worded to
+  ask for the number of the submission itself rather than of its draft. The page
+  makes at most one follow-up request, with the same timeout, rate-limit
+  fallback and handling of overlapping lookups as the first. See
+  [Status page](docs/configuration.md#status-page).
 - A submission that attached no slide deck still had its front matter name
   one: an unanswered `file` question (GitHub's `_No response_`) was written as
   `/<entry path>/<slug>/<filename>`, a path no file was ever saved to. The
