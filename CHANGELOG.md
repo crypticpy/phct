@@ -8,6 +8,35 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- **Suggest an edit** now opens a short form instead of GitHub's file editor.
+  Every entry page's link opens `.github/ISSUE_TEMPLATE/edit-entry.yml` with
+  the entry's slug and an *Edit: &lt;entry title&gt;* title filled in. The
+  reader says how they are connected to the entry, describes in plain words
+  what should change, and can leave a name and email for follow-up questions.
+  The issue is labelled `content:edit-request`, and the new `edit-request.yml`
+  workflow posts one acknowledgement with its number and `/status/` link and
+  marks it `status:received`. When the slug names no entry, the comment says
+  so and asks for the page address. Nothing is applied automatically: a
+  maintainer edits the entry on a pull request labelled `content:edit-request`
+  that says `Closes #N`, and merging it publishes the request like any other
+  form's. A coding agent the maintainer assigns can draft that pull request by
+  following the new [docs/edit-requests.md](docs/edit-requests.md); a person
+  always merges. Run **Bootstrap labels** once to create the new label, and
+  reword the acknowledgement under `notifications.messages` (`edit_request`,
+  `edit_request_unknown_entry`) if you like. See
+  [Edit requests](docs/admin-guide.md#edit-requests).
+- **Report a problem with the site.** The per-entry *Report an issue* link,
+  which opened a blank pre-titled issue, is gone: entry pages keep only
+  *Suggest an edit*. Instead the footer of every page links to a short new
+  form, `.github/ISSUE_TEMPLATE/site-problem.yml`, that asks what went wrong
+  and, optionally, the page address and the browser and device. It carries no
+  label, so no content workflow runs on it: `missing-label.yml` acknowledges a
+  report from outside the project and labels it `needs-triage` for a
+  maintainer to triage by hand. See
+  [Site problem reports](docs/admin-guide.md#site-problem-reports).
+
 ### Fixed
 
 - `/status/` answered a draft pull request's number with "isn't a submission. It
@@ -1104,7 +1133,6 @@ about a hundred lines of CSS moved rather than added.
   unit.
 - `docs/design-system.md` gains a Surfaces section and the type table now
   matches the built site; `docs/design-brief.md` carries an amendment note.
-
 
 ## [1.3.0] — 2026-08-17
 
