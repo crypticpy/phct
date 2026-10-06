@@ -27,6 +27,14 @@ major version, and each entry says so when it happens.
   question; an attachment the submitter did upload is still downloaded into the
   entry folder and named by its path.
 
+### Security
+
+- `source-map-js` is updated from 1.2.1 to 1.2.2, which fixes GHSA-68fv-2mgg-jv7q
+  (high: an indexed source map with crafted section offsets could stall the event
+  loop). The advisory failed `npm run security:audit`. The package is a dev-only
+  dependency that comes in through `postcss` and through `jsdom`'s `css-tree`.
+  Both already accept `^1.2.1`, so only the lockfile changes.
+
 ## [1.11.0-rc.4] — 2026-10-05
 
 Fourth candidate. rc.3's live BCHC update stopped before opening a pull request
