@@ -8,6 +8,14 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.5] — 2026-10-06
+
+Fifth candidate. rc.4's live BCHC update passed and deployed. This candidate makes
+*Suggest an edit* open a plain-language edit-request form and adds a footer
+form for reporting a problem with the site (#91), lets the status page follow a
+draft pull request's number to its submission (#90), leaves a skipped file
+upload blank (#89) and updates `source-map-js` for GHSA-68fv-2mgg-jv7q (#92).
+
 ### Added
 
 - **Suggest an edit** now opens a short form instead of GitHub's file editor.
@@ -1551,7 +1559,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.4...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.5...HEAD
+[1.11.0-rc.5]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.4...v1.11.0-rc.5
 [1.11.0-rc.4]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.3...v1.11.0-rc.4
 [1.11.0-rc.3]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.2...v1.11.0-rc.3
 [1.11.0-rc.2]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.1...v1.11.0-rc.2
