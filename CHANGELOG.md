@@ -37,6 +37,25 @@ major version, and each entry says so when it happens.
   maintainer to triage by hand. See
   [Site problem reports](docs/admin-guide.md#site-problem-reports).
 
+### Fixed
+
+- `/status/` answered a draft pull request's number with "isn't a submission. It
+  belongs to something else on GitHub", a dead end for a submitter who copied
+  the number they saw most often. It now reads the draft's `Closes #N` (or
+  `Fixes #N`, `Resolves #N`) line and shows that submission, saying "#101 is the
+  draft for submission #97." A pull request that links nothing, or links an
+  issue that is not a submission, still gets "isn't a submission", now worded to
+  ask for the number of the submission itself rather than of its draft. The page
+  makes at most one follow-up request, with the same timeout, rate-limit
+  fallback and handling of overlapping lookups as the first. See
+  [Status page](docs/configuration.md#status-page).
+- A submission that attached no slide deck still had its front matter name
+  one: an unanswered `file` question (GitHub's `_No response_`) was written as
+  `/<entry path>/<slug>/<filename>`, a path no file was ever saved to. The
+  scaffolder now leaves the field blank, the same as any other unanswered
+  question; an attachment the submitter did upload is still downloaded into the
+  entry folder and named by its path.
+
 ## [1.11.0-rc.4] — 2026-10-05
 
 Fourth candidate. rc.3's live BCHC update stopped before opening a pull request
@@ -1106,7 +1125,6 @@ about a hundred lines of CSS moved rather than added.
   unit.
 - `docs/design-system.md` gains a Surfaces section and the type table now
   matches the built site; `docs/design-brief.md` carries an amendment note.
-
 
 ## [1.3.0] — 2026-08-17
 
