@@ -20,6 +20,12 @@ major version, and each entry says so when it happens.
   makes at most one follow-up request, with the same timeout, rate-limit
   fallback and handling of overlapping lookups as the first. See
   [Status page](docs/configuration.md#status-page).
+- A submission that attached no slide deck still had its front matter name
+  one: an unanswered `file` question (GitHub's `_No response_`) was written as
+  `/<entry path>/<slug>/<filename>`, a path no file was ever saved to. The
+  scaffolder now leaves the field blank, the same as any other unanswered
+  question; an attachment the submitter did upload is still downloaded into the
+  entry folder and named by its path.
 
 ## [1.11.0-rc.4] — 2026-10-05
 
