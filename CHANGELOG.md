@@ -8,6 +8,12 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.7] — 2026-10-12
+
+Seventh candidate. rc.6 failed closed in BCHC on a build test that assumed the
+deployment's own `site.yml` leaves analytics off (nothing was published). This
+candidate fixes that test (#103) and otherwise carries rc.6 unchanged.
+
 ### Fixed
 
 - A deployment with `analytics.plausible_domain` set could not update to rc.6:
@@ -1642,7 +1648,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.6...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.7...HEAD
+[1.11.0-rc.7]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.6...v1.11.0-rc.7
 [1.11.0-rc.6]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.5...v1.11.0-rc.6
 [1.11.0-rc.5]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.4...v1.11.0-rc.5
 [1.11.0-rc.4]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.3...v1.11.0-rc.4
