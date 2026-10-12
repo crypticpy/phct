@@ -8,6 +8,21 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- Merging two submissions in quick succession left the first submitter without
+  their "Your entry is now live" comment. `pages.yml` cancels a deploy still in
+  progress when a newer push reaches `main`, and the deploy that finished only
+  announced the pull request its own commit belonged to. The `announce` job now
+  covers every pull request merged since the last successful `Build & Deploy`
+  run on `main`, each with its own entry's address, and still posts at most
+  once per issue, so a re-run or an overlapping deploy repeats nothing. It falls
+  back to announcing only its own push when there is no earlier successful run,
+  more than 100 commits landed in between, or the run history cannot be read,
+  and a submission that cannot be updated is a warning that no longer stops the
+  rest. The job gains `actions: read` to find that run. See
+  [Troubleshooting](docs/admin-guide.md#troubleshooting).
+
 ## [1.11.0-rc.5] — 2026-10-06
 
 Fifth candidate. rc.4's live BCHC update passed and deployed. This candidate makes
