@@ -8,6 +8,13 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- A deployment that had removed its sample entries, left demo mode or turned
+  cohorts on failed `npm run verify`: the `npm run setup --dry-run` test relied
+  on the repository's own data. It now sets up its own demo site with one
+  sample entry.
+
 ## [1.11.0-rc.7] — 2026-10-12
 
 Seventh candidate. rc.6 failed closed in BCHC on a build test that assumed the
