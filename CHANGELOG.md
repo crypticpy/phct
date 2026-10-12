@@ -32,8 +32,13 @@ major version, and each entry says so when it happens.
   and deletes the rest, and `generate --check` (and so `npm run verify`) fails
   when the set is out of step either way. Setup in progress means `demo: true`
   unless the new optional `github.setup_forms: true|false` says otherwise.
-  `npm run setup` now runs `generate` once it has written its files, and
-  **Bootstrap labels** links its welcome issue to `_data/site.yml` when the
+  `npm run setup` now runs `generate` once it has written its files, and its
+  `--dry-run` lists what `generate` would then add, change or delete.
+  `/setup/`'s review step lists the forms a change adds or retires after the
+  files to paste: each new form has a *Create on GitHub* link that opens
+  GitHub's new-file page filled in with what `generate` would write, and each
+  retired one a *Delete on GitHub* link, so a site without a terminal can make
+  the change in GitHub's editor. **Bootstrap labels** links its welcome issue to `_data/site.yml` when the
   *Apply setup* form is gone. The bug, feature, documentation and accessibility
   forms are reworded to describe this site rather than PHCT: the bug form asks
   *Where it happens* instead of requiring a PHCT release, which is now an

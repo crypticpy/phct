@@ -18,12 +18,19 @@
  *   issue-template.js     .github/ISSUE_TEMPLATE/new-entry.yml
  *   issue-form-limits.js  GitHub's issue-form limits and help-text fitting
  *   issue-form-ids.js     element ids for keys GitHub reserves (body -> entry_body); a classic script /submit/ shares
- *   issue-chooser.js      .github/ISSUE_TEMPLATE/config.yml and which optional forms exist
+ *   issue-chooser.js      .github/ISSUE_TEMPLATE/config.yml, and which optional forms exist and their contents
  *   jekyll-config.js      _config.yml
  *   render-files.js       config -> {path: contents}
  */
 
-export { slugify, snakeKey, githubNewFileUrl, githubEditFileUrl, prefillNoticeIfTooLong } from './strings.js';
+export {
+  slugify,
+  snakeKey,
+  githubNewFileUrl,
+  githubEditFileUrl,
+  githubDeleteFileUrl,
+  prefillNoticeIfTooLong,
+} from './strings.js';
 export { toYaml, quoteYamlString, isPlainObject } from './yaml-emit.js';
 export { parseHexColor, toHexColor, contrastRatio, meetsAA, isHexColor, derivePrimaryDark } from './color.js';
 export { BUNDLED_FONT_NAMES, normalizeBundledFontName } from './fonts.js';
@@ -62,6 +69,10 @@ export {
   renderIssueChooser,
   setupFormsEnabled,
   OPTIONAL_ISSUE_FORMS,
+  optionalFormPath,
+  optionalFormFiles,
+  optionalFormChanges,
+  renderOptionalForm,
 } from './issue-chooser.js';
 export { jekyllConfig, patchJekyllConfig } from './jekyll-config.js';
 export { renderFiles, HEADERS } from './render-files.js';

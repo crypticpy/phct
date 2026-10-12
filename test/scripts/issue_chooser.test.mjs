@@ -7,6 +7,8 @@ import YAML from 'yaml';
 
 import {
   isRepositoryIdentity,
+  optionalFormChanges,
+  optionalFormFiles,
   renderIssueChooser,
   setupFormsEnabled,
 } from '../../assets/js/configurator/issue-chooser.js';
@@ -79,4 +81,54 @@ test('the canonical chooser defaults a missing branch and URL-encodes branch seg
     renderIssueChooser('example/community-catalog', 'release/catalog#2'),
     /blob\/release\/catalog%232\/SECURITY\.md/u
   );
+});
+
+test('optionalFormChanges lists only what a change adds and retires', () => {
+  const sources = Object.fromEntries(
+    ['apply-setup.yml', 'new-year.yml', 'schedule.yml', 'new-event.yml', 'update-event-attachments.yml'].map(
+      (file) => [file, `name: ${file}\n`]
+    )
+  );
+  const finished = { demo: false, modules: { cohorts: false } };
+  const cohorts = { demo: false, modules: { cohorts: true } };
+
+  assert.deepEqual(optionalFormChanges(finished, finished, sources), { add: {}, remove: {} });
+  assert.deepEqual(optionalFormChanges(cohorts, cohorts, sources), { add: {}, remove: {} });
+
+  const on = optionalFormChanges(finished, cohorts, sources);
+  assert.deepEqual(Object.keys(on.add), [
+    '.github/ISSUE_TEMPLATE/new-year.yml',
+    '.github/ISSUE_TEMPLATE/schedule.yml',
+    '.github/ISSUE_TEMPLATE/new-event.yml',
+    '.github/ISSUE_TEMPLATE/update-event-attachments.yml',
+  ]);
+  assert.equal(
+    on.add['.github/ISSUE_TEMPLATE/new-year.yml'],
+    optionalFormFiles(cohorts, sources).write['.github/ISSUE_TEMPLATE/new-year.yml']
+  );
+  assert.deepEqual(on.add['.github/ISSUE_TEMPLATE/new-year.yml'].split('\n').slice(-2), [
+    'name: new-year.yml',
+    '',
+  ]);
+  assert.deepEqual(on.remove, {});
+
+  const off = optionalFormChanges({ ...cohorts, demo: true }, finished, sources);
+  assert.deepEqual(off.add, {});
+  assert.deepEqual(Object.keys(off.remove), [
+    '.github/ISSUE_TEMPLATE/apply-setup.yml',
+    '.github/ISSUE_TEMPLATE/new-year.yml',
+    '.github/ISSUE_TEMPLATE/schedule.yml',
+    '.github/ISSUE_TEMPLATE/new-event.yml',
+    '.github/ISSUE_TEMPLATE/update-event-attachments.yml',
+  ]);
+  assert.equal(off.remove['.github/ISSUE_TEMPLATE/new-year.yml'], 'modules.cohorts');
+});
+
+test('optionalFormFiles refuses to render a form whose source is missing', () => {
+  assert.throws(
+    () => optionalFormFiles({ modules: { cohorts: true } }, {}),
+    /Missing scripts\/issue-forms\/new-year\.yml/u
+  );
+  // A form that is off needs no source.
+  assert.deepEqual(optionalFormFiles({ modules: { cohorts: false } }, {}).write, {});
 });

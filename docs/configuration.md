@@ -141,7 +141,8 @@ Each toggle does three things (four for `cohorts`):
    GitHub's issue chooser only while `cohorts` is on. GitHub cannot hide a form, so
    `npm run generate` writes them into `.github/ISSUE_TEMPLATE/` from `scripts/issue-forms/` and
    deletes them when the module is off; run it after changing the toggle (`npm run setup` and the
-   Apply setup issue run it for you), or the `Validate Content` check names the stale files. Their
+   Apply setup issue run it for you, and `/setup/`'s review step lists the forms to create or
+   delete in GitHub's editor), or the `Validate Content` check names the stale files. Their
    workflows stay installed either way and only act on issues carrying their label.
 
 The shipped `ai-use-cases` configuration has `catalog`, `submit`, `carousel`, `stats`, `governance` and `status` on, and `events`, `cohorts` and `resources` off. Sample data for the three off-by-default modules still ships in `_data/`, so turning one on gives you something to look at immediately.
@@ -649,7 +650,7 @@ Keys: `generated_at`, and `entries` keyed by entry slug. Each record carries `ap
 
 All three read/write the same seven files (`_data/site.yml`, `_data/theme.yml`, `_data/schema.yml`, `_data/navigation.yml`, `_config.yml`, `.github/ISSUE_TEMPLATE/new-entry.yml`, `.github/ISSUE_TEMPLATE/config.yml`) using the same shared logic in `assets/js/configurator/core.js`, so they always produce equivalent output.
 
-Their starting point — the defaults both wizards open with — is not hand-maintained JavaScript. `assets/js/configurator/defaults.generated.js` is produced from `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml` and `_data/navigation.yml` by `npm run generate`, so the wizards can never drift from the YAML that actually builds the site. Do not edit it; a `--check` run in CI fails the build if it is stale.
+Their starting point — the defaults both wizards open with — is not hand-maintained JavaScript. `assets/js/configurator/defaults.generated.js` is produced from `_data/site.yml`, `_data/theme.yml`, `_data/schema.yml` and `_data/navigation.yml` by `npm run generate`, so the wizards can never drift from the YAML that actually builds the site. It also carries the optional issue forms' sources from `scripts/issue-forms/`, which `/setup/` renders the same way `generate` does. Do not edit it; a `--check` run in CI fails the build if it is stale.
 
 ### `/setup/` — browser wizard
 
@@ -667,6 +668,7 @@ A no-terminal step-by-step wizard on the deployed site (`setup/index.md` + `asse
 - Reports validation problems in a single **error summary** that takes focus when you try to continue, with one link per problem that jumps to the control at fault.
 - Saves your answers in the browser as you go (a resume banner appears if you return with unfinished progress).
 - Produces copy/download/"open in GitHub, pre-filled" links for each generated file — nothing is pushed automatically; you commit the files yourself via the GitHub UI or by pulling them locally.
+- Lists, after those files, the optional issue forms the change adds or retires: the four cohort forms when you switch the `cohorts` module, *Apply setup* when a starting point turns setup forms on or off. A new form has a **Create on GitHub** link to GitHub's new-file page, filled in with exactly what `npm run generate` would write; a retired one has a **Delete on GitHub** link. Commit those too and the issue chooser matches the configuration without anyone running `generate`.
 
 | Colors & type step | Entry model step |
 | --- | --- |
@@ -678,7 +680,7 @@ A no-terminal step-by-step wizard on the deployed site (`setup/index.md` + `asse
 npm run setup                          # interactive, asks every question
 npm run setup -- --preset ai-use-cases # start from a preset instead of choosing interactively
 npm run setup -- --yes                 # accept every default, ask nothing (good for CI / smoke tests)
-npm run setup -- --dry-run             # print the file list and a diff summary; write nothing
+npm run setup -- --dry-run             # print the file list, a diff summary and what generate would then change; write nothing
 npm run setup -- --out <dir>           # write the files into <dir> instead of the repo (implies --yes)
 npm run setup -- --help
 ```
@@ -696,7 +698,8 @@ calls the same `renderFiles()` and opens a pull request.
 The form (`.github/ISSUE_TEMPLATE/apply-setup.yml`, generated from
 `scripts/issue-forms/apply-setup.yml`) exists only while setup forms are on — `github.setup_forms`,
 or `demo` when that is unset ([GitHub repository](#github-repository)). On a finished site the
-review step offers the file-by-file editor route instead and says how to bring the form back.
+review step offers the file-by-file editor route instead, with any issue forms to create or delete
+listed after the files. `github.setup_forms: true` brings the form back.
 
 - Only three files are pasted. The other four are *derived* from them, so the generated half can
   never drift from the pasted half — however stale the tab the maintainer copied from.

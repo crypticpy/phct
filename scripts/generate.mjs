@@ -29,6 +29,7 @@ import {
   renderIssueChooser,
   setupFormsEnabled,
 } from '../assets/js/configurator/issue-chooser.js';
+import { pointRepositoryLinks } from './lib/generate_plan.mjs';
 import { checkIssueForms, describeIssueFormProblems } from './lib/issue_forms.mjs';
 import {
   checkOptionalFormSources,
@@ -115,13 +116,8 @@ function sync(relative, content, note = '') {
 const repository = String(readData(SITE_DATA_PATH).github?.repository || '').trim();
 const ownRepository = /^[\w.-]+\/[\w.-]+$/.test(repository);
 if (ownRepository) {
-  const siteFile = path.join(ROOT, SITE_DATA_PATH);
-  const original = fs.readFileSync(siteFile, 'utf8');
-  const patched = original.replace(
-    /github\.com\/[\w.-]+\/[\w.-]+(?=\/(?:blob|tree|raw|edit)\/)/g,
-    `github.com/${repository}`
-  );
-  sync(SITE_DATA_PATH, patched, `repository links point at ${repository}`);
+  const original = fs.readFileSync(path.join(ROOT, SITE_DATA_PATH), 'utf8');
+  sync(SITE_DATA_PATH, pointRepositoryLinks(original, repository), `repository links point at ${repository}`);
 }
 
 // --- 1. wizard defaults, compiled from _data/*.yml --------------------------

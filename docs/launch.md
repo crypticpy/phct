@@ -74,7 +74,7 @@ same seven files:
 
 | Path | How | Good for |
 |---|---|---|
-| Browser | Open `/setup/` on your deployed site | No terminal. Copy each generated file into GitHub's editor at the end. |
+| Browser | Open `/setup/` on your deployed site | No terminal. Copy each generated file into GitHub's editor at the end, and create or delete any issue form it lists. |
 | Browser → pull request | Open `/setup/`, then paste its files into an **Apply setup** issue | No terminal, and no hand-editing files: the answer comes back as a reviewable pull request. |
 | Terminal | `npm ci && npm run setup` | Anyone with a checkout. Writes the files directly; `npm run setup -- --preset <id> --yes` skips every prompt. |
 

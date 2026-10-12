@@ -16,7 +16,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import * as jsYaml from 'js-yaml';
 
-import { OPTIONAL_ISSUE_FORMS } from '../../assets/js/configurator/issue-chooser.js';
+import { OPTIONAL_FORM_SOURCES } from '../../assets/js/configurator/defaults.generated.js';
+import { OPTIONAL_ISSUE_FORMS, optionalFormChanges } from '../../assets/js/configurator/issue-chooser.js';
 import { issueFormProblems } from '../../assets/js/configurator/issue-form-limits.js';
 import { renderFiles } from '../../assets/js/configurator/render-files.js';
 import { applyUpdate } from '../../scripts/apply_phct_update.mjs';
@@ -331,4 +332,144 @@ test("an update keeps a cohorts-on deployment's forms and delivers their new wor
     'M .github/ISSUE_TEMPLATE/config.yml',
     'M .github/ISSUE_TEMPLATE/new-year.yml',
   ]);
+});
+
+/** Every file in the scratch copy's .github/ISSUE_TEMPLATE/, name → contents. */
+function issueTemplates(root) {
+  const dir = path.join(root, '.github/ISSUE_TEMPLATE');
+  return Object.fromEntries(
+    fs
+      .readdirSync(dir)
+      .sort()
+      .map((name) => [name, fs.readFileSync(path.join(dir, name), 'utf8')])
+  );
+}
+
+/** Assert two issueTemplates() snapshots match, naming the files that differ rather than dumping both. */
+function assertSameTemplates(actual, expected, label) {
+  assert.deepEqual(Object.keys(actual), Object.keys(expected), `${label}: a different set of files`);
+  for (const name of Object.keys(expected))
+    assert.equal(actual[name], expected[name], `${label}: ${name} differs`);
+}
+
+/**
+ * Do what /setup/'s review step tells a maintainer without a terminal to do in
+ * GitHub's web editor, starting from the site the page was built from: commit
+ * every renderFiles() file, create each optional form it lists (rendered from
+ * the sources compiled into defaults.generated.js, as the page has them) and
+ * delete each one it retires.
+ */
+function commitFromBrowser(root, next, current) {
+  for (const [relative, content] of Object.entries(renderFiles(next, { url: '', baseurl: '' }))) {
+    fs.writeFileSync(path.join(root, relative), content);
+  }
+  const forms = optionalFormChanges(current, next.site, OPTIONAL_FORM_SOURCES);
+  for (const [relative, content] of Object.entries(forms.add)) {
+    assert.equal(exists(root, relative), false, `/setup/ offers to create ${relative}, which exists`);
+    fs.writeFileSync(path.join(root, relative), content);
+  }
+  for (const relative of Object.keys(forms.remove)) {
+    assert.ok(exists(root, relative), `/setup/ offers to delete ${relative}, which does not exist`);
+    fs.rmSync(path.join(root, relative));
+  }
+  return forms;
+}
+
+/** A finished site's configuration as /setup/ starts from it, with `change` applied to site.yml. */
+function browserConfig(root, change) {
+  const site = jsYaml.load(read(root, '_data/site.yml'));
+  change(site);
+  return {
+    site,
+    theme: jsYaml.load(read(root, '_data/theme.yml')),
+    schema: jsYaml.load(read(root, '_data/schema.yml')),
+  };
+}
+
+test('what /setup/ tells a finished site to commit leaves the issue forms generate would write', (t) => {
+  const root = scratchRepository(t);
+  configure(root, { cohorts: false, demo: false });
+  generateOk(root);
+
+  const cohortPaths = COHORT_FORMS.map(optionalFormPath);
+  for (const cohorts of [true, false]) {
+    const current = jsYaml.load(read(root, '_data/site.yml'));
+    const forms = commitFromBrowser(
+      root,
+      browserConfig(root, (site) => {
+        site.modules.cohorts = cohorts;
+      }),
+      current
+    );
+    assert.deepEqual(Object.keys(cohorts ? forms.add : forms.remove), cohortPaths);
+    assert.deepEqual(Object.keys(cohorts ? forms.remove : forms.add), []);
+    const committed = issueTemplates(root);
+    generateOk(root);
+    assertSameTemplates(issueTemplates(root), committed, `cohorts ${cohorts ? 'on' : 'off'}`);
+  }
+
+  for (const setupForms of [true, false]) {
+    const current = jsYaml.load(read(root, '_data/site.yml'));
+    const forms = commitFromBrowser(
+      root,
+      browserConfig(root, (site) => {
+        site.github.setup_forms = setupForms;
+      }),
+      current
+    );
+    assert.deepEqual(Object.keys(setupForms ? forms.add : forms.remove), [
+      optionalFormPath('apply-setup.yml'),
+    ]);
+    const committed = issueTemplates(root);
+    generateOk(root);
+    assertSameTemplates(issueTemplates(root), committed, `setup_forms: ${setupForms}`);
+  }
+});
+
+/** `npm run setup -- --preset <preset> --yes --dry-run` in the scratch copy. */
+function setupDryRun(root, preset) {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/setup.mjs', '--preset', preset, '--yes', '--dry-run'],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, NO_COLOR: '1' },
+    }
+  );
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  return result.stdout;
+}
+
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
+test('npm run setup --dry-run lists the issue forms generate would add and remove, and writes nothing', (t) => {
+  const root = scratchRepository(t);
+  const untouched = () => ({ templates: issueTemplates(root), site: read(root, '_data/site.yml') });
+
+  // The template has cohorts off: the cohort portal preset turns them on.
+  let before = untouched();
+  let output = setupDryRun(root, 'cohort-portal');
+  assert.match(output, /Then `npm run generate` will change:/u);
+  for (const file of COHORT_FORMS) {
+    assert.match(output, new RegExp(`${escape(optionalFormPath(file))}\\s+new file`, 'u'));
+  }
+  assert.match(output, /assets\/js\/configurator\/defaults\.generated\.js\s+\+\d+ -\d+ lines/u);
+  assert.match(output, /Dry run — nothing was written/u);
+  assert.deepEqual(untouched().site, before.site, 'the dry run wrote _data/site.yml');
+  assertSameTemplates(untouched().templates, before.templates, 'the dry run');
+
+  // A site with cohorts on: the blank preset turns them off.
+  configure(root, { cohorts: true });
+  generateOk(root);
+  before = untouched();
+  output = setupDryRun(root, 'blank');
+  for (const file of COHORT_FORMS) {
+    assert.match(
+      output,
+      new RegExp(`${escape(optionalFormPath(file))}\\s+delete \\(modules\\.cohorts is off\\)`, 'u')
+    );
+  }
+  assert.deepEqual(untouched().site, before.site, 'the dry run wrote _data/site.yml');
+  assertSameTemplates(untouched().templates, before.templates, 'the dry run');
 });

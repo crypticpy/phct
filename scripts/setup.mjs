@@ -22,7 +22,9 @@
  * Flags:
  *   --preset <id>   start from a preset instead of asking
  *   --yes           accept every default, ask nothing (CI / smoke tests)
- *   --dry-run       print the file list and a diff summary, write nothing
+ *   --dry-run       print the file list and a diff summary, and what
+ *                   `npm run generate` would then add, change or delete;
+ *                   write nothing
  *   --out <dir>     write into <dir> instead of the repository (implies --yes);
  *                   nothing in the working tree is touched
  */
@@ -34,6 +36,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { ejectSamples, ejectSummary } from './eject_samples.mjs';
+import { planGenerate, pointRepositoryLinks } from './lib/generate_plan.mjs';
 import { helpText, parseArgs } from './lib/setup-args.mjs';
 import {
   bold,
@@ -124,12 +127,31 @@ async function main() {
       files['_config.yml'] = core.patchJekyllConfig(fs.readFileSync(configFile, 'utf8'), config.site).text;
     }
 
+    // Step 7 runs `npm run generate` on what this writes into the repository.
+    // Its first job, pointing the footer's links into GitHub at this
+    // repository, is done here so the summary shows the site.yml that lands;
+    // the rest of what it will do is listed under the files. `--out` never
+    // reaches step 7.
+    if (!args.out) {
+      files['_data/site.yml'] = pointRepositoryLinks(files['_data/site.yml'], config.site.github?.repository);
+    }
+    const derived = args.out ? null : planGenerate(ROOT, files);
+
     // --- 4. summary ---------------------------------------------------------
     console.log(bold('\nFiles to write:\n'));
     for (const [relative, content] of Object.entries(files)) {
       console.log(
         `  ${relative.padEnd(42)} ${args.out ? green('new file') : diffSummary(ROOT, relative, content)}`
       );
+    }
+    if (derived && Object.keys(derived.write).length + Object.keys(derived.remove).length > 0) {
+      console.log(bold('\nThen `npm run generate` will change:\n'));
+      for (const [relative, content] of Object.entries(derived.write)) {
+        console.log(`  ${relative.padEnd(42)} ${diffSummary(ROOT, relative, content)}`);
+      }
+      for (const [relative, when] of Object.entries(derived.remove)) {
+        console.log(`  ${relative.padEnd(42)} ${red('delete')} ${dim(`(${when} is off)`)}`);
+      }
     }
     console.log('');
     console.log(`  Site        ${bold(config.site.name)}`);
