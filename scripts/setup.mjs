@@ -7,7 +7,10 @@
  *   npm run setup -- --dry-run
  *
  * Asks a handful of questions, then writes _data/site.yml, _data/theme.yml,
- * _data/schema.yml, _data/navigation.yml, _config.yml and both GitHub issue-routing files.
+ * _data/schema.yml, _data/navigation.yml, _config.yml and both GitHub issue-routing files,
+ * then runs `npm run generate` for everything derived from them (the issue forms
+ * the module toggles switch on, the wizard defaults), as the Apply setup
+ * workflow does after it writes the same files.
  * The same answers -> files logic runs in the browser at /setup/; everything
  * lives in assets/js/configurator/core.js.
  *
@@ -24,6 +27,7 @@
  *                   nothing in the working tree is touched
  */
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -187,7 +191,22 @@ async function main() {
       }
     }
 
-    // --- 7. next steps ------------------------------------------------------
+    // --- 7. derived files ---------------------------------------------------
+    // After step 6, which may just have turned `demo` off: that drops the
+    // Apply setup form and the chooser's Launch checklist link.
+    console.log('');
+    const generated = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'generate.mjs')], {
+      cwd: ROOT,
+      stdio: 'inherit',
+    });
+    if (generated.status !== 0) {
+      console.error(
+        red('\n`npm run generate` stopped on the problem above. Fix it and run it again before committing.\n')
+      );
+      return 1;
+    }
+
+    // --- 8. next steps ------------------------------------------------------
     console.log(green(bold('\nDone.')) + ' Next steps:\n');
     console.log(`  1. Review the changes:      ${cyan('git diff')}`);
     console.log(

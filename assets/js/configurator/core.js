@@ -18,7 +18,7 @@
  *   issue-template.js     .github/ISSUE_TEMPLATE/new-entry.yml
  *   issue-form-limits.js  GitHub's issue-form limits and help-text fitting
  *   issue-form-ids.js     element ids for keys GitHub reserves (body -> entry_body); a classic script /submit/ shares
- *   issue-chooser.js      .github/ISSUE_TEMPLATE/config.yml
+ *   issue-chooser.js      .github/ISSUE_TEMPLATE/config.yml and which optional forms exist
  *   jekyll-config.js      _config.yml
  *   render-files.js       config -> {path: contents}
  */
@@ -57,6 +57,11 @@ export {
   DESCRIPTION_MAX,
   NAME_MIN,
 } from './issue-form-limits.js';
-export { isRepositoryIdentity, renderIssueChooser } from './issue-chooser.js';
+export {
+  isRepositoryIdentity,
+  renderIssueChooser,
+  setupFormsEnabled,
+  OPTIONAL_ISSUE_FORMS,
+} from './issue-chooser.js';
 export { jekyllConfig, patchJekyllConfig } from './jekyll-config.js';
 export { renderFiles, HEADERS } from './render-files.js';

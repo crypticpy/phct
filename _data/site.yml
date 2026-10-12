@@ -40,6 +40,9 @@ social:
 
 # GitHub repository that hosts this site, as "owner/repo".
 # Used to build the "Submit" form links, "Edit this page" links, and issue URLs.
+# `setup_forms` (optional, true or false) decides whether GitHub's New issue page
+# offers the maintainer-only Apply setup form and Launch checklist link. Leave it
+# out and they follow `demo` below. Run `npm run generate` after changing either.
 github:
   repository: "crypticpy/phct"
   branch: "main"

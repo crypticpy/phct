@@ -58,9 +58,19 @@ pages read `image` from [`_data/governance.yml`](#_datagovernanceyml) and
 github:
   repository: "owner/repo"
   branch: "main"
+  setup_forms: false   # optional — see below
 ```
 
 Used to build the `/submit/` form's GitHub issue URL, the "Suggest an edit" link on entry pages, the footer's "Report a problem with the site" link, and the "Watch the repository" links throughout. **Update this after using the template** — it does not infer itself from where the site is actually hosted. The CLI wizard (`npm run setup`) fills the question in from your git remote; the browser wizard at `/setup/` cannot detect it at all, so on its **Basics** step (site and organization identity), under *GitHub*, check that the **Repository** field says *your* `owner/repo` and not the template's before you continue. A hand-edited `_data/site.yml` is entirely up to you. The `Validate Content` check fails any pull request where this key still names another repository, so a copy that skips it will not merge.
+
+`setup_forms` (optional) decides whether GitHub's **New issue** page offers the maintainer-only
+**Apply setup** form and the **Launch checklist** link. Leave it out and they follow `demo` below:
+offered while the demo banner is up, gone once the demo content is removed. Set it to `false` to
+drop them while keeping the banner (a deployment showing a `demo_message` about provisional
+content, say), or to `true` to bring the Apply setup form back on a finished site. Only `true` and
+`false` count; anything else is ignored. GitHub has no way to hide a form, so `npm run generate`
+writes `.github/ISSUE_TEMPLATE/apply-setup.yml` from `scripts/issue-forms/apply-setup.yml` while
+setup forms are on and deletes it while they are off — run it after changing this key or `demo`.
 
 ### Demo mode
 
@@ -95,7 +105,9 @@ The **Demo content** label stays. Blank or absent, the banner shows the default 
 
 It is turned off by whatever removes the content: `npm run eject:samples`, the **Remove the demo
 content** checkbox on the Apply setup issue, or `npm run setup`'s last question. Delete the key
-entirely once the catalog is yours — a missing `demo` is the same as `false`. The same step
+entirely once the catalog is yours — a missing `demo` is the same as `false`. Unless
+`github.setup_forms` says otherwise, the next `npm run generate` also takes the Apply setup form
+and the Launch checklist link out of GitHub's issue chooser. The same step
 switches the `governance` module off, because `_data/governance.yml` is a worked example rather
 than sample rows (see [`_data/governance.yml`](#_datagovernanceyml)).
 
@@ -118,11 +130,19 @@ modules:
   status: true        # /status/ — "Check your submission": look up a submission by its GitHub number
 ```
 
-Each toggle does three things:
+Each toggle does three things (four for `cohorts`):
 
 1. Removes (or restores) the module's link from the header, via `_data/navigation.yml`'s `module:` key.
 2. Shows or hides the module's block on the home page (`index.md` checks `cfg.modules.<name>`).
 3. **Removes the module's pages from the build entirely.** `_plugins/modules.rb` runs on `post_read` and drops any page whose URL starts with the module's path prefix when that module is off — those pages are not built, not in the sitemap, and not in `search.json`. Prefixes come from `_data/modules.yml` (`/cohorts/`, `/events/`, `/governance/`, `/resources/`, `/status/`, `/submit/`); `catalog`'s prefix is derived from the schema's `entry.path` instead, since it has to track the configured entry folder. Turning the module back on brings its pages back on the next build without further changes.
+4. **`cohorts` only: adds or removes the cohort issue forms.** *Start a new cohort year*
+   (`new-year.yml`), *Update a cohort schedule* (`schedule.yml`), *Add event details*
+   (`new-event.yml`) and *Update event attachments* (`update-event-attachments.yml`) are in
+   GitHub's issue chooser only while `cohorts` is on. GitHub cannot hide a form, so
+   `npm run generate` writes them into `.github/ISSUE_TEMPLATE/` from `scripts/issue-forms/` and
+   deletes them when the module is off; run it after changing the toggle (`npm run setup` and the
+   Apply setup issue run it for you), or the `Validate Content` check names the stale files. Their
+   workflows stay installed either way and only act on issues carrying their label.
 
 The shipped `ai-use-cases` configuration has `catalog`, `submit`, `carousel`, `stats`, `governance` and `status` on, and `events`, `cohorts` and `resources` off. Sample data for the three off-by-default modules still ships in `_data/`, so turning one on gives you something to look at immediately.
 
@@ -666,10 +686,15 @@ Same four presets (`ai-use-cases`, `cohort-portal`, `resource-library`, `blank`)
 ### The Apply setup issue — the browser wizard, finished
 
 `/setup/` hands back finished files but cannot commit them, so the last mile used to be seven manual
-pastes into GitHub's file editor. `.github/ISSUE_TEMPLATE/apply-setup.yml` closes that: paste
+pastes into GitHub's file editor. The Apply setup form closes that: paste
 `_data/site.yml`, `_data/theme.yml` and `_data/schema.yml` from the wizard's review step into one
 issue, and `.github/workflows/apply-setup.yml` runs `scripts/apply_setup_from_issue.mjs`, which
 calls the same `renderFiles()` and opens a pull request.
+
+The form (`.github/ISSUE_TEMPLATE/apply-setup.yml`, generated from
+`scripts/issue-forms/apply-setup.yml`) exists only while setup forms are on — `github.setup_forms`,
+or `demo` when that is unset ([GitHub repository](#github-repository)). On a finished site the
+review step offers the file-by-file editor route instead and says how to bring the form back.
 
 - Only three files are pasted. The other four are *derived* from them, so the generated half can
   never drift from the pasted half — however stale the tab the maintainer copied from.

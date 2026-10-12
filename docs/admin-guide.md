@@ -48,7 +48,7 @@ Work down this list once, in order. [Repository settings at a glance](#repositor
   - `status:received`, `status:in-review`, `status:changes-requested`, `status:published`, `status:declined`: the one status a submission issue is in, kept up to date by the automation and read by the `/status/` page (see [What the submitter is told](#what-the-submitter-is-told)); nothing triggers on them
   - `needs-triage`: applied by `missing-label.yml` to an issue from outside the project that no submission form claimed, so you can find it
 
-  The generated issue forms (`.github/ISSUE_TEMPLATE/*.yml`) already apply these labels when someone opens the issue; you just need the labels to exist in the repo first, or GitHub silently drops them.
+  The generated issue forms (`.github/ISSUE_TEMPLATE/*.yml`) already apply these labels when someone opens the issue; you just need the labels to exist in the repo first, or GitHub silently drops them. Create every label even for a feature you have switched off: the cohort forms only appear in the issue chooser while the `cohorts` module is on, and the Apply setup form only while setup is in progress (`github.setup_forms`, or `demo`; see [configuration.md](configuration.md#github-repository)), but turning one back on should not need another trip here.
 - [ ] **`_data/site.yml` → `github.repository`**: set to this repo's `owner/repo`. Drives the submit form's issue links, every entry page's "Suggest an edit" link, and the footer's "Report a problem with the site" link.
 - [ ] Configure branding/theme/schema via `/setup/` or `npm run setup` (see the [README](../README.md) quick start and [configuration reference](configuration.md)). With no terminal, paste the wizard's three `_data/*.yml` files into the **Apply setup (creates PR)** issue form and merge the pull request it opens.
 - [ ] Clear the demo content: `npm run eject:samples`, or the **Remove the demo content** checkbox on that same Apply setup issue. Until it is gone every page carries a *Demo content* banner — that is deliberate, and it is the only thing telling a visitor that "Baytown Metro Health District" is fictional. The same step switches the `governance` module off; rewrite `_data/governance.yml` as your own review process and policies, then set `governance: true` again. It also removes the showcase — `_showcase/`, `_data/showcase.yml` and `assets/images/showcase/`, the landing page and example sites the template publishes about itself (see [the showcase](configuration.md#the-showcase)). Your fork never builds those anyway: your home page is your catalog.
@@ -491,6 +491,8 @@ Replacing an asset with **Edit** → delete, then upload under the same name kee
 URL working.
 
 ## Cohorts and events (modules: `cohorts`, `events`)
+
+The four forms below are in GitHub's issue chooser only while `modules.cohorts` is on in `_data/site.yml`: `npm run generate` writes them from `scripts/issue-forms/` and removes them when the module is off (see [configuration.md](configuration.md#modules)).
 
 **Start a new cohort year:**
 - Open the **Start a new cohort year** issue (label `content:new-year`) with the four-digit year, or run the `Scaffold new cohort year` workflow manually (`workflow_dispatch`, input `year`).

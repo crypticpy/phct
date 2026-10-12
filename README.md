@@ -174,7 +174,8 @@ assets/js/submit.js      turns the /submit/ form into a pre-filled GitHub issue 
 scripts/                 setup.mjs, generate.mjs, validate.mjs, build_showcase.mjs, and the issue-to-PR automation scripts
 .github/workflows/       pages, validate, quality (a11y + Lighthouse), smoke, new-entry, thumbnails, new-year, new-event, update-schedule, update-event-attachments,
                          verification-sweep, metrics
-.github/ISSUE_TEMPLATE/  new-entry.yml is generated — do not hand-edit it, run `npm run generate`
+.github/ISSUE_TEMPLATE/  new-entry.yml and config.yml are generated, and so are the cohort and Apply setup forms (from
+                         scripts/issue-forms/, only while _data/site.yml uses them) — do not hand-edit, run `npm run generate`
 _showcase/<id>/          sample content for the live examples on the template's own deployment; _data/showcase.yml is the
                          landing page's copy. Both are removed by `npm run eject:samples` (docs/showcase-plan.md)
 catalog/<slug>/index.md  published entries; screenshots live in catalog/<slug>/screenshots/

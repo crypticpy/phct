@@ -6,10 +6,10 @@
  * editor. Nothing is written from here.
  */
 
-import { githubEditFileUrl, renderFiles, validateSchema } from '../core.js';
+import { githubEditFileUrl, renderFiles, setupFormsEnabled, validateSchema } from '../core.js';
 import { el } from '../dom.js';
 import { announce } from '../wizard/errors.js';
-import { buildConfig, state } from '../wizard/state.js';
+import { buildConfig, currentConfig, state } from '../wizard/state.js';
 
 const FILE_HELP = {
   '_data/site.yml': 'Branding, contact details and module toggles.',
@@ -160,10 +160,39 @@ export function renderReview() {
   // The Apply setup issue is the path docs/launch.md recommends: three files
   // pasted into a form, and the automation opens the pull request. The
   // file-by-file editor route below it is the fallback for a copy whose
-  // labels or workflows are not in place yet.
+  // labels or workflows are not in place yet. The form only exists while the
+  // live site has setup forms on (`npm run generate` removes it once the
+  // catalog is the deployment's own), so a finished site is offered the
+  // editor route alone and told how to bring the form back.
+  const applySetupOffered = setupFormsEnabled(currentConfig.site);
   const applySetupUrl = repository
     ? `https://github.com/${repository}/issues/new?template=apply-setup.yml`
     : '';
+  const publishLead = applySetupOffered
+    ? [
+        el('span', { text: 'Easiest: open the ' }),
+        applySetupUrl
+          ? el('a', {
+              class: 'font-medium underline decoration-brand-accent underline-offset-2',
+              href: applySetupUrl,
+              target: '_blank',
+              rel: 'noopener',
+              text: 'Apply setup issue',
+            })
+          : el('span', { text: 'Apply setup issue (Issues → New issue → Apply setup)' }),
+        el('span', {
+          text: " and paste _data/site.yml, _data/theme.yml and _data/schema.yml into its three boxes — the automation opens a pull request with all seven files. Or paste each file into GitHub's editor:",
+        }),
+      ]
+    : [
+        el('span', {
+          text: "Paste each file into GitHub's editor. This site has switched the Apply setup issue off, so a module you turn on or off here gets its issue forms the next time someone runs ",
+        }),
+        el('code', { text: 'npm run generate' }),
+        el('span', { text: '. To use the issue again, add ' }),
+        el('code', { text: 'setup_forms: true' }),
+        el('span', { text: ' under github: in _data/site.yml and run it once.' }),
+      ];
   // A success moment before the working document: every check passed, so say so.
   // The illustration comes from a <template> setup/index.md only renders when the
   // image file exists (and with the site's baseurl already applied), so a copy
@@ -187,21 +216,7 @@ export function renderReview() {
     el('div', { class: 'card' }, [
       el('div', { class: 'card-header' }, [
         el('p', { class: 'card-title', text: 'How to publish these changes' }),
-        el('p', { class: 'section-lead mt-1' }, [
-          el('span', { text: 'Easiest: open the ' }),
-          applySetupUrl
-            ? el('a', {
-                class: 'font-medium underline decoration-brand-accent underline-offset-2',
-                href: applySetupUrl,
-                target: '_blank',
-                rel: 'noopener',
-                text: 'Apply setup issue',
-              })
-            : el('span', { text: 'Apply setup issue (Issues → New issue → Apply setup)' }),
-          el('span', {
-            text: " and paste _data/site.yml, _data/theme.yml and _data/schema.yml into its three boxes — the automation opens a pull request with all seven files. Or paste each file into GitHub's editor:",
-          }),
-        ]),
+        el('p', { class: 'section-lead mt-1' }, publishLead),
       ]),
       el('ol', { class: 'list-decimal space-y-2 px-10 py-5 text-sm text-brand-ink' }, [
         el('li', { text: 'Press Copy on a file below.' }),
