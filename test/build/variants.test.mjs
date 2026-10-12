@@ -992,4 +992,56 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
       assert.ok(linksToStatus(siteDir, 'submit'), 'the submit page does not link to /status/');
     }
   );
+
+  /* ------------------------------------------------------------- analytics */
+
+  /** The Plausible pieces of a page's <head>. */
+  function analyticsHead(siteDir, urlPath) {
+    const doc = page(siteDir, urlPath);
+    const script = doc.querySelector('head script[src="https://plausible.io/js/script.js"]');
+    const stub = [...doc.querySelectorAll('head script:not([src]):not([type])')].find((node) =>
+      /window\.plausible\s*=\s*window\.plausible\s*\|\|/.test(node.textContent)
+    );
+    const rules = JSON.parse(doc.querySelector('head script[type="speculationrules"]').textContent);
+    return { script, stub, speculation: Object.keys(rules) };
+  }
+
+  test(
+    'all-modules: a Plausible domain renders the script, then the queue stub the submit page counts through',
+    { skip: needs('all-modules') },
+    () => {
+      const { dir, siteDir } = built.get('all-modules');
+      const site = yaml.load(fs.readFileSync(path.join(dir, '_data', 'site.yml'), 'utf8'));
+      const domain = site.analytics.plausible_domain;
+      assert.ok(domain, 'precondition: the variant sets analytics.plausible_domain');
+      for (const urlPath of ['', 'submit']) {
+        const { script, stub, speculation } = analyticsHead(siteDir, urlPath);
+        assert.ok(script, `/${urlPath} has no Plausible script`);
+        assert.equal(script.getAttribute('data-domain'), domain);
+        assert.ok(stub, `/${urlPath} has no Plausible queue stub`);
+        // After the script tag, as Plausible's own snippet places it.
+        assert.ok(
+          script.compareDocumentPosition(stub) & 4,
+          `/${urlPath}: the queue stub comes before the script`
+        );
+        assert.deepEqual(speculation, ['prefetch'], `/${urlPath} still prerenders with analytics on`);
+      }
+    }
+  );
+
+  test(
+    'shipped: with no Plausible domain neither the script nor the stub renders',
+    { skip: needs('shipped') },
+    () => {
+      const { dir, siteDir } = built.get('shipped');
+      const site = yaml.load(fs.readFileSync(path.join(dir, '_data', 'site.yml'), 'utf8'));
+      assert.ok(!site.analytics?.plausible_domain, 'precondition: the shipped site.yml leaves analytics off');
+      for (const urlPath of ['', 'submit']) {
+        const { script, stub, speculation } = analyticsHead(siteDir, urlPath);
+        assert.equal(script, null, `/${urlPath} loads Plausible with analytics off`);
+        assert.equal(stub, undefined, `/${urlPath} defines window.plausible with analytics off`);
+        assert.deepEqual(speculation, ['prerender']);
+      }
+    }
+  );
 });
