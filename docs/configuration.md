@@ -459,7 +459,9 @@ analytics:
   plausible_domain: ""   # e.g. "catalog.example.org" — leave blank to disable
 ```
 
-When set, `_includes/head.html` injects the Plausible `<script data-domain>` snippet. No other analytics provider is wired up.
+When set, `_includes/head.html` injects the Plausible `<script data-domain>` snippet, followed by Plausible's small queue stub so custom events can be sent before the script has loaded. No other analytics provider is wired up.
+
+Besides pageviews, the submit page sends one custom event, `Send to GitHub`, each time a submitter presses that button and GitHub's prefilled new-issue form opens in a new tab. It is not sent when a required question is still blank, when a pop-up blocker stops the tab, or when the answers are too long for a link and the page hands them over to copy instead. No answers, title, email address or custom properties are attached to it; like every Plausible event, it carries the standard context Plausible's script sends (the site domain, the page URL, the referrer and the browser's user agent). Plausible only reports a custom event that has a goal, so add a custom-event goal named exactly `Send to GitHub` in your Plausible site settings (*Goals* → *Add goal* → *Custom event*) to see the count. With `plausible_domain` blank, nothing is loaded and nothing is sent.
 
 ## `_data/theme.yml`
 
