@@ -8,6 +8,14 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.6] — 2026-10-12
+
+Sixth candidate. rc.5's live BCHC update passed and deployed. This candidate
+counts *Send to GitHub* presses as a Plausible event on sites with analytics on
+(#97), announces every submission a deploy publishes rather than only its own
+push (#98), shows on GitHub's New issue page only the forms a deployment uses
+(#100) and updates `sharp` for GHSA-wq5f-xc86-pv6w (#99).
+
 ### Added
 
 - **Count submissions handed to GitHub.** With `analytics.plausible_domain` set,
@@ -1627,7 +1635,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.5...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.6...HEAD
+[1.11.0-rc.6]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.5...v1.11.0-rc.6
 [1.11.0-rc.5]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.4...v1.11.0-rc.5
 [1.11.0-rc.4]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.3...v1.11.0-rc.4
 [1.11.0-rc.3]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.2...v1.11.0-rc.3
