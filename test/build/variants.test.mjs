@@ -1029,18 +1029,26 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
     }
   );
 
+  // `shipped` builds this repository's own site.yml, so a deployment that has
+  // turned analytics on checks the on state here instead of failing its update.
   test(
-    'shipped: with no Plausible domain neither the script nor the stub renders',
+    'shipped: the Plausible script and stub render exactly when site.yml sets a domain',
     { skip: needs('shipped') },
     () => {
       const { dir, siteDir } = built.get('shipped');
       const site = yaml.load(fs.readFileSync(path.join(dir, '_data', 'site.yml'), 'utf8'));
-      assert.ok(!site.analytics?.plausible_domain, 'precondition: the shipped site.yml leaves analytics off');
+      const domain = site.analytics?.plausible_domain;
       for (const urlPath of ['', 'submit']) {
         const { script, stub, speculation } = analyticsHead(siteDir, urlPath);
-        assert.equal(script, null, `/${urlPath} loads Plausible with analytics off`);
-        assert.equal(stub, undefined, `/${urlPath} defines window.plausible with analytics off`);
-        assert.deepEqual(speculation, ['prerender']);
+        if (domain) {
+          assert.equal(script?.getAttribute('data-domain'), domain, `/${urlPath} has no Plausible script`);
+          assert.ok(stub, `/${urlPath} has no Plausible queue stub`);
+          assert.deepEqual(speculation, ['prefetch']);
+        } else {
+          assert.equal(script, null, `/${urlPath} loads Plausible with analytics off`);
+          assert.equal(stub, undefined, `/${urlPath} defines window.plausible with analytics off`);
+          assert.deepEqual(speculation, ['prerender']);
+        }
       }
     }
   );
