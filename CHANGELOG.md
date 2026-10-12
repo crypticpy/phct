@@ -8,6 +8,19 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- **Count submissions handed to GitHub.** With `analytics.plausible_domain` set,
+  the submit page now sends a Plausible custom event named `Send to GitHub`
+  when a submitter presses that button and GitHub's prefilled issue form opens.
+  It is not sent while validation blocks the form, when a pop-up blocker stops
+  the tab, or when the answers are too long for a link. No answers or custom
+  properties are attached to it. `_includes/head.html` adds Plausible's queue
+  stub after its script tag so the event is not lost while the script loads. To
+  see the count, add a custom-event goal named `Send to GitHub` in Plausible.
+  Sites with analytics off load and send nothing, as before. See
+  [Analytics](docs/configuration.md#analytics).
+
 ### Fixed
 
 - Merging two submissions in quick succession left the first submitter without
@@ -22,6 +35,13 @@ major version, and each entry says so when it happens.
   and a submission that cannot be updated is a warning that no longer stops the
   rest. The job gains `actions: read` to find that run. See
   [Troubleshooting](docs/admin-guide.md#troubleshooting).
+
+### Security
+
+- `sharp` is updated from 0.35.4 to 0.35.5, which fixes GHSA-wq5f-xc86-pv6w
+  (high: CVE-2026-96889 in the bundled librsvg). The advisory failed
+  `npm run security:audit`. `sharp` is a dev-only dependency used to render
+  the template's images; the published site does not ship it.
 
 ## [1.11.0-rc.5] — 2026-10-06
 
