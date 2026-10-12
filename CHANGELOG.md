@@ -8,6 +8,13 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- A deployment with `analytics.plausible_domain` set could not update to rc.6:
+  a build test assumed the repository's own `site.yml` leaves analytics off,
+  which holds only for the template. The test now checks that the Plausible
+  script and queue stub render exactly when that file sets a domain.
+
 ## [1.11.0-rc.6] — 2026-10-12
 
 Sixth candidate. rc.5's live BCHC update passed and deployed. This candidate
