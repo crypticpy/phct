@@ -35,7 +35,13 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-import { ejectSamples, ejectSummary } from './eject_samples.mjs';
+import {
+  EXAMPLE_MODULES,
+  ejectSamples,
+  ejectSummary,
+  siteYamlWithModuleOff,
+  siteYamlWithoutDemo,
+} from './eject_samples.mjs';
 import { planGenerate, pointRepositoryLinks } from './lib/generate_plan.mjs';
 import { helpText, parseArgs } from './lib/setup-args.mjs';
 import {
@@ -135,7 +141,42 @@ async function main() {
     if (!args.out) {
       files['_data/site.yml'] = pointRepositoryLinks(files['_data/site.yml'], config.site.github?.repository);
     }
-    const derived = args.out ? null : planGenerate(ROOT, files);
+
+    // --- 3b. demo content ---------------------------------------------------
+    // The shipped sample entries were written for the previous entry model. If
+    // the schema changed, they will fail validation, so offer to remove them —
+    // along with the rest of the demo content and the banner that announces it.
+    // Asked before the summary so the plan below, dry run included, reflects
+    // the answer: removal turns `demo` off, which drops the Apply setup form
+    // and the chooser's Launch checklist link.
+    const previousSchema = readSchema(ROOT);
+    let removeDemo = false;
+    let offerDemoRemoval = false;
+    if (!args.out) {
+      const schemaChanged =
+        JSON.stringify(schemaFieldKeys(previousSchema)) !==
+        JSON.stringify(config.schema.fields.map((field) => field.key));
+      const sampleEntries = listSampleEntries(ROOT, entryPathFrom(previousSchema));
+      offerDemoRemoval = sampleEntries.length > 0 && (schemaChanged || preset.id !== 'current');
+      if (offerDemoRemoval) {
+        const count = `${sampleEntries.length} sample ${sampleEntries.length === 1 ? 'entry' : 'entries'}`;
+        removeDemo = await asker.confirm(
+          `Remove the demo content — ${count} under ${entryPathFrom(previousSchema)}/, the sample events, cohort and resources — and switch the governance page off until you have rewritten it?`,
+          schemaChanged
+        );
+      }
+    }
+
+    // What generate will see after step 6 has run.
+    let planned = files;
+    if (removeDemo) {
+      // Each helper returns null when there is nothing to switch off.
+      let site = files['_data/site.yml'];
+      site = siteYamlWithoutDemo(site) ?? site;
+      for (const name of EXAMPLE_MODULES) site = siteYamlWithModuleOff(site, name) ?? site;
+      planned = { ...files, '_data/site.yml': site };
+    }
+    const derived = args.out ? null : planGenerate(ROOT, planned);
 
     // --- 4. summary ---------------------------------------------------------
     console.log(bold('\nFiles to write:\n'));
@@ -183,7 +224,6 @@ async function main() {
     }
 
     // --- 5. write -----------------------------------------------------------
-    const previousSchema = readSchema(ROOT);
     writeFiles(target, files);
 
     // Writing elsewhere never touches the working tree, so stop here.
@@ -193,24 +233,10 @@ async function main() {
     }
 
     // --- 6. demo content ----------------------------------------------------
-    // The shipped sample entries were written for the previous entry model. If
-    // the schema changed, they will fail validation, so offer to remove them —
-    // along with the rest of the demo content and the banner that announces it.
-    const schemaChanged =
-      JSON.stringify(schemaFieldKeys(previousSchema)) !==
-      JSON.stringify(config.schema.fields.map((field) => field.key));
-    const sampleEntries = listSampleEntries(ROOT, entryPathFrom(previousSchema));
-    if (sampleEntries.length && (schemaChanged || preset.id !== 'current')) {
-      const count = `${sampleEntries.length} sample ${sampleEntries.length === 1 ? 'entry' : 'entries'}`;
-      const remove = await asker.confirm(
-        `Remove the demo content — ${count} under ${entryPathFrom(previousSchema)}/, the sample events, cohort and resources — and switch the governance page off until you have rewritten it?`,
-        schemaChanged
-      );
-      if (remove) {
-        for (const line of ejectSummary(ejectSamples(ROOT))) console.log(dim(`  ${line}`));
-      } else {
-        console.log(dim('  Kept. Run `npm run eject:samples` when you are ready to clear it.'));
-      }
+    if (removeDemo) {
+      for (const line of ejectSummary(ejectSamples(ROOT))) console.log(dim(`  ${line}`));
+    } else if (offerDemoRemoval) {
+      console.log(dim('  Kept. Run `npm run eject:samples` when you are ready to clear it.'));
     }
 
     // --- 7. derived files ---------------------------------------------------

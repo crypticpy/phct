@@ -445,6 +445,8 @@ const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
 test('npm run setup --dry-run lists the issue forms generate would add and remove, and writes nothing', (t) => {
   const root = scratchRepository(t);
+  // The shipped sample entries, so setup offers to remove the demo content.
+  fs.cpSync(path.join(ROOT, 'catalog'), path.join(root, 'catalog'), { recursive: true });
   const untouched = () => ({ templates: issueTemplates(root), site: read(root, '_data/site.yml') });
 
   // The template has cohorts off: the cohort portal preset turns them on.
@@ -455,6 +457,13 @@ test('npm run setup --dry-run lists the issue forms generate would add and remov
     assert.match(output, new RegExp(`${escape(optionalFormPath(file))}\\s+new file`, 'u'));
   }
   assert.match(output, /assets\/js\/configurator\/defaults\.generated\.js\s+\+\d+ -\d+ lines/u);
+  // The preset changes the schema, so --yes accepts removing the demo content,
+  // which turns `demo` off and retires the Apply setup form.
+  assert.match(output, new RegExp(`${escape(optionalFormPath('apply-setup.yml'))}\\s+delete`, 'u'));
+  assert.match(
+    output,
+    /Then `npm run generate` will change:[\s\S]*\.github\/ISSUE_TEMPLATE\/config\.yml\s+\+\d+ -\d+ lines/u
+  );
   assert.match(output, /Dry run — nothing was written/u);
   assert.deepEqual(untouched().site, before.site, 'the dry run wrote _data/site.yml');
   assertSameTemplates(untouched().templates, before.templates, 'the dry run');
