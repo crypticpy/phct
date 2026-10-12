@@ -8,6 +8,13 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Security
+
+- `sharp` is updated from 0.35.4 to 0.35.5, which fixes GHSA-wq5f-xc86-pv6w
+  (high: CVE-2026-96889 in the bundled librsvg). The advisory failed
+  `npm run security:audit`. `sharp` is a dev-only dependency used to render
+  the template's images; the published site does not ship it.
+
 ## [1.11.0-rc.5] — 2026-10-06
 
 Fifth candidate. rc.4's live BCHC update passed and deployed. This candidate makes
