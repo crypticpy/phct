@@ -8,6 +8,19 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- **Count submissions handed to GitHub.** With `analytics.plausible_domain` set,
+  the submit page now sends a Plausible custom event named `Send to GitHub`
+  when a submitter presses that button and GitHub's prefilled issue form opens.
+  It is not sent while validation blocks the form, when a pop-up blocker stops
+  the tab, or when the answers are too long for a link. Only the event name is
+  sent, never an answer. `_includes/head.html` adds Plausible's queue stub after
+  its script tag so the event is not lost while the script loads. To see the
+  count, add a custom-event goal named `Send to GitHub` in Plausible. Sites with
+  analytics off load and send nothing, as before. See
+  [Analytics](docs/configuration.md#analytics).
+
 ## [1.11.0-rc.5] — 2026-10-06
 
 Fifth candidate. rc.4's live BCHC update passed and deployed. This candidate makes
