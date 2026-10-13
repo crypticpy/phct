@@ -8,6 +8,21 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- Three tests added in rc.9 failed inside a real deployment's PHCT update,
+  which runs the template's suite on the deployment's own files.
+  `direct_issue_body.test.mjs` drove the template's `/submit/` snapshot but
+  compared against the repository's own issue template and ran the scaffolder
+  on its own `_data/schema.yml`, so a deployment that relabels a question
+  (BCHC's "Role of AI" for "How AI is involved") failed it. It now generates the
+  issue form and the scaffolder's schema from the snapshot's own questions, the
+  way `submit_form.test.mjs` already did. The byte-for-byte check on the
+  repository's own schema stays in `test/build/variants.test.mjs`.
+  `signin_url.test.mjs` required `_data/site.yml` to carry a blank
+  `submit.signin_url`, which a deployment's own `site.yml` need not have; it now
+  sets the key itself. The submit page and its issue body were not at fault.
+
 ## [1.11.0-rc.9] — 2026-10-13
 
 Ninth candidate. rc.8's live BCHC update passed and deployed. This candidate

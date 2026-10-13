@@ -9,6 +9,34 @@
  * left blank — with a blank line between sections.
  */
 
+/**
+ * The schema a booted /submit/ page was built from, read back off the page:
+ * each question's key, label and type, whether it is required, and a choice
+ * question's options, in page order. A test driving the committed snapshot
+ * (test/fixtures/submit-form.html) generates its issue form and runs the
+ * scaffolder from this, never from the repository's own _data/schema.yml or
+ * .github/ISSUE_TEMPLATE/new-entry.yml: a deployment's update runs these tests
+ * on its own schema, whose questions and labels are not the snapshot's.
+ * @param {HTMLFormElement} form
+ * @returns {{entry: object, fields: object[]}}
+ */
+export function pageSchema(form) {
+  const fields = Array.from(form.querySelectorAll('[data-field]'), (wrap) => ({
+    key: wrap.dataset.field,
+    label: wrap.dataset.label,
+    type: wrap.dataset.type,
+    required: wrap.dataset.required === 'true',
+    ...(wrap.dataset.type === 'select' || wrap.dataset.type === 'multiselect'
+      ? {
+          options: Array.from(wrap.querySelectorAll('input[value], option'), (node) => node.value).filter(
+            Boolean
+          ),
+        }
+      : {}),
+  }));
+  return { entry: { singular: 'Entry', path: 'catalog' }, fields };
+}
+
 /** Issue-form elements that write a section into the issue body. */
 const ANSWERED = new Set(['input', 'textarea', 'dropdown', 'checkboxes', 'upload']);
 
