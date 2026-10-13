@@ -8,6 +8,24 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- `/submit/` did not warn that a signed-out submitter can lose every answer
+  on the way to GitHub: GitHub keeps a prefilled issue link through its
+  sign-in page only up to about 5,400 characters. The page now asks submitters
+  to sign in to GitHub before the first question, with a link to GitHub's
+  sign-in page that opens in a new tab, and repeats it in one line beside
+  *Send to GitHub*.
+- Typing while the "You have an unfinished draft" bar was still showing was
+  never saved. The first edit now moves the old draft aside (to
+  `<draft key>:previous`) and saves the new work as usual; the bar stays up,
+  and *Restore it* brings the old draft back.
+- Answers typed in the half second before leaving the page were lost: the draft
+  is now saved when the page is hidden or closed, and the browser asks before
+  leaving only when the answers could not be saved at all.
+- *Submitted it? Delete the saved draft* saved the still-filled form again half
+  a second later. Deleting now holds autosave until the next edit.
+
 ## [1.11.0-rc.8] — 2026-10-12
 
 Eighth candidate. rc.7's live BCHC update passed and deployed. This candidate

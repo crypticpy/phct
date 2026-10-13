@@ -157,6 +157,16 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
     <li><strong class="text-brand-ink">2.</strong> Check your answers, then send them to GitHub.</li>
     <li><strong class="text-brand-ink">3.</strong> Press <em>Submit new issue</em> on GitHub — that is what actually submits it.</li>
   </ol>
+  {%- comment -%}
+    Before any question: GitHub keeps a prefilled issue through its sign-in
+    page only for a short link, so a submitter who signs in on the way can land
+    on an empty form. Signing in first, in another tab, avoids it. The review
+    panel repeats this in one line beside the send button
+    (assets/js/submit/review.js).
+  {%- endcomment -%}
+  <p class="mt-4 flex items-start gap-1.5 rounded-lg border border-brand-line bg-surface-base p-4 text-sm text-brand-ink" data-form-chrome data-signin-notice>
+    {% include icon.html name='warning' size='sm' class='mt-0.5 shrink-0' %}<span><strong>Sign in to GitHub before you start.</strong> If you are not signed in when you send, GitHub can drop your answers on the way through its sign-in page. <a class="font-medium text-brand-primary underline underline-offset-2 hover:no-underline" href="https://github.com/login" target="_blank" rel="noopener">Sign in to GitHub</a> (opens in a new tab), then come back here.</span>
+  </p>
   {%- else -%}
   <p class="mt-4 flex items-start gap-1.5 rounded-lg border border-brand-line bg-surface-base p-4 text-sm text-brand-ink" data-form-chrome>
     {% include icon.html name='warning' size='sm' class='mt-0.5 shrink-0' %}<span>This site has no catalog repository behind it, so nothing here can be submitted. The questions, the card preview and the copy buttons all work — the last step, which on a published catalog opens a prefilled GitHub issue for a maintainer to review, has nowhere to go{% if fallback_email != '' %}, so <em>Email it instead</em> is the way out of this page{% endif %}.</span>

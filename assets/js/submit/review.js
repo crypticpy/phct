@@ -277,6 +277,18 @@
       ...groups,
       ...[unprefillableBlock(fields)].filter(Boolean),
       el('div', { class: 'card' }, [whatHappensNext()].filter(Boolean)),
+      // GitHub can drop a prefill on its sign-in page, so a signed-out
+      // submitter may land on an empty form. The intro says so at length
+      // (submit/index.md); this is the reminder at the moment it matters.
+      // Only a site with a repository sends anyone to GitHub.
+      ...(form.dataset.repo
+        ? [
+            el('p', {
+              class: 'text-sm text-brand-muted',
+              text: 'Not signed in to GitHub? Sign in first — GitHub can drop your answers on the way through sign-in.',
+            }),
+          ]
+        : []),
       el('div', { class: 'flex flex-wrap items-center gap-3' }, [
         el('button', {
           type: 'button',

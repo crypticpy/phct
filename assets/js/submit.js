@@ -201,7 +201,14 @@
       return titleField ? String(ns.readValue(titleField)) : '';
     }
 
-    let draft = { save: function () {}, clear: function () {}, flush: function () {} };
+    let draft = {
+      save: function () {},
+      clear: function () {},
+      flush: function () {},
+      unsaved: function () {
+        return false;
+      },
+    };
 
     /**
      * Warn while there is still time to do something about it: once the
@@ -396,6 +403,8 @@
         email: form.dataset.fallbackEmail || '',
         subject: (form.dataset.titlePrefix || '') + (entryTitle() || 'New entry'),
         onDelete: function () {
+          // Clearing also holds autosave until the next edit, so the refresh
+          // below repaints the form without saving it all back.
           draft.clear();
           ns.exitReview(form);
           say(status, 'Saved draft deleted. Thanks for sending it in.');
@@ -426,6 +435,20 @@
         onBack: refresh,
         sendLabel: form.dataset.repo ? '' : 'Copy your answers',
       });
+    });
+
+    // Leaving the page, or a phone putting the browser away, must not lose
+    // what was typed inside the autosave debounce.
+    window.addEventListener('pagehide', () => draft.flush());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') draft.flush();
+    });
+    // Asked only when answers could not be saved even now — storage refused
+    // or failed — not on every leave: a saved draft is already safe.
+    window.addEventListener('beforeunload', (event) => {
+      if (!draft.unsaved()) return;
+      event.preventDefault();
+      event.returnValue = '';
     });
 
     /**

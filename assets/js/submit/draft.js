@@ -12,6 +12,10 @@
  * [data-draft-action=restore|discard|save|clear], [data-draft-status], and
  * [data-draft-unavailable] for the "this browser will not save" case.
  *
+ * A stored draft offered by the bar is never overwritten by new typing: the
+ * first edit made before the bar is answered moves it to `<key>:previous`, and
+ * the bar stays up offering it from there while the new answers save as usual.
+ *
  * Exposes: window.SubmitForm.initDraft
  */
 (function (ns) {
@@ -75,28 +79,43 @@
 
   /**
    * Wire autosave, the restore bar and the draft buttons.
+   *
+   * Besides `save`/`clear`, the returned `flush` writes a pending autosave now
+   * (for the page being left), and `unsaved` flushes, then reports whether
+   * typed answers are still not in storage — the one case worth a warning.
    * @param {HTMLFormElement} form
    * @param {object[]} fields descriptors from readFields
    * @param {(ui: object|null) => void} onRestore called after a draft is
    *   written into the form, with the draft's saved UI state (or null)
    * @param {(() => object|null)|undefined} uiState reads the UI state (stepper
    *   position, short-form mode) to store beside the answers
-   * @returns {{save: Function, clear: Function, flush: Function}}
+   * @returns {{save: Function, clear: Function, flush: Function, unsaved: () => boolean}}
    */
   ns.initDraft = function initDraft(form, fields, onRestore, uiState) {
     const key = storageKey(form);
+    // Where an offered draft is kept once new typing starts (see the header).
+    const previousKey = key + ':previous';
     const memory = store();
     const status = form.querySelector('[data-draft-status]');
     const bar = form.querySelector('[data-draft-restore]');
     const barSaved = form.querySelector('[data-draft-saved]');
     const barCount = form.querySelector('[data-draft-count]');
+    const discardButton = form.querySelector('[data-draft-action="discard"]');
     const unavailable = form.querySelector('[data-draft-unavailable]');
     let timer = null;
     let savedAt = '';
-    // True between "you have an unfinished draft" appearing and the submitter
-    // answering it. Autosaving while the bar is up would overwrite the very
-    // draft the bar is offering — one keystroke and it is gone.
+    // True between "you have an unfinished draft" appearing and the first
+    // edit (or the submitter answering it). Writing then would overwrite the
+    // very draft the bar is offering, so the first write sets it aside first.
     let pending = false;
+    // The storage key the bar offers to restore from; '' with the bar down.
+    let offered = '';
+    // True once the draft has been deleted and until the next real edit: the
+    // form still shows the answers, and saving them again unasked would undo
+    // the delete.
+    let held = false;
+    // True while there are answers storage does not have yet.
+    let dirty = false;
 
     /** @returns {object} the current answers, keyed by schema key */
     function snapshot() {
@@ -122,13 +141,58 @@
       setStatus('Saved ' + relative(savedAt) + ' — on this device only.');
     }
 
+    /**
+     * Move the offered draft to the `previous` key, so the new answers can be
+     * saved without overwriting it, and say so on the bar, which stays up.
+     * @returns {boolean} false when storage refused, and nothing may be saved
+     */
+    function setAside() {
+      try {
+        const current = memory.getItem(key);
+        if (current !== null) {
+          // An older kept draft, left unanswered on an earlier visit, is
+          // replaced: this one was offered over it, and the edit went ahead.
+          memory.setItem(previousKey, current);
+          memory.removeItem(key);
+        }
+      } catch (error) {
+        setStatus(
+          'This browser would not keep your earlier draft and save your new answers too. Restore the draft or delete it to keep saving.'
+        );
+        return false;
+      }
+      pending = false;
+      offered = previousKey;
+      if (barCount) barCount.textContent += ' Restoring it replaces what you have typed since.';
+      if (discardButton) discardButton.textContent = 'Delete the earlier draft';
+      return true;
+    }
+
     /** Write the current answers to storage and announce it. */
     function write() {
-      if (!memory || pending) return;
+      if (timer) window.clearTimeout(timer);
+      timer = null;
+      if (held) return;
       const data = snapshot();
-      if (Object.keys(data).length === 0) {
+      const empty = Object.keys(data).length === 0;
+      if (!memory) {
+        dirty = !empty;
+        return;
+      }
+      let setAsideNow = false;
+      if (pending) {
+        // Nothing typed yet: the offered draft stays exactly where it is.
+        if (empty) {
+          dirty = false;
+          return;
+        }
+        if (!setAside()) return;
+        setAsideNow = true;
+      }
+      if (empty) {
         memory.removeItem(key);
         savedAt = '';
+        dirty = false;
         setStatus('');
         return;
       }
@@ -144,31 +208,57 @@
         return;
       }
       savedAt = stamp;
+      dirty = false;
       paintStatus();
+      if (setAsideNow && status) {
+        setStatus(status.textContent + ' Your earlier draft is kept until you restore or delete it.');
+      }
     }
 
-    /** Debounced autosave. Inert while a restore decision is outstanding. */
+    /** Debounced autosave. Inert after a delete, until the next real edit. */
     function save() {
-      if (pending) return;
+      if (held) return;
+      dirty = true;
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(write, DEBOUNCE_MS);
     }
 
-    /** Drop the saved draft. */
+    /** Write a pending autosave now, rather than after the debounce. */
+    function flush() {
+      if (timer) write();
+    }
+
+    /** @returns {boolean} true when typed answers could not be saved, even now */
+    function unsaved() {
+      flush();
+      return dirty;
+    }
+
+    /** Drop the saved draft, and the kept one, and hold autosave until the next edit. */
     function clear() {
       if (timer) window.clearTimeout(timer);
+      timer = null;
       pending = false;
+      offered = '';
+      held = true;
+      dirty = false;
       savedAt = '';
-      if (memory) memory.removeItem(key);
+      if (memory) {
+        memory.removeItem(key);
+        memory.removeItem(previousKey);
+      }
       if (status) status.textContent = '';
       if (bar) bar.hidden = true;
     }
 
-    /** @returns {{saved: string, fields: object, ui: object|null}|null} the stored draft, if any */
-    function read() {
+    /**
+     * @param {string} from storage key
+     * @returns {{saved: string, fields: object, ui: object|null}|null} the stored draft, if any
+     */
+    function read(from) {
       if (!memory) return null;
       try {
-        const parsed = JSON.parse(memory.getItem(key) || 'null');
+        const parsed = JSON.parse(memory.getItem(from) || 'null');
         if (!parsed || !parsed.fields) return null;
         return {
           saved: String(parsed.saved || ''),
@@ -187,10 +277,18 @@
      * question, and the answer to it has nowhere to go. Those keys are dropped
      * rather than silently kept, and the submitter is told how many, so a
      * shorter form than they remember has an explanation.
+     *
+     * The draft replaces the form rather than merging into it: an answer it
+     * does not have is put back to the question's starting value, so a draft
+     * restored over newer typing comes back as it was saved.
      */
     function restore() {
-      const draft = read();
+      const from = offered || key;
+      const draft = read(from);
+      if (timer) window.clearTimeout(timer);
+      timer = null;
       pending = false;
+      held = false;
       if (!draft) return;
       const known = new Set(fields.map((field) => field.key));
       const stored = Object.keys(draft.fields);
@@ -198,8 +296,13 @@
       fields.forEach((field) => {
         if (Object.prototype.hasOwnProperty.call(draft.fields, field.key)) {
           ns.setValue(field, draft.fields[field.key]);
+        } else if (ns.isAnswered(field)) {
+          ns.setValue(field, field.initial);
         }
       });
+      // Used up: from here on it is the current draft, saved under `key`.
+      if (from === previousKey) memory.removeItem(previousKey);
+      offered = '';
       if (bar) bar.hidden = true;
       const restored = stored.length - dropped;
       setStatus(
@@ -218,8 +321,12 @@
       save();
     }
 
-    /** Fill the restore bar with what is in storage, and show it. */
-    function offerRestore(draft) {
+    /**
+     * Fill the restore bar with what is in storage, and show it.
+     * @param {{saved: string, fields: object}} draft
+     * @param {string} from the storage key it was read from
+     */
+    function offerRestore(draft, from) {
       if (!bar) return;
       if (barSaved) {
         const when = relative(draft.saved);
@@ -231,14 +338,27 @@
       }
       bar.hidden = false;
       pending = true;
+      offered = from;
     }
 
     if (!memory) {
       if (unavailable) unavailable.hidden = false;
     } else {
-      const existing = read();
-      if (existing) offerRestore(existing);
+      // A kept draft is offered on its own only when there is no newer one.
+      const existing = read(key);
+      const kept = existing ? null : read(previousKey);
+      if (existing) offerRestore(existing, key);
+      else if (kept) offerRestore(kept, previousKey);
     }
+
+    // A real edit after a delete is new work: saving resumes. Registered here,
+    // before assets/js/submit.js adds the listeners that call save().
+    form.addEventListener('input', () => {
+      held = false;
+    });
+    form.addEventListener('change', () => {
+      held = false;
+    });
 
     // The status line ages in place: a form open for half an hour should not
     // still claim the draft was saved "just now".
@@ -254,10 +374,19 @@
           setStatus('This browser will not save a draft. Copy your answers before leaving.');
           return;
         }
-        if (timer) window.clearTimeout(timer);
+        // An explicit save is a request, held or not.
+        held = false;
         write();
         if (!savedAt) return;
         setStatus('Saved. Come back to this page in this browser and your answers will be waiting.');
+      }
+      if (action === 'discard' && offered === previousKey && !pending) {
+        // Only the kept draft goes: what was typed since is the current one.
+        memory.removeItem(previousKey);
+        offered = '';
+        if (bar) bar.hidden = true;
+        setStatus('Earlier draft deleted. Your new answers are still saved on this device.');
+        return;
       }
       if (action === 'discard' || action === 'clear') {
         clear();
@@ -265,6 +394,6 @@
       }
     });
 
-    return { save: save, clear: clear, flush: write };
+    return { save: save, clear: clear, flush: flush, unsaved: unsaved };
   };
 })((window.SubmitForm = window.SubmitForm || {}));
