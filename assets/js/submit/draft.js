@@ -15,6 +15,8 @@
  * A stored draft offered by the bar is never overwritten by new typing: the
  * first edit made before the bar is answered moves it to `<key>:previous`, and
  * the bar stays up offering it from there while the new answers save as usual.
+ * Nothing is ever moved onto an occupied `:previous`: a visit that finds both
+ * keys picks up the newer work in the form and offers the kept one again.
  *
  * Exposes: window.SubmitForm.initDraft
  */
@@ -150,8 +152,10 @@
       try {
         const current = memory.getItem(key);
         if (current !== null) {
-          // An older kept draft, left unanswered on an earlier visit, is
-          // replaced: this one was offered over it, and the edit went ahead.
+          // Never onto a kept draft: that one would be gone without anyone
+          // choosing it. Load picks up both (see the boot code below), so this
+          // only guards against storage changed under the page.
+          if (memory.getItem(previousKey) !== null) throw new Error('an earlier draft is already kept');
           memory.setItem(previousKey, current);
           memory.removeItem(key);
         }
@@ -161,11 +165,19 @@
         );
         return false;
       }
+      showKept();
+      return true;
+    }
+
+    /**
+     * The bar now offers the kept draft while the current answers save as
+     * usual: say what Restore and Delete will do from here.
+     */
+    function showKept() {
       pending = false;
       offered = previousKey;
       if (barCount) barCount.textContent += ' Restoring it replaces what you have typed since.';
       if (discardButton) discardButton.textContent = 'Delete the earlier draft';
-      return true;
     }
 
     /** Write the current answers to storage and announce it. */
@@ -290,6 +302,23 @@
       pending = false;
       held = false;
       if (!draft) return;
+      const message = fill(draft);
+      // Used up: from here on it is the current draft, saved under `key`.
+      if (from === previousKey) memory.removeItem(previousKey);
+      offered = '';
+      if (bar) bar.hidden = true;
+      setStatus(message);
+      onRestore(draft.ui);
+      savedAt = '';
+      save();
+    }
+
+    /**
+     * Put a draft's answers into the form (see restore).
+     * @param {{fields: object}} draft
+     * @returns {string} what was restored, and what was left behind, in words
+     */
+    function fill(draft) {
       const known = new Set(fields.map((field) => field.key));
       const stored = Object.keys(draft.fields);
       const dropped = stored.filter((stored_key) => !known.has(stored_key)).length;
@@ -300,25 +329,18 @@
           ns.setValue(field, field.initial);
         }
       });
-      // Used up: from here on it is the current draft, saved under `key`.
-      if (from === previousKey) memory.removeItem(previousKey);
-      offered = '';
-      if (bar) bar.hidden = true;
       const restored = stored.length - dropped;
-      setStatus(
+      return (
         'Restored ' +
-          restored +
-          (restored === 1 ? ' answer.' : ' answers.') +
-          (dropped > 0
-            ? ' ' +
-              dropped +
-              (dropped === 1 ? ' answer was' : ' answers were') +
-              ' saved for questions this form no longer asks, so it was left behind.'
-            : '')
+        restored +
+        (restored === 1 ? ' answer.' : ' answers.') +
+        (dropped > 0
+          ? ' ' +
+            dropped +
+            (dropped === 1 ? ' answer was' : ' answers were') +
+            ' saved for questions this form no longer asks, so it was left behind.'
+          : '')
       );
-      onRestore(draft.ui);
-      savedAt = '';
-      save();
     }
 
     /**
@@ -344,10 +366,18 @@
     if (!memory) {
       if (unavailable) unavailable.hidden = false;
     } else {
-      // A kept draft is offered on its own only when there is no newer one.
       const existing = read(key);
-      const kept = existing ? null : read(previousKey);
-      if (existing) offerRestore(existing, key);
+      const kept = read(previousKey);
+      if (existing && kept) {
+        // Left last time after typing over a draft: the newer work goes back
+        // into the form, where it was, and the kept draft is offered as before.
+        // Offering the newer one instead would mean moving it onto the kept
+        // one at the first keystroke.
+        offerRestore(kept, previousKey);
+        showKept();
+        setStatus(fill(existing) + ' Your earlier draft is kept until you restore or delete it.');
+        onRestore(existing.ui);
+      } else if (existing) offerRestore(existing, key);
       else if (kept) offerRestore(kept, previousKey);
     }
 

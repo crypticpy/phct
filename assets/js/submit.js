@@ -318,7 +318,8 @@
       if (stepper) stepper.apply(true);
     };
 
-    ns.initRepeatables(fields, refresh);
+    // Adding or removing a row dispatches `input`, handled below.
+    ns.initRepeatables(fields);
 
     form.addEventListener('input', (event) => {
       const wrap = event.target.closest ? event.target.closest('[data-field]') : null;

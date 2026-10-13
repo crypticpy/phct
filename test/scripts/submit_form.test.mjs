@@ -43,11 +43,12 @@ test.after(() => booted.forEach((dom) => dom.window.close()));
 /**
  * A booted submit page. The scripts are evaluated only once the document is
  * complete, mirroring the deferred <script> tags the layout emits.
- * @param {{popupBlocked?: boolean, draft?: object, ui?: object,
+ * @param {{popupBlocked?: boolean, draft?: object, ui?: object, previous?: object,
  *   plausible?: 'stub'|'spy'|'throws'}} [options]
  *   popupBlocked makes window.open return null the way a pop-up blocker does;
  *   draft seeds a saved draft in localStorage before the scripts boot, and ui
- *   rides beside it as the draft's stored UI state (step, short-form mode).
+ *   rides beside it as the draft's stored UI state (step, short-form mode);
+ *   previous seeds the earlier draft kept aside under `<key>:previous`.
  *   plausible stands in for a site with analytics on: `stub` runs the queue
  *   stub _includes/head.html renders (Plausible's script itself never loads
  *   here), `spy` records every call in ctx.events, `throws` throws on every
@@ -97,6 +98,10 @@ async function boot(options = {}) {
     const stored = { saved: new Date().toISOString(), fields: options.draft };
     if (options.ui) stored.ui = options.ui;
     window.localStorage.setItem(draftKey, JSON.stringify(stored));
+  }
+  if (options.previous) {
+    const kept = { saved: new Date(Date.now() - 3600000).toISOString(), fields: options.previous };
+    window.localStorage.setItem(draftKey + ':previous', JSON.stringify(kept));
   }
 
   SCRIPTS.forEach((rel) => window.eval(fs.readFileSync(path.join(ROOT, rel), 'utf8')));
@@ -1029,6 +1034,68 @@ test('a browser that refuses storage warns before leaving typed answers behind',
   assert.equal(leaveChallenged(page), false, 'nothing typed, nothing to lose');
   answer(page, 'title', 'Nowhere to keep this');
   assert.equal(leaveChallenged(page), true);
+});
+
+test('coming back with new work and a kept earlier draft continues the new work and keeps both', async () => {
+  // Left last time after typing over draft A: A was kept aside, B saved.
+  const ctx = await boot({
+    draft: { title: 'B, the newer work' },
+    previous: { title: 'A, the earlier draft' },
+  });
+  const previous = () => JSON.parse(ctx.window.localStorage.getItem(ctx.draftKey + ':previous') || 'null');
+  const title = ctx.form.querySelector('[data-field="title"] input');
+  const bar = ctx.form.querySelector('[data-draft-restore]');
+
+  // The newer work is back in the form; the earlier draft is still on offer.
+  assert.equal(title.value, 'B, the newer work');
+  assert.equal(bar.hidden, false);
+  assert.match(
+    bar.querySelector('[data-draft-count]').textContent,
+    /Restoring it replaces what you have typed since/
+  );
+  assert.equal(
+    ctx.form.querySelector('[data-draft-action="discard"]').textContent.trim(),
+    'Delete the earlier draft'
+  );
+  assert.match(ctx.form.querySelector('[data-draft-status]').textContent, /earlier draft is kept/);
+
+  // Typing again saves over B (it is in the form) and never touches A.
+  answer(ctx, 'title', 'C, typed after coming back');
+  await settle();
+  assert.equal(ctx.storedDraft().fields.title, 'C, typed after coming back');
+  assert.equal(previous().fields.title, 'A, the earlier draft', 'the earlier draft was overwritten');
+
+  ctx.form.querySelector('[data-draft-action="restore"]').click();
+  assert.equal(title.value, 'A, the earlier draft');
+  assert.equal(previous(), null);
+});
+
+test('removing a filled link row after deleting the draft saves again', async () => {
+  const ctx = await boot();
+  const wrap = ctx.form.querySelector('[data-field="resources"]');
+  wrap.querySelector('[data-links-add]').click();
+  const rows = () => wrap.querySelectorAll('[data-links-rows] > *');
+  [
+    ['Evaluation', 'https://example.org/eval.pdf'],
+    ['Slides', 'https://example.org/slides.pdf'],
+  ].forEach(([label, url], index) => {
+    const row = rows()[index];
+    row.querySelector('[data-links-label]').value = label;
+    row.querySelector('[data-links-url]').value = url;
+    row.querySelector('[data-links-url]').dispatchEvent(new ctx.window.Event('input', { bubbles: true }));
+  });
+  await settle();
+  assert.equal(ctx.storedDraft().fields.resources.length, 2);
+
+  ctx.form.querySelector('[data-draft-action="clear"]').click();
+  assert.equal(ctx.storedDraft(), null);
+
+  // Removing a filled row changes the answers: that is an edit, and is saved.
+  rows()[1].querySelector('[data-links-remove]').click();
+  await settle();
+  assert.ok(ctx.storedDraft(), 'removing a filled row was not saved');
+  assert.equal(ctx.storedDraft().fields.resources.length, 1);
+  assert.equal(ctx.storedDraft().fields.resources[0].label, 'Evaluation');
 });
 
 test('a browser that refuses storage says so where the draft bar would be', async () => {

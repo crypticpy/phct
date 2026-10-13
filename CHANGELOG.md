@@ -19,7 +19,9 @@ major version, and each entry says so when it happens.
 - Typing while the "You have an unfinished draft" bar was still showing was
   never saved. The first edit now moves the old draft aside (to
   `<draft key>:previous`) and saves the new work as usual; the bar stays up,
-  and *Restore it* brings the old draft back.
+  and *Restore it* brings the old draft back. Coming back later picks up the
+  new work in the form and still offers the old draft; neither is replaced
+  without the submitter choosing it.
 - Answers typed in the half second before leaving the page were lost: the draft
   is now saved when the page is hidden or closed, and the browser asks before
   leaving only when the answers could not be saved at all.
