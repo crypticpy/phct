@@ -8,6 +8,12 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.10] — 2026-10-13
+
+Tenth candidate. rc.9 failed closed in BCHC on three new tests that read the
+deployment's own schema and `site.yml` (nothing was published). This candidate
+fixes those tests (#112) and otherwise carries rc.9 unchanged.
+
 ### Fixed
 
 - Three tests added in rc.9 failed inside a real deployment's PHCT update,
@@ -1729,7 +1735,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.9...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.10...HEAD
+[1.11.0-rc.10]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.9...v1.11.0-rc.10
 [1.11.0-rc.9]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.8...v1.11.0-rc.9
 [1.11.0-rc.8]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.7...v1.11.0-rc.8
 [1.11.0-rc.7]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.6...v1.11.0-rc.7
