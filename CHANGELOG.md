@@ -8,6 +8,27 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Added
+
+- Optional **Sign in with GitHub, submit directly** on `/submit/`. Set
+  `submit.signin_url` in `_data/site.yml` to the address of a small sign-in
+  service deployed from the new `services/github-signin/` (a GitHub App's web
+  flow with PKCE, finished on Vercel; see its README). A signed-in submitter's
+  *Submit to GitHub* then creates the issue through GitHub's API, as them,
+  however long the answers are, with exactly the body GitHub's issue form
+  would have written; the saved draft is deleted only once GitHub confirms the
+  issue. The token stays in that tab's `sessionStorage` and goes only to
+  `api.github.com`. Anyone not signed in keeps the link hand-off, which is also
+  offered whenever a direct send fails. File questions cannot be sent this way;
+  the page says how to add a file to the new issue. A new `claim` job in
+  `new-entry.yml` labels these issues when they open or are edited (GitHub
+  drops API labels from anyone without push access) so the scaffold job drafts
+  the pull request as usual, and `missing-label.yml` leaves them alone. Every
+  page on an allowed origin is trusted with the token, so on a shared
+  `<owner>.github.io` origin read the README's origin section first.
+  `npm run validate` checks the address. Blank (the default) leaves the page
+  exactly as it was.
+
 ### Fixed
 
 - `/submit/` did not warn that a signed-out submitter can lose every answer
@@ -28,6 +49,11 @@ major version, and each entry says so when it happens.
   leaving only when the answers could not be saved at all.
 - *Submitted it? Delete the saved draft* saved the still-filled form again half
   a second later. Deleting now holds autosave until the next edit.
+- The "Almost there" panel always said the answers were still saved in this
+  browser, even when saving had failed. It now says so only when they are;
+  otherwise it says they could not be saved on this device, asks the submitter
+  to keep the tab open until the issue is submitted, and offers no *Delete the
+  saved draft* button.
 
 ## [1.11.0-rc.8] — 2026-10-12
 

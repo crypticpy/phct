@@ -1011,6 +1011,29 @@ test('leaving warns only when typed answers could not be saved', async () => {
   assert.equal(leaveChallenged(ctx), true, 'unsaved answers must be challenged');
 });
 
+test('the confirmation panel promises a saved draft only when the answers really are saved', async () => {
+  const ctx = await boot();
+  fillRequired(ctx);
+  await settle();
+  // A full quota: the answers in the form never reach storage.
+  const setItem = ctx.window.Storage.prototype.setItem;
+  ctx.window.Storage.prototype.setItem = function (key, value) {
+    if (key === ctx.draftKey) throw new ctx.window.DOMException('full', 'QuotaExceededError');
+    return setItem.call(this, key, value);
+  };
+  answer(ctx, 'title', 'Too big to keep');
+  sendToGitHub(ctx);
+
+  const panel = ctx.form.querySelector('[data-review]');
+  assert.match(panel.textContent, /Almost there/);
+  assert.doesNotMatch(panel.textContent, /still saved in this browser/);
+  assert.match(panel.textContent, /could not be saved on this device/);
+  assert.match(panel.textContent, /keep this tab open until the issue is submitted/);
+  // Nothing to delete, and clearing the form would lose the only copy.
+  const buttons = Array.from(panel.querySelectorAll('button')).map((button) => button.textContent);
+  assert.ok(!buttons.includes('Submitted it? Delete the saved draft'), buttons.join(' | '));
+});
+
 test('a browser that refuses storage warns before leaving typed answers behind', async () => {
   const dom = new JSDOM('<!doctype html><body>' + HTML + '</body>', {
     url: 'https://example.org/submit/',
