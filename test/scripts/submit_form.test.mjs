@@ -1240,6 +1240,39 @@ test('"Delete it and start fresh" with nothing typed just deletes the offered dr
   assert.equal(leaveChallenged(ctx), false);
 });
 
+test('"Delete it and start fresh" leaves alone a draft another tab has since replaced', async () => {
+  const ctx = await boot({ draft: { title: 'A, offered in both tabs' } });
+  const store = ctx.window.localStorage;
+  // The other tab typed first: A moved aside, its newer work saved in A's place.
+  store.setItem(ctx.draftKey + ':previous', store.getItem(ctx.draftKey));
+  store.setItem(
+    ctx.draftKey,
+    JSON.stringify({ saved: new Date().toISOString(), fields: { title: 'B, the other tab' } })
+  );
+
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  assert.equal(ctx.storedDraft().fields.title, 'B, the other tab', "the other tab's work was deleted");
+  assert.equal(JSON.parse(store.getItem(ctx.draftKey + ':previous')).fields.title, 'A, offered in both tabs');
+  assert.equal(ctx.form.querySelector('[data-draft-restore]').hidden, true);
+  assert.match(ctx.form.querySelector('[data-draft-status]').textContent, /another tab/);
+});
+
+test('"Delete the earlier draft" leaves alone a kept draft another tab has since replaced', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  const store = ctx.window.localStorage;
+  answer(ctx, 'title', 'B, typed over it');
+  await settle();
+  // Meanwhile another tab put a different draft under the kept key.
+  const theirs = JSON.stringify({ saved: new Date().toISOString(), fields: { title: 'C, the other tab' } });
+  store.setItem(ctx.draftKey + ':previous', theirs);
+
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  assert.equal(store.getItem(ctx.draftKey + ':previous'), theirs, "the other tab's draft was deleted");
+  assert.equal(ctx.storedDraft().fields.title, 'B, typed over it');
+  assert.equal(ctx.form.querySelector('[data-draft-restore]').hidden, true);
+  assert.match(ctx.form.querySelector('[data-draft-status]').textContent, /another tab/);
+});
+
 test('restoring the kept draft keeps it stored until it is saved again', async () => {
   const ctx = await boot({ draft: { title: 'A, the offered draft' } });
   const previous = () => JSON.parse(ctx.window.localStorage.getItem(ctx.draftKey + ':previous') || 'null');

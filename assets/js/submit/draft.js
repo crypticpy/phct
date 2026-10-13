@@ -112,6 +112,9 @@
     let pending = false;
     // The storage key the bar offers to restore from; '' with the bar down.
     let offered = '';
+    // What was stored under `offered` when this tab offered it. Another tab
+    // can move or replace it meanwhile; Delete removes only this exact draft.
+    let offeredRaw = null;
     // True once the draft has been deleted and until the next real edit: the
     // form still shows the answers, and saving them again unasked would undo
     // the delete.
@@ -149,18 +152,18 @@
     /**
      * Copy the offered draft to the `previous` key, so the new answers can be
      * saved over it under `key`. Throws when storage refuses.
-     * @returns {boolean} true when a copy was made (and must be undone if the
-     *   new answers then fail to save)
+     * @returns {string|null} the draft copied, or null when there was none (a
+     *   copy must be undone if the new answers then fail to save)
      */
     function setAside() {
       const current = memory.getItem(key);
-      if (current === null) return false;
+      if (current === null) return null;
       // Never onto a kept draft: that one would be gone without anyone
       // choosing it. Load picks up both (see the boot code below), so this
       // only guards against storage changed under the page.
       if (memory.getItem(previousKey) !== null) throw new Error('an earlier draft is already kept');
       memory.setItem(previousKey, current);
-      return true;
+      return current;
     }
 
     /**
@@ -206,12 +209,12 @@
       // A failed setItem leaves the key as it was, so the offered draft stays
       // under `key` until the new answers have actually replaced it; the copy
       // under `:previous` is undone if they have not.
-      let copied = false;
+      let copied = null;
       try {
         if (pending) copied = setAside();
         memory.setItem(key, JSON.stringify(payload));
       } catch (error) {
-        if (copied) {
+        if (copied !== null) {
           try {
             memory.removeItem(previousKey);
           } catch (ignored) {
@@ -233,6 +236,7 @@
       dirty = false;
       paintStatus();
       if (pending) {
+        if (copied !== null) offeredRaw = copied;
         showKept();
         if (status)
           setStatus(status.textContent + ' Your earlier draft is kept until you restore or delete it.');
@@ -375,6 +379,7 @@
       bar.hidden = false;
       pending = true;
       offered = from;
+      offeredRaw = memory.getItem(from);
     }
 
     if (!memory) {
@@ -432,10 +437,20 @@
         // work, whether it is saved already (the draft was kept aside), is
         // waiting on the debounce, or did not fit beside the offered draft.
         const kept = !pending;
-        memory.removeItem(offered);
+        const unchanged = memory.getItem(offered) === offeredRaw;
+        if (unchanged) memory.removeItem(offered);
         pending = false;
         offered = '';
         if (bar) bar.hidden = true;
+        if (!unchanged) {
+          // Moved or replaced by another tab: that draft is not this one to delete.
+          if (timer) window.clearTimeout(timer);
+          timer = null;
+          setStatus(
+            'That draft was changed in another tab, so it was not deleted. Reload the page to see the latest version.'
+          );
+          return;
+        }
         // Saved now, or retried: with the offered draft gone there may be room.
         if (dirty) write();
         const deleted = kept ? 'Earlier draft deleted.' : 'Saved draft deleted.';
