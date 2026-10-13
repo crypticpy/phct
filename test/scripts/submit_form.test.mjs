@@ -722,9 +722,10 @@ test('typing while the restore prompt is unanswered saves the new work and keeps
   ctx.form.querySelector('[data-draft-action="restore"]').click();
   assert.equal(ctx.form.querySelector('[data-field="title"] input').value, 'Saved earlier');
   assert.equal(bar.hidden, true);
-  assert.equal(previous(), null, 'the kept copy is used up by restoring it');
   await settle();
   assert.equal(ctx.storedDraft().fields.title, 'Saved earlier');
+  // Kept until the restored answers were saved, then used up.
+  assert.equal(previous(), null, 'the kept copy is used up by restoring it');
 });
 
 test('deleting the kept draft after typing leaves the new work saved', async () => {
@@ -1034,6 +1035,11 @@ test('a browser that refuses storage warns before leaving typed answers behind',
   assert.equal(leaveChallenged(page), false, 'nothing typed, nothing to lose');
   answer(page, 'title', 'Nowhere to keep this');
   assert.equal(leaveChallenged(page), true);
+
+  // Pressing "Save" after a delete still has nowhere to put the answers.
+  page.form.querySelector('[data-draft-action="clear"]').click();
+  page.form.querySelector('[data-draft-action="save"]').click();
+  assert.equal(leaveChallenged(page), true, 'a save with no storage is still unsaved');
 });
 
 test('coming back with new work and a kept earlier draft continues the new work and keeps both', async () => {
@@ -1067,6 +1073,8 @@ test('coming back with new work and a kept earlier draft continues the new work 
 
   ctx.form.querySelector('[data-draft-action="restore"]').click();
   assert.equal(title.value, 'A, the earlier draft');
+  await settle();
+  assert.equal(ctx.storedDraft().fields.title, 'A, the earlier draft');
   assert.equal(previous(), null);
 });
 
@@ -1096,6 +1104,121 @@ test('removing a filled link row after deleting the draft saves again', async ()
   assert.ok(ctx.storedDraft(), 'removing a filled row was not saved');
   assert.equal(ctx.storedDraft().fields.resources.length, 1);
   assert.equal(ctx.storedDraft().fields.resources[0].label, 'Evaluation');
+});
+
+/**
+ * Make writes of the main draft key fail the way a full quota does, from now on.
+ * @param {object} ctx from boot()
+ * @param {(value: string) => boolean} [when] fail only these values
+ */
+function failDraftWrites(ctx, when = () => true) {
+  const setItem = ctx.window.Storage.prototype.setItem;
+  ctx.window.Storage.prototype.setItem = function (key, value) {
+    if (key === ctx.draftKey && when(value)) throw new ctx.window.DOMException('full', 'QuotaExceededError');
+    return setItem.call(this, key, value);
+  };
+}
+
+test('a failed "Save and come back later" after a delete still warns before leaving', async () => {
+  const ctx = await boot();
+  answer(ctx, 'title', 'Typed once');
+  await settle();
+  ctx.form.querySelector('[data-draft-action="clear"]').click();
+  assert.equal(leaveChallenged(ctx), false, 'precondition: nothing to lose right after a delete');
+
+  failDraftWrites(ctx);
+  ctx.form.querySelector('[data-draft-action="save"]').click();
+  assert.equal(ctx.storedDraft(), null);
+  assert.doesNotMatch(ctx.form.querySelector('[data-draft-status]').textContent, /^Saved/);
+  assert.equal(leaveChallenged(ctx), true, 'the answers are in no storage, so leaving must be challenged');
+});
+
+test('new answers too big to save leave the offered draft where it was', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  const previous = () => ctx.window.localStorage.getItem(ctx.draftKey + ':previous');
+  failDraftWrites(ctx, (value) => value.includes('too big'));
+
+  answer(ctx, 'title', 'B, too big to save');
+  await settle();
+  assert.equal(ctx.storedDraft().fields.title, 'A, the offered draft', 'the offered draft was lost');
+  assert.equal(previous(), null, 'a half-done move was left behind');
+  assert.doesNotMatch(ctx.form.querySelector('[data-draft-status]').textContent, /Saved/);
+  // Nothing moved, so the bar still offers A from where it always was.
+  assert.equal(
+    ctx.form.querySelector('[data-draft-action="discard"]').textContent.trim(),
+    'Delete it and start fresh'
+  );
+  assert.equal(leaveChallenged(ctx), true);
+
+  // Restore still brings A back.
+  ctx.form.querySelector('[data-draft-action="restore"]').click();
+  assert.equal(ctx.form.querySelector('[data-field="title"] input').value, 'A, the offered draft');
+});
+
+test('deleting the kept draft after a failed save does not claim the new answers are saved', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  answer(ctx, 'title', 'B, saved once');
+  await settle();
+  assert.equal(ctx.storedDraft().fields.title, 'B, saved once', 'precondition: the move went through');
+
+  failDraftWrites(ctx);
+  answer(ctx, 'title', 'B, grown past the quota');
+  await settle();
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  const status = ctx.form.querySelector('[data-draft-status]').textContent;
+  assert.doesNotMatch(status, /still saved/);
+  assert.match(status, /could not be saved/);
+  assert.equal(leaveChallenged(ctx), true);
+});
+
+test('deleting the kept draft makes room to save answers that did not fit beside it', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  answer(ctx, 'title', 'B, saved once');
+  await settle();
+  // Too big only while the earlier draft takes up room.
+  failDraftWrites(ctx, () => ctx.window.localStorage.getItem(ctx.draftKey + ':previous') !== null);
+  answer(ctx, 'title', 'B, grown past the quota');
+  await settle();
+  assert.equal(ctx.storedDraft().fields.title, 'B, saved once', 'precondition: the save failed');
+
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  assert.equal(ctx.storedDraft().fields.title, 'B, grown past the quota');
+  assert.match(ctx.form.querySelector('[data-draft-status]').textContent, /still saved/);
+  assert.equal(leaveChallenged(ctx), false);
+});
+
+test('restoring the kept draft keeps it stored until it is saved again', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  const previous = () => JSON.parse(ctx.window.localStorage.getItem(ctx.draftKey + ':previous') || 'null');
+  answer(ctx, 'title', 'B, typed over it');
+  await settle();
+
+  failDraftWrites(ctx);
+  ctx.form.querySelector('[data-draft-action="restore"]').click();
+  assert.equal(ctx.form.querySelector('[data-field="title"] input').value, 'A, the offered draft');
+  await settle();
+  assert.equal(
+    previous().fields.title,
+    'A, the offered draft',
+    'A is in the form only, and was dropped from storage'
+  );
+});
+
+test('coming back to both drafts also reopens the newer one on its step, in its mode', async () => {
+  const ctx = await boot({
+    draft: { title: 'B, the newer work' },
+    ui: { step: 'build', short: true },
+    previous: { title: 'A, the earlier draft' },
+  });
+  await settle();
+  assert.equal(ctx.form.querySelector('[data-field="title"] input').value, 'B, the newer work');
+  assert.equal(
+    ctx.form.querySelector('[data-section="build"]').hidden,
+    false,
+    'the saved step was not reopened'
+  );
+  assert.equal(ctx.form.querySelector('[data-field="impact"]').hidden, true, 'short mode is back on');
+  assert.equal(ctx.form.querySelector('[data-shortform-toggle]').textContent, 'Show every question');
 });
 
 test('a browser that refuses storage says so where the draft bar would be', async () => {

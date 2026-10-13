@@ -118,6 +118,9 @@
     let held = false;
     // True while there are answers storage does not have yet.
     let dirty = false;
+    // True after the kept draft is restored and until its answers are saved
+    // under `key`: until then `:previous` is still the only stored copy.
+    let dropKept = false;
 
     /** @returns {object} the current answers, keyed by schema key */
     function snapshot() {
@@ -144,28 +147,19 @@
     }
 
     /**
-     * Move the offered draft to the `previous` key, so the new answers can be
-     * saved without overwriting it, and say so on the bar, which stays up.
-     * @returns {boolean} false when storage refused, and nothing may be saved
+     * Copy the offered draft to the `previous` key, so the new answers can be
+     * saved over it under `key`. Throws when storage refuses.
+     * @returns {boolean} true when a copy was made (and must be undone if the
+     *   new answers then fail to save)
      */
     function setAside() {
-      try {
-        const current = memory.getItem(key);
-        if (current !== null) {
-          // Never onto a kept draft: that one would be gone without anyone
-          // choosing it. Load picks up both (see the boot code below), so this
-          // only guards against storage changed under the page.
-          if (memory.getItem(previousKey) !== null) throw new Error('an earlier draft is already kept');
-          memory.setItem(previousKey, current);
-          memory.removeItem(key);
-        }
-      } catch (error) {
-        setStatus(
-          'This browser would not keep your earlier draft and save your new answers too. Restore the draft or delete it to keep saving.'
-        );
-        return false;
-      }
-      showKept();
+      const current = memory.getItem(key);
+      if (current === null) return false;
+      // Never onto a kept draft: that one would be gone without anyone
+      // choosing it. Load picks up both (see the boot code below), so this
+      // only guards against storage changed under the page.
+      if (memory.getItem(previousKey) !== null) throw new Error('an earlier draft is already kept');
+      memory.setItem(previousKey, current);
       return true;
     }
 
@@ -191,18 +185,15 @@
         dirty = !empty;
         return;
       }
-      let setAsideNow = false;
-      if (pending) {
-        // Nothing typed yet: the offered draft stays exactly where it is.
-        if (empty) {
-          dirty = false;
-          return;
-        }
-        if (!setAside()) return;
-        setAsideNow = true;
+      // Nothing typed yet: the offered draft stays exactly where it is.
+      if (pending && empty) {
+        dirty = false;
+        return;
       }
       if (empty) {
         memory.removeItem(key);
+        if (dropKept) memory.removeItem(previousKey);
+        dropKept = false;
         savedAt = '';
         dirty = false;
         setStatus('');
@@ -212,18 +203,39 @@
       const payload = { saved: stamp, fields: data };
       const ui = uiState ? uiState() : null;
       if (ui) payload.ui = ui;
+      // A failed setItem leaves the key as it was, so the offered draft stays
+      // under `key` until the new answers have actually replaced it; the copy
+      // under `:previous` is undone if they have not.
+      let copied = false;
       try {
+        if (pending) copied = setAside();
         memory.setItem(key, JSON.stringify(payload));
       } catch (error) {
+        if (copied) {
+          try {
+            memory.removeItem(previousKey);
+          } catch (ignored) {
+            // A reload offers both drafts, so a copy left behind loses nothing.
+          }
+        }
         savedAt = '';
-        setStatus('This browser would not save a draft. Copy your answers before leaving.');
+        dirty = true;
+        setStatus(
+          pending
+            ? 'This browser would not keep your earlier draft and save your new answers too. Restore the draft or delete it to keep saving.'
+            : 'This browser would not save a draft. Copy your answers before leaving.'
+        );
         return;
       }
+      if (dropKept) memory.removeItem(previousKey);
+      dropKept = false;
       savedAt = stamp;
       dirty = false;
       paintStatus();
-      if (setAsideNow && status) {
-        setStatus(status.textContent + ' Your earlier draft is kept until you restore or delete it.');
+      if (pending) {
+        showKept();
+        if (status)
+          setStatus(status.textContent + ' Your earlier draft is kept until you restore or delete it.');
       }
     }
 
@@ -254,6 +266,7 @@
       offered = '';
       held = true;
       dirty = false;
+      dropKept = false;
       savedAt = '';
       if (memory) {
         memory.removeItem(key);
@@ -303,8 +316,9 @@
       held = false;
       if (!draft) return;
       const message = fill(draft);
-      // Used up: from here on it is the current draft, saved under `key`.
-      if (from === previousKey) memory.removeItem(previousKey);
+      // Used up: from here on it is the current draft, saved under `key`. The
+      // kept copy goes once that save has gone through (see write).
+      if (from === previousKey) dropKept = true;
       offered = '';
       if (bar) bar.hidden = true;
       setStatus(message);
@@ -376,7 +390,10 @@
         offerRestore(kept, previousKey);
         showKept();
         setStatus(fill(existing) + ' Your earlier draft is kept until you restore or delete it.');
-        onRestore(existing.ui);
+        // After the caller has finished starting up: the answers are in place
+        // for its controllers to read, but the stepper and short-form mode the
+        // saved UI state moves do not exist until initDraft has returned.
+        Promise.resolve().then(() => onRestore(existing.ui));
       } else if (existing) offerRestore(existing, key);
       else if (kept) offerRestore(kept, previousKey);
     }
@@ -400,13 +417,13 @@
       const action = button.dataset.draftAction;
       if (action === 'restore') restore();
       if (action === 'save') {
+        // An explicit save is a request, held or not.
+        held = false;
+        write();
         if (!memory) {
           setStatus('This browser will not save a draft. Copy your answers before leaving.');
           return;
         }
-        // An explicit save is a request, held or not.
-        held = false;
-        write();
         if (!savedAt) return;
         setStatus('Saved. Come back to this page in this browser and your answers will be waiting.');
       }
@@ -415,7 +432,13 @@
         memory.removeItem(previousKey);
         offered = '';
         if (bar) bar.hidden = true;
-        setStatus('Earlier draft deleted. Your new answers are still saved on this device.');
+        // Saved now, or retried: with the earlier draft gone there may be room.
+        if (dirty) write();
+        setStatus(
+          dirty
+            ? 'Earlier draft deleted. Your latest answers could not be saved on this device. Copy them before leaving.'
+            : 'Earlier draft deleted. Your new answers are still saved on this device.'
+        );
         return;
       }
       if (action === 'discard' || action === 'clear') {

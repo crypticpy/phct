@@ -21,7 +21,8 @@ major version, and each entry says so when it happens.
   `<draft key>:previous`) and saves the new work as usual; the bar stays up,
   and *Restore it* brings the old draft back. Coming back later picks up the
   new work in the form and still offers the old draft; neither is replaced
-  without the submitter choosing it.
+  without the submitter choosing it. When the browser has no room for both, the
+  old draft stays where it was and the page says the new answers were not saved.
 - Answers typed in the half second before leaving the page were lost: the draft
   is now saved when the page is hidden or closed, and the browser asks before
   leaving only when the answers could not be saved at all.
