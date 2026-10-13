@@ -8,6 +8,12 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.9] — 2026-10-13
+
+Ninth candidate. rc.8's live BCHC update passed and deployed. This candidate
+keeps submitters' answers safe on `/submit/` (#109) and adds an optional
+*Sign in with GitHub* that submits directly (#110).
+
 ### Added
 
 - Optional **Sign in with GitHub, submit directly** on `/submit/`. Set
@@ -1708,7 +1714,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.8...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.9...HEAD
+[1.11.0-rc.9]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.8...v1.11.0-rc.9
 [1.11.0-rc.8]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.7...v1.11.0-rc.8
 [1.11.0-rc.7]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.6...v1.11.0-rc.7
 [1.11.0-rc.6]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.5...v1.11.0-rc.6
