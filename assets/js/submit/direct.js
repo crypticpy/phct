@@ -76,9 +76,10 @@
     const repo = form.dataset.repo || '';
     if (!origin || !repo) return null;
     const el = ns.el;
-    // Per site: several sites can share one *.github.io origin, and with it
-    // one sessionStorage.
-    const storeKey = 'phct:github-signin:v1:' + (form.dataset.draftKey || 'catalog');
+    // Per repository and sign-in service: several sites can share one
+    // *.github.io origin, and with it one sessionStorage, and a token from one
+    // site's GitHub App is no use on another's repository.
+    const storeKey = 'phct:github-signin:v1:' + repo + '@' + origin;
     const notice = document.querySelector('[data-signin-notice]');
     const mineUrl = 'https://github.com/' + repo + '/issues?q=' + encodeURIComponent('is:issue author:@me');
 

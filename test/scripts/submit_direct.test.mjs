@@ -29,7 +29,7 @@ const SIGNIN = 'https://signin.example';
 const PAGE = 'https://example.org/submit/';
 const REPO = 'crypticpy/phct';
 const TOKEN = 'ghu_' + 'a'.repeat(36);
-const STORE = 'phct:github-signin:v1:ai-use-case-catalog';
+const STORE = 'phct:github-signin:v1:' + REPO + '@' + SIGNIN;
 const ISSUES_URL = 'https://api.github.com/repos/' + REPO + '/issues';
 
 // The intro's notice as submit/index.md renders it: an icon, then the copy.
@@ -117,7 +117,7 @@ async function boot(options = {}) {
     }
     return Promise.reject(new TypeError('unexpected request to ' + url));
   };
-  if (options.token) window.sessionStorage.setItem(STORE, JSON.stringify(options.token));
+  if (options.token) window.sessionStorage.setItem(options.storeKey || STORE, JSON.stringify(options.token));
 
   await new Promise((resolve) => {
     if (window.document.readyState === 'complete') resolve();
@@ -344,6 +344,13 @@ test('a sign-in window closed without a token says so', async () => {
   post(ctx, { type: 'phct-github-token', token: TOKEN }, { source: ctx.popups[0] });
   await flush();
   assert.equal(ctx.storedToken(), null);
+});
+
+test('a sign-in stored for another repository on the same origin is not used', async () => {
+  const other = 'phct:github-signin:v1:someone/other-catalog@' + SIGNIN;
+  const ctx = await boot({ token: { token: TOKEN, expiresAt: Date.now() + 60_000 }, storeKey: other });
+  assert.ok(ctx.notice().querySelector('[data-direct-action="signin"]'), 'the page should be signed out');
+  assert.equal(ctx.requests.length, 0, 'another site’s token must not be sent to GitHub');
 });
 
 test('an expired stored sign-in is dropped without asking GitHub', async () => {
