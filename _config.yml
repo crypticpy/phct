@@ -34,6 +34,7 @@ exclude:
   - quality
   - assets/css/tailwind.css
   - scripts
+  - services
   - test
   - docs
   - Gemfile
