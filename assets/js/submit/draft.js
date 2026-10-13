@@ -427,23 +427,36 @@
         if (!savedAt) return;
         setStatus('Saved. Come back to this page in this browser and your answers will be waiting.');
       }
-      if (action === 'discard' && offered === previousKey && !pending) {
-        // Only the kept draft goes: what was typed since is the current one.
-        memory.removeItem(previousKey);
+      if (action === 'discard' && offered) {
+        // Only the offered draft goes: what is in the form is the current
+        // work, whether it is saved already (the draft was kept aside), is
+        // waiting on the debounce, or did not fit beside the offered draft.
+        const kept = !pending;
+        memory.removeItem(offered);
+        pending = false;
         offered = '';
         if (bar) bar.hidden = true;
-        // Saved now, or retried: with the earlier draft gone there may be room.
+        // Saved now, or retried: with the offered draft gone there may be room.
         if (dirty) write();
-        setStatus(
-          dirty
-            ? 'Earlier draft deleted. Your latest answers could not be saved on this device. Copy them before leaving.'
-            : 'Earlier draft deleted. Your new answers are still saved on this device.'
-        );
+        const deleted = kept ? 'Earlier draft deleted.' : 'Saved draft deleted.';
+        if (dirty) {
+          setStatus(
+            deleted + ' Your latest answers could not be saved on this device. Copy them before leaving.'
+          );
+        } else if (kept) {
+          setStatus(deleted + ' Your new answers are still saved on this device.');
+        } else if (savedAt) {
+          setStatus(deleted + ' Your new answers are saved on this device.');
+        } else {
+          setStatus('');
+        }
         return;
       }
-      if (action === 'discard' || action === 'clear') {
+      // Everything goes, on request ("Submitted it? Delete the saved draft"):
+      // the answers left in the form are held, not saved again (see clear).
+      if (action === 'clear') {
         clear();
-        if (action === 'clear' && status) status.textContent = 'Saved draft deleted.';
+        if (status) status.textContent = 'Saved draft deleted.';
       }
     });
 

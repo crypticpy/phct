@@ -1187,6 +1187,59 @@ test('deleting the kept draft makes room to save answers that did not fit beside
   assert.equal(leaveChallenged(ctx), false);
 });
 
+test('deleting the offered draft after the new answers did not fit saves them in its place', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  const previous = () => ctx.window.localStorage.getItem(ctx.draftKey + ':previous');
+  // Storage holds one draft, not two: the move aside fails.
+  failDraftWrites(ctx, () => previous() !== null);
+  answer(ctx, 'title', 'B, no room beside A');
+  await settle();
+  assert.equal(ctx.storedDraft().fields.title, 'A, the offered draft', 'precondition: the save failed');
+  assert.match(ctx.form.querySelector('[data-draft-status]').textContent, /delete it to keep saving/);
+
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  assert.equal(ctx.storedDraft().fields.title, 'B, no room beside A', 'the visible answers were not saved');
+  assert.equal(previous(), null);
+  assert.equal(ctx.form.querySelector('[data-draft-restore]').hidden, true);
+  assert.doesNotMatch(ctx.form.querySelector('[data-draft-status]').textContent, /could not/);
+  assert.equal(leaveChallenged(ctx), false);
+
+  // And autosave carries on, not held as after "Delete the saved draft".
+  answer(ctx, 'title', 'B, still typing');
+  await settle();
+  assert.equal(ctx.storedDraft().fields.title, 'B, still typing');
+});
+
+test('deleting the offered draft when even then the answers will not fit says so and warns', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  failDraftWrites(ctx);
+  answer(ctx, 'title', 'B, never fits');
+  await settle();
+
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  assert.equal(ctx.storedDraft(), null, 'the offered draft was the one asked to go');
+  assert.match(ctx.form.querySelector('[data-draft-status]').textContent, /could not be saved/);
+  assert.equal(leaveChallenged(ctx), true);
+});
+
+test('"Delete it and start fresh" right after typing deletes the old draft and saves the new answers', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  answer(ctx, 'title', 'B, typed a moment ago');
+  // Inside the autosave debounce: nothing written yet.
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  assert.equal(ctx.storedDraft().fields.title, 'B, typed a moment ago');
+  assert.equal(leaveChallenged(ctx), false);
+});
+
+test('"Delete it and start fresh" with nothing typed just deletes the offered draft', async () => {
+  const ctx = await boot({ draft: { title: 'A, the offered draft' } });
+  ctx.form.querySelector('[data-draft-action="discard"]').click();
+  assert.equal(ctx.storedDraft(), null);
+  assert.equal(ctx.form.querySelector('[data-draft-restore]').hidden, true);
+  assert.equal(ctx.form.querySelector('[data-field="title"] input').value, '');
+  assert.equal(leaveChallenged(ctx), false);
+});
+
 test('restoring the kept draft keeps it stored until it is saved again', async () => {
   const ctx = await boot({ draft: { title: 'A, the offered draft' } });
   const previous = () => JSON.parse(ctx.window.localStorage.getItem(ctx.draftKey + ':previous') || 'null');
