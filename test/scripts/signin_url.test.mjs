@@ -48,9 +48,11 @@ test('anything the page would mangle or that would carry the token unencrypted i
 });
 
 test('a hand-set signin_url survives the configurators, which never ask about it', () => {
+  // Set by hand here rather than read from this repository's _data/site.yml,
+  // which a deployment owns: it may leave the key out or point it at its own
+  // service.
   const base = defaultConfig();
-  assert.equal(base.site.submit.signin_url, '', 'the shipped site.yml carries the key, blank');
-  base.site.submit.signin_url = 'https://catalog-signin.vercel.app';
+  base.site.submit = { ...base.site.submit, signin_url: 'https://catalog-signin.vercel.app' };
   const config = applyAnswers(base, { ...answersFromConfig(base), siteName: 'Renamed' });
   const site = jsYaml.load(renderFiles(config)['_data/site.yml']);
   assert.equal(site.submit.signin_url, 'https://catalog-signin.vercel.app');
