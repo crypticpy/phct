@@ -912,6 +912,30 @@ describe('preset build matrix', { skip: ready.ok ? false : ready.reason, concurr
     }
   );
 
+  test(
+    'shipped: /submit/ asks submitters to sign in to GitHub before the first question',
+    { skip: needs('shipped') },
+    () => {
+      const { siteDir } = built.get('shipped');
+      const main = page(siteDir, 'submit').querySelector('main');
+      const notice = main.querySelector('[data-signin-notice]');
+      assert.ok(notice, 'the submit page has no sign-in notice');
+      assert.match(notice.textContent, /Sign in to GitHub before you start\./);
+      assert.match(notice.textContent, /GitHub can drop your answers on the way through its sign-in page/);
+      const link = notice.querySelector('a[href="https://github.com/login"]');
+      assert.ok(link, 'the notice does not link to GitHub sign-in');
+      assert.equal(link.getAttribute('target'), '_blank');
+      assert.equal(link.getAttribute('rel'), 'noopener');
+      // Before any question, so it is read before the work it protects.
+      const firstQuestion = main.querySelector('[data-field]');
+      assert.ok(
+        notice.compareDocumentPosition(firstQuestion) &
+          notice.ownerDocument.defaultView.Node.DOCUMENT_POSITION_FOLLOWING,
+        'the sign-in notice comes after a question'
+      );
+    }
+  );
+
   /* ------------------------------------------------- the email submission route */
 
   /** Every email route /submit/ offers, read off <main> (templates and <noscript> included). */
