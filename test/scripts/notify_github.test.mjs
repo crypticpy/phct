@@ -24,7 +24,12 @@ import {
   submitter,
 } from '../../scripts/lib/notify_github.mjs';
 import { ENTRY_LABEL, REVIEW_LABELS, STATUS, hasMarker, marker } from '../../scripts/lib/notify.mjs';
-import { claimEntrySubmission, isEntrySubmission, loadSchema } from '../../scripts/lib/direct_submission.mjs';
+import {
+  claimEntrySubmission,
+  entryIssueShape,
+  isEntrySubmission,
+  loadSchema,
+} from '../../scripts/lib/direct_submission.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OWNER = 'acme';
@@ -822,6 +827,22 @@ test('missing-label: an entry submission sent through "Sign in with GitHub" is l
   const partial = body.replace(/### Summary\n\n_No response_\n\n/, '');
   const rescued = await runMissingLabel({ title, body: partial });
   assert.match(rescued.commentsOn(41)[0], /It looks like a \*\*New entry\*\* submission/);
+});
+
+test('isEntrySubmission: a write-up that is not the last question does not hide the ones after it', () => {
+  const schema = {
+    entry: { singular: 'Entry' },
+    fields: [
+      { key: 'title', label: 'Title', type: 'text', required: true },
+      { key: 'body', label: 'Write-up', type: 'markdown' },
+      { key: 'contact', label: 'Contact', type: 'text' },
+    ],
+  };
+  const { labels, finalLabel } = entryIssueShape(schema);
+  assert.equal(labels[labels.length - 1], 'Contact', 'the fixture must put a question after the write-up');
+  assert.equal(finalLabel, '');
+  const body = labels.map((label) => `### ${label}\n\nAnswer`).join('\n\n');
+  assert.equal(isEntrySubmission({ title: '[Entry] Water routing', body, schema }), true);
 });
 
 test('isEntrySubmission: the form’s prefix in any case, and every question’s heading', () => {

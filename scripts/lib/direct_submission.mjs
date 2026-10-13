@@ -42,11 +42,13 @@ export function entryIssueShape(schema) {
   const labels = fields.map((field) => String(field.label ?? '').trim()).filter(Boolean);
   // The generator adds a Title question of its own when the schema has none.
   if (!fields.some((field) => field.key === 'title')) labels.unshift('Title');
-  const writeUp = [...fields].reverse().find((field) => field.type === 'markdown');
+  // Seal the parser at the write-up only when it really is the form's last
+  // question; sealing earlier would hide every question after it.
+  const last = fields[fields.length - 1];
   return {
     prefix: `[${singular}] `.toLowerCase(),
     labels,
-    finalLabel: writeUp ? String(writeUp.label ?? '').trim() : '',
+    finalLabel: last?.type === 'markdown' ? String(last.label ?? '').trim() : '',
   };
 }
 
