@@ -43,8 +43,8 @@ dependencies.
   else. It is never logged, stored or passed on.
 - Each file is its own branch, `u/<user-id>/<draft>/<sha256>`, holding a single
   commit with just that file, so deleting the branch is the whole cleanup.
-- Uploading the same file twice is harmless: the second upload is answered
-  without writing anything.
+- Uploading the same file to the same draft twice is harmless: the second
+  upload is answered without writing anything.
 - Every response is `Cache-Control: no-store` and `Referrer-Policy:
   no-referrer`, and only the origins in `ALLOWED_ORIGIN` may call it.
 - If any environment variable is missing or malformed, every upload and every
@@ -161,9 +161,21 @@ Actions**:
   whole `.pem` file).
 - Variables: `UPLOADS_REPO`, the same `owner/name` as above.
 
-The scaffold workflow mints a read-only token for the uploads repository from
-these for each run; the cleanup workflow mints one that can delete. Then delete
-the downloaded `.pem` file.
+Two workflows already in the catalog use them, and both do nothing while
+`UPLOADS_REPO` is unset:
+
+- **New entry from issue** (`new-entry.yml`) mints a read-only token for the
+  uploads repository for each run and gives it to the scaffold step alone.
+- **Uploads cleanup** (`uploads-cleanup.yml`) mints a token that can delete
+  branches. It runs when a `content:new-entry` issue closes, and every day at
+  04:47 UTC, when it deletes any draft's files that are more than 14 days old
+  and that no open submission still names. To run it by hand, use **Actions →
+  Uploads cleanup → Run workflow**; tick **Preview only** to list what would be
+  deleted without deleting anything. (An issue the automation itself closes,
+  such as a declined submission, does not start the first run; the daily sweep
+  catches it.)
+
+Then delete the downloaded `.pem` file.
 
 ### 5. Turn it on in the catalog
 
@@ -206,7 +218,9 @@ uploads repository has no branches left under `u/`.
   minute and 500 an hour. Each file takes four, so that is roughly fourteen
   submissions an hour with a deck and eight screenshots each, for the whole
   catalog. When GitHub says to slow down, the service answers `429` with a
-  `Retry-After` time and the page tries again.
+  `Retry-After` time (`rate_limited`) and the page waits and tries again, a few
+  times at most. The per-person limits above are answered `429` too, but the
+  page does not retry those: it shows the message.
 
 ## For the submit page
 

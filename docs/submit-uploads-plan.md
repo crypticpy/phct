@@ -1,6 +1,6 @@
 # Attach files on the submit page
 
-**Status: in progress (started 2026-10-16).**
+**Status: built on `feat/submit-uploads`, not yet released.**
 
 ## Why
 
@@ -240,3 +240,37 @@ run on a throwaway deployment (real App, real private repo) before release.
 - Submitting without a GitHub account (the service opening the issue).
 - Uploads on edit requests and refreshes.
 - Agents calling the upload service directly.
+
+## As built
+
+Where the code differs from the plan above; the code wins.
+
+- **Refs use the full SHA-256.** The branch is `u/<user-id>/<set>/<sha256>` (64 hex characters), and
+  `upload:<set>/<sha256>.<ext>` carries the same digest. `scripts/lib/upload_refs.mjs` is the contract;
+  `services/uploads/lib/refs.mjs` is a copy because the service deploys from its own directory, kept in
+  step by `test/scripts/upload_refs_parity.test.mjs`.
+- **`assets/js/submit/uploads-core.js` is split out of `uploads.js`.** The core holds the pure and
+  browser-API pieces (set ids, re-encode, XHR send, retry delay); `uploads.js` is the UI and draft wiring.
+- **Service error codes.** Every error is `{error, message}`. `rate_limited` (GitHub busy; `Retry-After`)
+  is retryable and the page waits and retries up to three times. `too_many_drafts` and `too_many_files`
+  are also `429` with a `Retry-After` of an hour but are limits, not worth retrying, and the page shows
+  their message. The success body also carries `ext`.
+- **`Access-Control-Expose-Headers: Retry-After`** is sent on every allowed-origin response, so the
+  browser can read the retry time.
+- **Cleanup needs no npm dependencies.** `scripts/uploads_cleanup.mjs` uses Node built-ins and
+  `scripts/lib`; the workflow selects npm but runs no install. A sweep judges a set's age by its newest
+  commit, and an age it cannot read keeps the set.
+- **An `uploads-repo` helper step** splits `UPLOADS_REPO` into owner and name in both `new-entry.yml` and
+  `uploads-cleanup.yml`, because `actions/create-github-app-token` takes them separately and expressions
+  cannot split a string. `uploads-cleanup.yml` also has a `turned-off` job that says why nothing ran.
+- **The scaffold warns once per answer when uploads are off or broken**, with the reason (which setting
+  is missing, never its value) logged once in the job. A reference that cannot be found warns per file.
+- **A failed deck upload leaves the entry path in the front matter**, like an attachment GitHub could
+  not keep, and the warning says to commit the file under that path.
+- **`new-entry.yml`'s "drag it onto this issue" text was left unchanged**, because dragging still works
+  after an edit and for anyone who did not use the pickers.
+- **Cleanup also runs on `pull_request: closed`.** A closure made by the automation itself (a declined
+  submission) uses the built-in token, which does not start workflows, so `issues: closed` alone would
+  leave those files to the daily sweep. The workflow also runs when a same-repository `entry/<slug>-<n>`
+  draft pull request labelled `content:new-entry` closes, takes the issue number from the branch and the
+  body and author from the API, and keeps any set another open submission by the same author names.
