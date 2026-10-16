@@ -699,6 +699,7 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
 {%- if uploads_url != '' %}
 {%- comment -%} Also before the front-matter scripts: it only defines window.SubmitForm.initUploads, which assets/js/submit.js calls once sign-in is wired. {%- endcomment %}
 <script defer src="{{ '/assets/js/submit/uploads-core.js' | relative_url }}"></script>
+<script defer src="{{ '/assets/js/submit/uploads-view.js' | relative_url }}"></script>
 <script defer src="{{ '/assets/js/submit/uploads.js' | relative_url }}"></script>
 {%- endif -%}
 {%- endif -%}

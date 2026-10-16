@@ -13,8 +13,10 @@
  *
  * Only loaded when `submit.uploads_url` and `submit.signin_url` are both set
  * (submit/index.md renders `data-uploads-url` and this script together, after
- * uploads-core.js). Without sign-in there are no pickers at all: the page is
- * what it was. assets/js/submit.js calls initUploads once direct.js is wired.
+ * uploads-core.js and uploads-view.js). This file holds the state and talks
+ * to the service; uploads-view.js draws it. Without sign-in there are no
+ * pickers at all: the page is what it was. assets/js/submit.js calls
+ * initUploads once direct.js is wired.
  *
  * The record kept in the draft (draft.js, key `uploads`) names files and the
  * person who uploaded them, never the sign-in token or the file contents:
@@ -32,6 +34,7 @@
   'use strict';
 
   const core = ns.uploadsCore;
+  const view = ns.uploadsView;
   /** A picture bigger than this is not even decoded. */
   const MAX_ORIGINAL = 25 * 1024 * 1024;
 
@@ -44,11 +47,10 @@
    *   null when the page has nothing to upload to or with
    */
   ns.initUploads = function initUploads(options) {
-    if (!core || typeof ns.el !== 'function') return null;
+    if (!core || !view || typeof ns.el !== 'function') return null;
     const form = options.form;
     const fields = options.fields;
     const direct = options.direct;
-    const el = ns.el;
     const origin = typeof ns.serviceOrigin === 'function' ? ns.serviceOrigin(form.dataset.uploadsUrl) : '';
     const targets = fields.filter((field) => field.type === 'images' || field.type === 'file');
     if (!origin || !direct || targets.length === 0) return null;
@@ -77,19 +79,15 @@
       lists[key] = [];
     });
 
-    const live = el('p', {
-      class: 'sr-only',
-      role: 'status',
-      'aria-live': 'polite',
-      'data-uploads-live': true,
-    });
-    form.append(live);
+    const live = view.buildLive(form);
+    /** What the rows and pickers hand back (assets/js/submit/uploads-view.js). */
+    const handlers = { onRetry: retry, onRemove: removeItem, onPick: addFiles };
 
     // --- small helpers --------------------------------------------------------
 
     /** @param {string} text */
     function announce(text) {
-      live.textContent = text;
+      view.announce(live, text);
     }
 
     /** @returns {'out'|'checking'|'ready'} */
@@ -269,239 +267,22 @@
       return '';
     }
 
-    // --- the page -------------------------------------------------------------
+    // --- the page (drawn by assets/js/submit/uploads-view.js) ----------------
 
-    /**
-     * One row of the list: name, status, progress, description, buttons.
-     * @param {object} field
-     * @param {object} item
-     */
-    function buildRow(field, item) {
-      const base = (field.wrap.id || 'f-' + field.key) + '-file-' + item.id;
-      const name = el('p', { class: 'text-sm font-medium text-brand-ink break-words' });
-      const status = el('p', { class: 'text-sm text-brand-muted' });
-      const bar = el('progress', {
-        class: 'mt-1 block h-2 w-full',
-        max: '100',
-        value: '0',
-        'aria-label': 'Upload progress for ' + item.name,
-        hidden: true,
-      });
-      const row = el('li', {
-        class: 'rounded-lg border border-brand-line bg-surface-card p-3',
-        'data-upload-item': true,
-      });
-      row.append(name, status, bar);
-
-      let altInput = null;
-      if (item.kind === 'image') {
-        altInput = el('input', {
-          type: 'text',
-          class: 'field-input mt-1',
-          id: base + '-alt',
-          maxlength: String(core.MAX_ALT),
-          autocomplete: 'off',
-          'aria-required': 'true',
-          'aria-describedby': base + '-alt-help',
-          'data-upload-alt': true,
-        });
-        altInput.value = item.alt;
-        altInput.addEventListener('input', () => {
-          item.alt = altInput.value;
-        });
-        row.append(
-          el('label', {
-            class: 'field-label mt-3',
-            for: base + '-alt',
-            text: 'Description of ' + item.name + ' (required)',
-          }),
-          el('span', {
-            class: 'field-help block',
-            id: base + '-alt-help',
-            text:
-              'What the picture shows, for people who cannot see it: one sentence, up to ' +
-              core.MAX_ALT +
-              ' characters.',
-          }),
-          altInput
-        );
-      }
-
-      const retry = el('button', {
-        type: 'button',
-        class: 'btn-secondary btn-sm',
-        'data-upload-action': 'retry',
-        'aria-label': 'Try again: ' + item.name,
-        text: 'Try again',
-        onclick: () => {
-          item.status = 'queued';
-          item.message = '';
-          updateRow(item);
-          announce('Trying ' + item.name + ' again.');
-          pump();
-        },
-      });
-      const remove = el('button', {
-        type: 'button',
-        class: 'btn-secondary btn-sm',
-        'data-upload-action': 'remove',
-        'aria-label': 'Remove ' + item.name,
-        text: 'Remove',
-        onclick: () => {
-          removeItem(field, item);
-        },
-      });
-      row.append(el('div', { class: 'mt-3 flex flex-wrap items-center gap-3' }, [retry, remove]));
-      item.row = row;
-      item.dom = { name: name, status: status, bar: bar, retry: retry, remove: remove };
-    }
-
-    /** @param {object} item repaint its row from its state */
+    /** @param {object} item repaint its row */
     function updateRow(item) {
-      if (!item.row) return;
-      const dom = item.dom;
-      dom.name.textContent =
-        item.name +
-        (item.bytes || (item.blob && item.blob.size)
-          ? ' (' + core.sizeText(item.bytes || item.blob.size) + ')'
-          : '');
-      const percent = Math.round(item.progress * 100);
-      const text = item.removing
-        ? 'Removing…'
-        : item.status === 'queued'
-          ? 'Waiting to upload.'
-          : item.status === 'encoding'
-            ? 'Preparing the picture…'
-            : item.status === 'uploading'
-              ? (item.note ? item.note + ' ' : 'Uploading… ') + percent + '%'
-              : item.status === 'done'
-                ? 'Uploaded.'
-                : 'Not uploaded: ' + item.message;
-      dom.status.textContent = text;
-      dom.bar.hidden = item.status !== 'uploading';
-      dom.bar.value = percent;
-      dom.retry.hidden = item.status !== 'error';
-      dom.remove.hidden = item.status === 'encoding' || item.status === 'uploading' || item.removing;
-    }
-
-    /**
-     * The picker and its notes, built when the submitter is signed in and torn
-     * down when not, so a signed-out page holds no file input at all.
-     * @param {object} field
-     * @param {string} base id prefix
-     */
-    function buildPicker(field, base) {
-      const isImage = field.type === 'images';
-      const input = el('input', {
-        type: 'file',
-        class: 'field-input',
-        id: base,
-        accept: isImage ? core.IMAGE_TYPES.join(',') : 'application/pdf',
-        multiple: isImage,
-        'aria-describedby': base + '-help ' + base + '-note',
-        'data-upload-picker': true,
-      });
-      input.addEventListener('change', () => {
-        // Copied first: clearing the input empties the live FileList, and
-        // clearing it lets the same file be picked again.
-        const picked = Array.from(input.files || []);
-        input.value = '';
-        addFiles(field, picked);
-      });
-      const help = isImage
-        ? 'PNG, JPEG or WebP, up to ' +
-          core.MAX_IMAGES +
-          ' pictures. Each is shrunk to fit and stripped of hidden details such as location before it is sent. Already online? Paste addresses in the box below instead, one per line; they are added after the pictures you upload.'
-        : 'A PDF up to 4 MB — in your PDF program, choose export as PDF, minimum size. Over 4 MB, or kept in a shared workspace? Leave this blank and paste a link in ' +
-          linkQuestion() +
-          '. A file you upload is used instead of any link.';
-      const picker = el('div', { class: 'space-y-1', 'data-upload-picker-block': true }, [
-        el('label', {
-          class: 'field-label',
-          for: base,
-          text: isImage ? 'Add screenshots from your computer' : 'Upload the file from your computer',
-        }),
-        el('span', { class: 'field-help block', id: base + '-help', text: help }),
-        el('span', {
-          class: 'field-help block',
-          id: base + '-note',
-          text: 'A reviewer checks every file. Screenshots become public on a draft as soon as you send them, so do not show personal information.',
-        }),
-        input,
-      ]);
-      return { picker: picker, input: input };
-    }
-
-    /** @param {object} field build the always-present parts of its box */
-    function buildBox(field) {
-      const base = (field.wrap.id || 'f-' + field.key) + '-upload';
-      const message = el('p', {
-        class: 'field-help mt-2 font-medium text-brand-ink',
-        'data-upload-message': true,
-        hidden: true,
-      });
-      const list = el('ul', { class: 'mt-3 space-y-3', 'data-upload-list': true });
-      const slot = el('div', {});
-      const outNote = el('p', {
-        class: 'field-note',
-        'data-upload-signed-out': true,
-        hidden: true,
-        text: 'Files you uploaded are saved in this draft. Sign in with GitHub again to see them and send them with your answers.',
-      });
-      const box = el('div', { class: 'mt-3', 'data-uploads': field.key, hidden: true }, [
-        slot,
-        message,
-        list,
-      ]);
-      const notes = Array.from(field.wrap.querySelectorAll('.field-note'));
-      const before =
-        field.type === 'images'
-          ? field.wrap.querySelector('textarea')
-          : field.wrap.querySelector('.field-error');
-      field.wrap.insertBefore(outNote, before);
-      field.wrap.insertBefore(box, before);
-      parts[field.key] = {
-        base: base,
-        box: box,
-        slot: slot,
-        list: list,
-        message: message,
-        outNote: outNote,
-        notes: notes,
-        picker: null,
-      };
+      view.updateRow(item);
     }
 
     /** @param {object} field repaint its box from the sign-in state and its items */
     function renderField(field) {
-      const part = parts[field.key];
-      const items = lists[field.key];
-      const current = mode();
-      const ready = current === 'ready';
-      part.box.hidden = !ready;
-      part.outNote.hidden = !(current === 'out' && uploaded(field.key).length > 0);
-      // The page's own "drag it into the GitHub issue" note is wrong while
-      // files can be sent from here.
-      part.notes.forEach((note) => {
-        note.hidden = ready;
-      });
-      const wantPicker = ready && (field.type === 'images' || items.length === 0);
-      if (wantPicker && !part.picker) {
-        part.picker = buildPicker(field, part.base);
-        part.slot.append(part.picker.picker);
-      } else if (!wantPicker && part.picker) {
-        part.picker.picker.remove();
-        part.picker = null;
-      }
-      Array.from(part.list.children).forEach((row) => {
-        if (!items.some((item) => item.row === row)) row.remove();
-      });
-      items.forEach((item, index) => {
-        if (!item.row) buildRow(field, item);
-        updateRow(item);
-        if (part.list.children[index] !== item.row)
-          part.list.insertBefore(item.row, part.list.children[index] || null);
-      });
+      view.renderField(
+        field,
+        parts[field.key],
+        lists[field.key],
+        { mode: mode(), uploaded: uploaded(field.key).length, linkQuestion: linkQuestion() },
+        handlers
+      );
     }
 
     function renderAll() {
@@ -627,6 +408,15 @@
       } finally {
         pumping = false;
       }
+    }
+
+    /** @param {object} item a failed file, queued again */
+    function retry(item) {
+      item.status = 'queued';
+      item.message = '';
+      updateRow(item);
+      announce('Trying ' + item.name + ' again.');
+      pump();
     }
 
     /** @param {object} item @param {string} message */
@@ -772,7 +562,6 @@
      */
     async function removeItem(field, item) {
       if (item.removing) return;
-      const index = lists[field.key].indexOf(item);
       if (item.status === 'done' && item.ref) {
         const headers = authHeaders();
         if (!headers) {
@@ -807,25 +596,16 @@
           return;
         }
       }
-      lists[field.key].splice(index, 1);
+      // Found again only now: another Remove, a restore or a sign-in change
+      // may have reshaped the list while the DELETE was out.
+      const at = lists[field.key].indexOf(item);
+      if (at !== -1) lists[field.key].splice(at, 1);
       if (item.row) item.row.remove();
       say(field, []);
       renderField(field);
       announce('Removed ' + item.name + '.');
-      focusAfterRemoval(field, index);
+      view.focusAfterRemoval(parts[field.key], lists[field.key], at);
       changed(field);
-    }
-
-    /** @param {object} field @param {number} index where the removed row was */
-    function focusAfterRemoval(field, index) {
-      const part = parts[field.key];
-      const rows = lists[field.key];
-      const next = rows[Math.min(index, rows.length - 1)];
-      const target =
-        (next && next.dom && !next.dom.remove.hidden ? next.dom.remove : null) ||
-        (part.picker ? part.picker.input : null) ||
-        part.box.querySelector('button:not([hidden])');
-      if (target && typeof target.focus === 'function') target.focus();
     }
 
     // --- the interface other scripts use ---------------------------------------
@@ -846,7 +626,9 @@
     ns.uploadSummary = summary;
 
     if (options.draft && typeof options.draft.trackUploads === 'function') options.draft.trackUploads(record);
-    targets.forEach(buildBox);
+    targets.forEach((field) => {
+      parts[field.key] = view.buildBox(field);
+    });
     direct.onChange(reconcile);
     reconcile();
 

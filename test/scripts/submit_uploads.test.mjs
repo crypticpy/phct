@@ -1,6 +1,6 @@
 /**
- * File uploads on the submit page (assets/js/submit/uploads.js and
- * uploads-core.js), driven through a real DOM.
+ * File uploads on the submit page (assets/js/submit/uploads.js,
+ * uploads-view.js and uploads-core.js), driven through a real DOM.
  *
  * Same harness as submit_direct.test.mjs: the Liquid snapshot of /submit/ with
  * the markup submit/index.md adds when `submit.signin_url` and
@@ -26,6 +26,7 @@ const INDEX = read('submit/index.md');
 const SCRIPTS = jsYaml.load(INDEX.split(/^---$/m)[1]).scripts.map((src) => src.replace(/^\//, ''));
 const DIRECT = read('assets/js/submit/direct.js');
 const CORE = read('assets/js/submit/uploads-core.js');
+const VIEW = read('assets/js/submit/uploads-view.js');
 const UPLOADS = read('assets/js/submit/uploads.js');
 
 const SIGNIN = 'https://signin.example';
@@ -91,6 +92,7 @@ const digest = (n) =>
  * @param {string} [options.draft] raw localStorage draft to start from
  * @param {(request: object, ctx: object) => any} [options.send] the upload service
  * @param {(file: File) => any} [options.reencode] the canvas
+ * @param {number} [options.issueStatus=201] what POST /issues answers
  */
 async function boot(options = {}) {
   const dom = new JSDOM('<!doctype html><body>' + page(options) + '</body>', {
@@ -106,6 +108,7 @@ async function boot(options = {}) {
     uploadsSent: [],
     sleeps: [],
     reencoded: [],
+    opened: [],
     count: 0,
   };
 
@@ -138,7 +141,10 @@ async function boot(options = {}) {
     },
   };
 
-  window.open = () => null;
+  window.open = (url) => {
+    ctx.opened.push(url);
+    return {};
+  };
   window.fetch = (url, init = {}) => {
     ctx.requests.push({ url, init });
     if (url === 'https://api.github.com/user')
@@ -146,6 +152,12 @@ async function boot(options = {}) {
         status: 200,
         ok: true,
         json: () => Promise.resolve(options.user || { login: 'octo-cat', id: 1001 }),
+      });
+    if (url === ISSUES_URL && init.method === 'POST' && options.issueStatus)
+      return Promise.resolve({
+        status: options.issueStatus,
+        ok: false,
+        json: () => Promise.resolve({ message: 'Validation Failed' }),
       });
     if (url === ISSUES_URL && init.method === 'POST')
       return Promise.resolve({
@@ -171,6 +183,7 @@ async function boot(options = {}) {
   if (options.signin !== false) window.eval(DIRECT);
   if (options.uploads !== false) {
     window.eval(CORE);
+    window.eval(VIEW);
     window.eval(UPLOADS);
   }
   SCRIPTS.forEach((rel) => window.eval(read(rel)));
@@ -271,9 +284,9 @@ test('feature off: no pickers, no script, no data attribute — in the markup an
     /\{% if uploads_url != '' %\}\s*data-uploads-url="\{\{ uploads_url \| escape \}\}"\{% endif %\}/
   );
   const scripts = INDEX.split('\n').filter(
-    (line) => /uploads(-core)?\.js/.test(line) && line.includes('<script')
+    (line) => /uploads(-core|-view)?\.js/.test(line) && line.includes('<script')
   );
-  assert.equal(scripts.length, 2);
+  assert.equal(scripts.length, 3);
   const block = INDEX.slice(INDEX.indexOf("{%- if uploads_url != '' %}\n{%- comment -%} Also before"));
   assert.ok(
     scripts.every((line) => block.includes(line)),
@@ -570,6 +583,48 @@ test('remove: DELETE with the ref, then the row is gone, focus moves on, the dra
   await settle();
   assert.equal(rowsOf(ctx, 'screenshots').length, 0);
   assert.equal(ctx.document.activeElement, pickerOf(ctx, 'screenshots'));
+});
+
+test('two quick removes take out the two files pressed, whichever DELETE answers first', async () => {
+  // b's DELETE is held until a's has come back: the list shifts under it.
+  let release;
+  const held = new Promise((resolve) => {
+    release = resolve;
+  });
+  const ctx = await boot({
+    send: async (request, c) => {
+      if (request.method !== 'DELETE') return defaultCreated(request, c);
+      if (request.url.includes(digest(2))) await held;
+      return reply(204, null);
+    },
+  });
+  await pick(ctx, 'screenshots', [png(ctx, 'a.png'), png(ctx, 'b.png'), png(ctx, 'c.png')]);
+  ['A', 'B', 'C'].forEach((alt, i) => describe(ctx, 'screenshots', i, 'Alt ' + alt));
+  const set = ctx.uploadsSent[0].headers['X-Upload-Set'];
+  const refC = 'upload:' + set + '/' + digest(3) + '.png';
+
+  rowsOf(ctx, 'screenshots')[1].querySelector('[data-upload-action="remove"]').click();
+  await settle();
+  rowsOf(ctx, 'screenshots')[0].querySelector('[data-upload-action="remove"]').click();
+  await settle();
+  release();
+  await settle();
+
+  assert.deepEqual(
+    rowsOf(ctx, 'screenshots').map((row) => /([abc])\.png/.exec(row.textContent)[1]),
+    ['c']
+  );
+  const { issueFormBody, markdownBody } = ctx.window.SubmitForm;
+  for (const body of [issueFormBody(ctx.fields), markdownBody(ctx.fields)])
+    assert.deepEqual(
+      body.split('\n').filter((line) => line.startsWith('upload:')),
+      [refC + ' | Alt C']
+    );
+  await settleDraft();
+  assert.deepEqual(
+    ctx.storedDraft().uploads.files.screenshots.map((entry) => [entry.name, entry.ref]),
+    [['c.png', refC]]
+  );
 });
 
 test('a deck removed brings its picker back; a failed DELETE keeps the row and says so', async () => {
@@ -931,6 +986,48 @@ test('without an upload the confirmation still says to drag the deck into the is
   const done = ctx.form.querySelector('[data-review]').textContent;
   assert.match(done, /Files cannot be sent from this page.*Slide deck or one-pager \(PDF\)/);
   assert.doesNotMatch(done, /uploaded file/);
+});
+
+test('a failed send with files: GitHub’s form is offered as the copy-out box, which keeps them', async () => {
+  const ctx = await boot({ issueStatus: 422 });
+  fillRequired(ctx);
+  await pick(ctx, 'screenshots', [png(ctx)]);
+  describe(ctx, 'screenshots', 0, 'The queue');
+  await pick(ctx, 'deck_pdf', [pdf(ctx)]);
+  assert.equal(tryReview(ctx), true);
+  await submitToGitHub(ctx);
+  ctx.form.querySelector('[data-direct-action="fallback"]').click();
+  await settle();
+
+  assert.deepEqual(ctx.opened, [], 'the prefilled link was opened, dropping the files');
+  assert.match(
+    ctx.form.querySelector('[data-submit-status]').textContent,
+    /The 2 files you uploaded do not travel in a link to GitHub’s form, but the box below carries them/
+  );
+  assert.equal(ctx.form.querySelector('[data-fallback]').hidden, false);
+  const box = ctx.form.querySelector('[data-fallback-body]').value;
+  assert.equal(box, ctx.window.SubmitForm.markdownBody(ctx.fields));
+  assert.match(box, /### Screenshots\n\nupload:[a-z2-7]{26}\/[0-9a-f]{64}\.png \| The queue/);
+  assert.match(box, /### Slide deck or one-pager \(PDF\)\n\nupload:[a-z2-7]{26}\/[0-9a-f]{64}\.pdf/);
+  const link = ctx.form.querySelector('[data-fallback-link]');
+  assert.equal(link.hidden, false);
+  assert.equal(link.href, ctx.window.SubmitForm.issueUrl(ctx.form, ctx.fields, 'Water routing'));
+  await settleDraft();
+  assert.equal(ctx.storedDraft().uploads.files.screenshots.length, 1, 'a failed send lost the draft');
+});
+
+test('a failed send without files: GitHub’s form opens as before, with no files warning', async () => {
+  const ctx = await boot({ issueStatus: 422 });
+  fillRequired(ctx);
+  assert.equal(tryReview(ctx), true);
+  await submitToGitHub(ctx);
+  ctx.form.querySelector('[data-direct-action="fallback"]').click();
+  await settle();
+
+  assert.equal(ctx.opened.length, 1);
+  assert.match(ctx.opened[0], /^https:\/\/github\.com\/crypticpy\/phct\/issues\/new\?/);
+  assert.doesNotMatch(ctx.form.textContent, /files? you uploaded/);
+  assert.equal(ctx.form.querySelector('[data-fallback]').hidden, true);
 });
 
 /* ------------------------------------------- the core's decision logic */

@@ -355,6 +355,16 @@
       true
     );
 
+    /** @returns {string} the issue form with nothing prefilled */
+    function blankFormUrl() {
+      return (
+        'https://github.com/' +
+        form.dataset.repo +
+        '/issues/new?template=' +
+        (form.dataset.template || 'new-entry.yml')
+      );
+    }
+
     /**
      * Hand the answers to GitHub, from the review panel.
      *
@@ -385,10 +395,7 @@
         // not: the chooser has blank issues off, and submitters cannot label.
         showFallback(
           'Your answers are too long to carry across in a link. Open the issue form with the link below, then copy each answer from the box into the question with the same heading.',
-          'https://github.com/' +
-            form.dataset.repo +
-            '/issues/new?template=' +
-            (form.dataset.template || 'new-entry.yml')
+          blankFormUrl()
         );
         return;
       }
@@ -479,8 +486,36 @@
           if (uploads) uploads.reset();
           ns.renderSubmitted(form, issue, fileLabels, uploaded);
         },
-        onFallback: send,
+        onFallback: fallbackWithFiles,
       });
+    }
+
+    /**
+     * "Use GitHub's form instead" after a direct send failed. The prefilled
+     * link never carries `upload:` lines (handoff.js), so with files attached
+     * it would drop them unannounced: hand over the copy-out box instead,
+     * which carries them, and say why. No files, or no repository: the
+     * ordinary link hand-off.
+     */
+    function fallbackWithFiles() {
+      const files = uploads ? uploads.count() : 0;
+      if (files === 0 || !form.dataset.repo) {
+        send();
+        return;
+      }
+      const url = ns.issueUrl(form, fields, entryTitle());
+      const fits = url.length <= MAX_URL;
+      ns.exitReview(form);
+      showFallback(
+        (files === 1 ? 'The file you uploaded does' : 'The ' + files + ' files you uploaded do') +
+          ' not travel in a link to GitHub’s form, but the box below carries ' +
+          (files === 1 ? 'it' : 'them') +
+          ' with your answers. ' +
+          (fits
+            ? 'Open the prefilled issue with the link below, then copy the upload: lines from the box into the questions with the same headings.'
+            : 'Open the issue form with the link below, then copy each answer from the box into the question with the same heading.'),
+        fits ? url : blankFormUrl()
+      );
     }
 
     form.addEventListener('submit', (event) => {

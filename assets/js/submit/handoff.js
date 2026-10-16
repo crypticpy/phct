@@ -67,7 +67,9 @@
   };
 
   /**
-   * The prefilled "new issue" URL.
+   * The prefilled "new issue" URL. Never carries `upload:` lines (see the
+   * header): with files attached, assets/js/submit.js offers the copy-out box
+   * instead, which does.
    * @param {HTMLFormElement} form carries data-repo / data-template / data-title-prefix
    * @param {object[]} fields
    * @param {string} title the entry title, used for the issue title
