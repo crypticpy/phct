@@ -1,6 +1,6 @@
 # Attach files on the submit page
 
-**Status: planned (2026-10-16). Not started.**
+**Status: in progress (started 2026-10-16).**
 
 ## Why
 
@@ -74,7 +74,7 @@ services/uploads/  (own Vercel project; stateless)
   │  1. GET api.github.com/user with the submitter's token → numeric id, login
   │  2. check origin, kind, size, magic bytes, per-user caps
   │  3. with its own GitHub App installation token (uploads repo only, contents:rw):
-  │     blob → tree → parentless commit → ref  refs/heads/u/<user-id>/<set-id>/<sha256-12>
+  │     blob → tree → parentless commit → ref  refs/heads/u/<user-id>/<set>/<sha256>
   ▼
 <owner>/<catalog>-uploads  (private GitHub repo, only ever holds refs under u/)
   ▲
@@ -130,7 +130,7 @@ and in a `file` section, a bare `upload:k3j9…/77ab…04.pdf`.
   `upload:` form (regex-validated: set id and full sha256, extension from an allowlist) and
   return `{ upload: { set, sha256, ext } }` instead of `{ url }`.
 - `scripts/lib/uploads.mjs` (new, the **only** code that sees the uploads token): builds the
-  ref name itself — `u/<ISSUE_AUTHOR_ID>/<set>/<sha256 prefix>` — so a reference can never
+  ref name itself — `u/<ISSUE_AUTHOR_ID>/<set>/<sha256>` (`scripts/lib/upload_refs.mjs`, the shared contract) — so a reference can never
   name another user's files or another repository; reads the blob; re-hashes and rejects a
   mismatch; hands the bytes to the existing sniff, per-file and total caps.
 - `scripts/lib/images.mjs` and `attachments.mjs`: split "fetch" from "check and save bytes" so
