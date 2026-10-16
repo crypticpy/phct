@@ -236,7 +236,7 @@ test('both files are listed as generator outputs, so updates keep them regenerat
       .map((line) => line.trim().split(/\s+/));
     assert.ok(
       lines.some(([path, attr]) => path === file && attr === 'merge=ours'),
-      `${file} merge=ours in .gitattributes`,
+      `${file} merge=ours in .gitattributes`
     );
   }
 });
