@@ -1,7 +1,8 @@
 /**
  * Submit form — entry point. Wires the pieces in assets/js/submit/*.js:
  * fields (registry) → validate → repeatable → preview → draft → handoff →
- * review, and direct (Sign in with GitHub) when the site has it on.
+ * review, and direct (Sign in with GitHub) and uploads (file pickers for
+ * signed-in submitters) when the site has them on.
  *
  * Loaded last by the `scripts:` list in submit/index.md front matter, so every
  * window.SubmitForm helper it calls is already defined.
@@ -241,10 +242,15 @@
       draft.save();
     }
 
+    // File uploads (assets/js/submit/uploads.js), set up below beside the
+    // sign-in they depend on; a restored draft hands its record of them over.
+    let uploads = null;
+
     draft = ns.initDraft(
       form,
       fields,
-      function afterRestore(ui) {
+      function afterRestore(ui, uploaded) {
+        if (uploads) uploads.restore(uploaded);
         fields.filter((field) => field.type === 'images').forEach(ns.renderImagePreviews);
         // Visibility before position: the short-form recompute decides which
         // sections still have anything to show before the stepper lands on one.
@@ -426,6 +432,13 @@
     // it can — the link hand-off is the way.
     const direct = titleField && typeof ns.initDirect === 'function' ? ns.initDirect(form) : null;
 
+    // Only with sign-in, and the service's address: submit/index.md renders
+    // data-uploads-url and uploads.js together, and only with signin_url set.
+    uploads =
+      direct && form.dataset.uploadsUrl && typeof ns.initUploads === 'function'
+        ? ns.initUploads({ form: form, fields: fields, direct: direct, draft: draft, onChange: refresh })
+        : null;
+
     /**
      * Send the answers straight to GitHub as the signed-in submitter. The
      * draft is deleted only once GitHub answers 201 — every other outcome
@@ -433,6 +446,12 @@
      * @param {HTMLButtonElement} button held while the request is out
      */
     function sendDirect(button) {
+      // Counted before the draft is cleared: the panel says where to drag the
+      // file for each file question that has no upload.
+      const uploaded = uploads ? uploads.count() : 0;
+      const fileLabels = fields
+        .filter((field) => field.type === 'file' && !(uploads && uploads.hasFiles(field)))
+        .map((field) => field.label);
       direct.submit({
         button: button,
         status: form.querySelector('[data-review-status]'),
@@ -442,11 +461,8 @@
           draft.clear();
           countEvent('Send to GitHub');
           say(status, '');
-          ns.renderSubmitted(
-            form,
-            issue,
-            fields.filter((field) => field.type === 'file').map((field) => field.label)
-          );
+          if (uploads) uploads.reset();
+          ns.renderSubmitted(form, issue, fileLabels, uploaded);
         },
         onFallback: send,
       });

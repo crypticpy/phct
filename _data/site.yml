@@ -123,6 +123,12 @@ submit:
   # answers as an issue straight from /submit/, however long. Blank keeps the
   # link hand-off only. See docs/configuration.md.
   signin_url: ""
+  # Optional file uploads on /submit/: the address of the upload service you
+  # deploy from services/uploads/ (e.g. https://catalog-uploads.vercel.app).
+  # Signed-in submitters can then attach screenshots and a PDF deck right on
+  # the page. Needs signin_url, because uploads work only for signed-in
+  # submitters. Blank turns it off. See docs/configuration.md.
+  uploads_url: ""
 
 # "Check your submission" page (module: status). A submitter types the number
 # GitHub gave their submission and sees its title, date and stage, read from

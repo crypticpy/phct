@@ -17,6 +17,13 @@
  * assets/js/configurator/issue-form-ids.js, the same helper the generator
  * names the form's elements with.
  *
+ * Files attached through assets/js/submit/uploads.js (a signed-in submitter,
+ * `submit.uploads_url` set) are written into the two bodies — never into the
+ * prefilled URL, which is the route for submitters who are not signed in —
+ * as `upload:<set>/<sha256>.<ext> | <alt text>` lines in a screenshots
+ * question and a bare `upload:…` reference in a `file` question, where they
+ * replace any typed link. The scaffolder resolves them (scripts/lib/upload_refs.mjs).
+ *
  * Exposes: window.SubmitForm.issueUrl, .markdownBody, .issueFormBody, .yamlFrontMatter,
  *          .mailtoUrl, .unprefillable
  */
@@ -32,6 +39,20 @@
     return fields
       .map((field) => ({ field: field, text: ns.serialize(field) }))
       .filter((entry) => entry.text !== '');
+  }
+
+  /**
+   * A field's answer as the issue body carries it: its attached files first
+   * (see the header), then what was typed. An attached file replaces a typed
+   * answer in a `file` question.
+   * @param {object} field
+   * @returns {string} '' when there is nothing to say
+   */
+  function bodyText(field) {
+    const lines = typeof ns.uploadLines === 'function' ? ns.uploadLines(field) : [];
+    if (lines.length === 0) return ns.serialize(field);
+    if (field.type === 'file') return lines[0];
+    return lines.concat(ns.serialize(field) === '' ? [] : [ns.serialize(field)]).join('\n');
   }
 
   /**
@@ -69,7 +90,9 @@
    * @returns {string}
    */
   ns.markdownBody = function markdownBody(fields) {
-    return answered(fields)
+    return fields
+      .map((field) => ({ field: field, text: bodyText(field) }))
+      .filter((entry) => entry.text !== '')
       .map((entry) => '### ' + entry.field.label + '\n\n' + entry.text + '\n')
       .join('\n');
   };
@@ -87,7 +110,7 @@
    */
   ns.issueFormBody = function issueFormBody(fields) {
     return fields
-      .map((field) => '### ' + field.label + '\n\n' + (ns.serialize(field) || '_No response_'))
+      .map((field) => '### ' + field.label + '\n\n' + (bodyText(field) || '_No response_'))
       .join('\n\n');
   };
 

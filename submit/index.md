@@ -28,6 +28,9 @@ scripts:
     [data-submit-form]        the form; carries repo/template/copy configuration
       data-signin-url         the "Sign in with GitHub" service, present only
                               when `submit.signin_url` is set (see below)
+      data-uploads-url        the file-upload service, present only when
+                              `submit.uploads_url` and `submit.signin_url` are
+                              both set (see below)
     [data-field=<key>]        one field wrapper
       data-type               schema type
       data-required           "true" when an answer is needed
@@ -128,6 +131,16 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
 {%- endcomment -%}
 {%- assign signin_url = '' -%}
 {%- if gh_repo != '' -%}{%- assign signin_url = cfg.submit.signin_url | default: '' | strip -%}{%- endif -%}
+
+{%- comment -%}
+  Optional file uploads: `submit.uploads_url` is the address of the upload
+  service (services/uploads/). With it set — and a sign-in service, because
+  only signed-in submitters can upload — assets/js/submit/uploads.js adds a file
+  picker to each screenshots and file question. Unset — the default — and
+  nothing changes: no attribute, no script, no extra markup.
+{%- endcomment -%}
+{%- assign uploads_url = '' -%}
+{%- if signin_url != '' -%}{%- assign uploads_url = cfg.submit.uploads_url | default: '' | strip -%}{%- endif -%}
 
 {%- comment -%}
   What a submitter should know once the issue exists: it has a number, GitHub
@@ -306,7 +319,8 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
         data-entry-path="{{ schema.entry.path | default: 'catalog' }}"
         data-draft-key="{{ cfg.name | default: 'catalog' | slugify }}"
         data-section-count="{{ form_groups.size }}"{% if signin_url != '' %}
-        data-signin-url="{{ signin_url | escape }}"{% endif %}>
+        data-signin-url="{{ signin_url | escape }}"{% endif %}{% if uploads_url != '' %}
+        data-uploads-url="{{ uploads_url | escape }}"{% endif %}>
 
     <input type="hidden" name="template" value="new-entry.yml">
 
@@ -648,5 +662,10 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
 {%- if signin_url != '' %}
 {%- comment -%} Before the front-matter scripts, which run in document order after it: it only defines window.SubmitForm.initDirect, which assets/js/submit.js calls. {%- endcomment %}
 <script defer src="{{ '/assets/js/submit/direct.js' | relative_url }}"></script>
+{%- if uploads_url != '' %}
+{%- comment -%} Also before the front-matter scripts: it only defines window.SubmitForm.initUploads, which assets/js/submit.js calls once sign-in is wired. {%- endcomment %}
+<script defer src="{{ '/assets/js/submit/uploads-core.js' | relative_url }}"></script>
+<script defer src="{{ '/assets/js/submit/uploads.js' | relative_url }}"></script>
+{%- endif -%}
 {%- endif -%}
 {%- endif -%}
