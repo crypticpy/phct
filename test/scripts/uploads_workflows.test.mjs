@@ -52,8 +52,14 @@ test('new-entry: UPLOADS_TOKEN reaches exactly one step, the scaffolder, just be
 });
 
 test('cleanup: triggers, empty top-level permissions, concurrency', () => {
-  assert.deepEqual(Object.keys(cleanup.on).sort(), ['issues', 'schedule', 'workflow_dispatch']);
+  assert.deepEqual(Object.keys(cleanup.on).sort(), [
+    'issues',
+    'pull_request',
+    'schedule',
+    'workflow_dispatch',
+  ]);
   assert.deepEqual(cleanup.on.issues.types, ['closed']);
+  assert.deepEqual(cleanup.on.pull_request.types, ['closed']);
   assert.equal(cleanup.on.schedule.length, 1);
   const [minute, hour] = cleanup.on.schedule[0].cron.split(' ');
   assert.notEqual(minute, '0');
@@ -99,7 +105,10 @@ test('cleanup: the write token is minted here, scoped to contents write, and rea
   const holders = job.steps.filter((s) => s.env && 'UPLOADS_TOKEN' in s.env);
   assert.equal(holders.length, 1);
   assert.equal(holders[0].run, 'node scripts/uploads_cleanup.mjs');
-  assert.equal(holders[0].env.MODE, "${{ github.event_name == 'issues' && 'closed' || 'sweep' }}");
+  assert.equal(
+    holders[0].env.MODE,
+    "${{ github.event_name == 'issues' && 'closed' || github.event_name == 'pull_request' && 'pr-closed' || 'sweep' }}"
+  );
   // Issue text only ever reaches a step through env:.
   for (const s of job.steps) assert.ok(!/github\.event\.issue/.test(s.run ?? ''), s.name);
 });
@@ -107,4 +116,38 @@ test('cleanup: the write token is minted here, scoped to contents write, and rea
 test('both workflows pin the app-token action to the same commit', () => {
   const pins = [entry.jobs.scaffold, cleanup.jobs.cleanup].map((j) => step(j, 'uploads-token').uses);
   assert.equal(pins[0], pins[1]);
+});
+
+test('cleanup: a closed draft pull request runs only for a labelled same-repo entry/ branch', () => {
+  const job = cleanup.jobs.cleanup;
+  const off = cleanup.jobs['turned-off'];
+  const pr = ({ label = 'content:new-entry', head = 'org/catalog', ref = 'entry/water-41' } = {}) => ({
+    github: {
+      event_name: 'pull_request',
+      repository: 'org/catalog',
+      event: { pull_request: { labels: [{ name: label }], head: { ref, repo: { full_name: head } } } },
+    },
+    vars: { UPLOADS_REPO: 'o/r' },
+  });
+  assert.equal(runs(job, pr()), true);
+  assert.equal(runs(job, pr({ label: 'bug' })), false);
+  assert.equal(runs(job, pr({ head: 'stranger/catalog' })), false);
+  assert.equal(runs(job, pr({ ref: 'feature/x' })), false);
+  const unset = { ...pr(), vars: { UPLOADS_REPO: '' } };
+  assert.equal(runs(job, unset), false);
+  assert.equal(runs(off, unset), true);
+  assert.equal(
+    runs(off, { ...unset, github: { ...unset.github, event: pr({ head: 'x/y' }).github.event } }),
+    false
+  );
+});
+
+test('cleanup: the pull request branch reaches the script through env only', () => {
+  const run = cleanup.jobs.cleanup.steps.find((s) => s.run === 'node scripts/uploads_cleanup.mjs');
+  assert.equal(run.env.PR_BRANCH, '${{ github.event.pull_request.head.ref }}');
+  assert.match(run.env.MODE, /pull_request' && 'pr-closed'/);
+  for (const s of cleanup.jobs.cleanup.steps)
+    assert.ok(!/github\.event\.pull_request/.test(s.run ?? ''), s.name);
+  for (const s of cleanup.jobs.cleanup.steps)
+    assert.ok(!/head\.(sha|ref)/.test(JSON.stringify(s.with ?? {})), s.name);
 });

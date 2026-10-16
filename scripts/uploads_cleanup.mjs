@@ -8,6 +8,10 @@
  *
  *   closed  A new-entry issue was closed: delete the author's sets that its
  *           body references.
+ *   pr-closed  A draft pull request closed (merged or declined). Neither
+ *           closing path is guaranteed to start `issues: closed` (a close made
+ *           with GITHUB_TOKEN starts nothing), so the issue is found from the
+ *           draft branch `entry/<slug>-<issue>` and handled as `closed`.
  *   sweep   Daily: delete every set older than MAX_AGE_DAYS that no OPEN
  *           `content:new-entry` issue by the same author still references.
  *
@@ -18,12 +22,13 @@
  * `refs/heads/u/<digits>/<set>/<sha256>` is left alone.
  *
  * Environment: UPLOADS_TOKEN (write, uploads repo only), UPLOADS_REPO,
- * CATALOG_REPO, GITHUB_TOKEN (issues: read), MODE, ISSUE_BODY and
- * ISSUE_AUTHOR_ID (closed), MAX_AGE_DAYS (default 14), DRY_RUN.
+ * CATALOG_REPO, GITHUB_TOKEN (issues: read), MODE, ISSUE_BODY, ISSUE_AUTHOR_ID
+ * and ISSUE_NUMBER (closed), PR_BRANCH (pr-closed), MAX_AGE_DAYS (default 14), DRY_RUN.
  */
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+import { draftBranchPattern } from './lib/drafts.mjs';
 import { parseUploadRef, SET_ID_RE, SHA256_RE } from './lib/upload_refs.mjs';
 
 const API = 'https://api.github.com';
@@ -54,13 +59,27 @@ function setsFromAnywhere(text) {
 }
 
 /**
+ * The issue number a draft branch `entry/<slug>-<issue>` was made for, or null.
+ * The shape is checked by the same pattern the draft finder uses.
+ *
+ * @param {unknown} branch
+ * @returns {number|null}
+ */
+export function issueFromDraftBranch(branch) {
+  const m = /-([1-9][0-9]{0,9})$/.exec(String(branch ?? ''));
+  if (!m) return null;
+  const issue = Number(m[1]);
+  return draftBranchPattern('entry/', issue, { numbered: true }).test(String(branch)) ? issue : null;
+}
+
+/**
  * @param {{ env: Record<string,string|undefined>, fetch?: typeof fetch, now?: () => number, log?: (line: string) => void }} io
  * @returns {Promise<{ mode: string, dryRun: boolean, listed: number, ignored: number, deleted: string[], gone: number, kept: number, failed: number, lines: string[] }>}
  */
 export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = Date.now, log = () => {} }) {
   const mode = env.MODE;
-  if (mode !== 'closed' && mode !== 'sweep')
-    throw new Error(`MODE must be "closed" or "sweep", got ${JSON.stringify(mode)}`);
+  if (!['closed', 'pr-closed', 'sweep'].includes(mode))
+    throw new Error(`MODE must be "closed", "pr-closed" or "sweep", got ${JSON.stringify(mode)}`);
   const uploadsRepo = env.UPLOADS_REPO;
   if (!/^[\w.-]+\/[\w.-]+$/.test(uploadsRepo ?? '')) throw new Error('UPLOADS_REPO must be owner/name');
   if (!env.UPLOADS_TOKEN) throw new Error('UPLOADS_TOKEN is not set');
@@ -95,6 +114,38 @@ export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = 
     }
   }
 
+  function requireCatalog() {
+    if (!env.GITHUB_TOKEN) throw new Error('GITHUB_TOKEN is not set');
+    if (!/^[\w.-]+\/[\w.-]+$/.test(env.CATALOG_REPO ?? ''))
+      throw new Error('CATALOG_REPO must be owner/name');
+  }
+
+  function maxAgeDays() {
+    const days = Number(env.MAX_AGE_DAYS || 14);
+    if (!Number.isFinite(days) || days < 0) throw new Error('MAX_AGE_DAYS must be a non-negative number');
+    return days;
+  }
+
+  /**
+   * `<user>/<set>` for every set an OPEN entry issue (other than `except`) still
+   * names. A failure throws before anything is deleted: not knowing what is
+   * still referenced must never look like "nothing is".
+   */
+  async function openReferences(except) {
+    requireCatalog();
+    const open = await pages(
+      `/repos/${env.CATALOG_REPO}/issues?state=open&labels=${encodeURIComponent(ENTRY_LABEL)}`,
+      env.GITHUB_TOKEN
+    );
+    const referenced = new Set();
+    for (const issue of open) {
+      if (issue.pull_request || String(issue.number) === String(except ?? '')) continue;
+      const author = String(issue.user?.id ?? '');
+      for (const set of setsFromAnywhere(issue.body)) referenced.add(`${author}/${set}`);
+    }
+    return referenced;
+  }
+
   // The ref listing: the only source of deletion targets.
   const listing = await pages(`/repos/${uploadsRepo}/git/matching-refs/heads/u/`, env.UPLOADS_TOKEN);
   const refs = [];
@@ -110,31 +161,48 @@ export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = 
   let kept = 0;
   const lines = [];
 
-  if (mode === 'closed') {
-    const author = String(env.ISSUE_AUTHOR_ID ?? '').trim();
-    if (!/^[1-9][0-9]*$/.test(author)) throw new Error('ISSUE_AUTHOR_ID is not a GitHub user id');
-    const named = setsFromLines(env.ISSUE_BODY);
-    targets = refs.filter((r) => r.user === author && named.has(r.set));
-  } else {
-    if (!env.GITHUB_TOKEN) throw new Error('GITHUB_TOKEN is not set');
-    const catalog = env.CATALOG_REPO;
-    if (!/^[\w.-]+\/[\w.-]+$/.test(catalog ?? '')) throw new Error('CATALOG_REPO must be owner/name');
-    const days = Number(env.MAX_AGE_DAYS || 14);
-    if (!Number.isFinite(days) || days < 0) throw new Error('MAX_AGE_DAYS must be a non-negative number');
-    const cutoff = now() - days * DAY_MS;
-
-    // A failure here throws before anything is deleted: not knowing what is
-    // still referenced must never look like "nothing is".
-    const open = await pages(
-      `/repos/${catalog}/issues?state=open&labels=${encodeURIComponent(ENTRY_LABEL)}`,
-      env.GITHUB_TOKEN
-    );
-    const referenced = new Set(); // `<user>/<set>`
-    for (const issue of open) {
-      if (issue.pull_request) continue;
-      const author = String(issue.user?.id ?? '');
-      for (const set of setsFromAnywhere(issue.body)) referenced.add(`${author}/${set}`);
+  if (mode !== 'sweep') {
+    let { ISSUE_AUTHOR_ID: authorId, ISSUE_BODY: body, ISSUE_NUMBER: number } = env;
+    if (mode === 'pr-closed') {
+      number = String(issueFromDraftBranch(env.PR_BRANCH) ?? '');
+      if (!number) {
+        lines.push(`Uploads cleanup (pr-closed): branch is not a draft branch; nothing to do`);
+        for (const line of lines) log(line);
+        return {
+          mode,
+          dryRun,
+          listed: listing.length,
+          ignored,
+          deleted: [],
+          gone: 0,
+          kept: 0,
+          failed: 0,
+          lines,
+        };
+      }
+      requireCatalog();
+      const res = await call('GET', `/repos/${env.CATALOG_REPO}/issues/${number}`, env.GITHUB_TOKEN);
+      if (!res.ok) throw new Error(`GET issue ${number} failed: ${res.status}`);
+      const issue = await res.json();
+      if (issue.pull_request) throw new Error(`#${number} is a pull request, not an issue`);
+      authorId = String(issue.user?.id ?? '');
+      body = issue.body;
     }
+    const author = String(authorId ?? '').trim();
+    if (!/^[1-9][0-9]*$/.test(author)) throw new Error('ISSUE_AUTHOR_ID is not a GitHub user id');
+    const named = setsFromLines(body);
+    // Another open submission by the same author that still names a set keeps
+    // it, so a copied `upload:` line cannot take that submission's files.
+    const referenced = await openReferences(number);
+    targets = refs.filter(
+      (r) => r.user === author && named.has(r.set) && !referenced.has(`${r.user}/${r.set}`)
+    );
+    kept =
+      new Set(refs.filter((r) => r.user === author && named.has(r.set)).map((r) => r.set)).size -
+      new Set(targets.map((r) => r.set)).size;
+  } else {
+    const cutoff = now() - maxAgeDays() * DAY_MS;
+    const referenced = await openReferences();
 
     const groups = new Map();
     for (const r of refs) {
@@ -189,7 +257,7 @@ export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = 
     `- refs listed: ${listing.length} (ignored, not an upload branch: ${ignored})`,
     `- ${dryRun ? 'would delete' : 'deleted'}: ${deleted.length}`,
     `- already gone: ${gone}`,
-    ...(mode === 'sweep' ? [`- sets kept (referenced or too young): ${kept}`] : []),
+    `- sets kept (referenced elsewhere${mode === 'sweep' ? ' or too young' : ''}): ${kept}`,
     `- failed: ${failed}`
   );
   for (const line of lines) log(line);

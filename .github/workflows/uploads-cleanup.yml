@@ -4,8 +4,11 @@ name: Uploads cleanup
 # branch each (`u/<user-id>/<set>/<sha256>`) in a PRIVATE uploads repository
 # (docs/submit-uploads-plan.md). This deletes them once they are not needed:
 #
-#   * when a `content:new-entry` issue closes (its pull request merged or was
-#     declined), the author's sets named in the issue body;
+#   * when a `content:new-entry` issue closes, or its draft pull request
+#     (branch `entry/<slug>-<issue>`) closes merged or declined, the author's
+#     sets named in the issue body. The pull request trigger exists because a
+#     close made with the built-in GITHUB_TOKEN (a decline, a "Closes #N" on
+#     merge) starts no `issues: closed` run;
 #   * every day, any set older than 14 days that no open `content:new-entry`
 #     issue by the same author still references.
 #
@@ -19,6 +22,12 @@ name: Uploads cleanup
 
 on:
   issues:
+    types:
+      - closed
+  # Same-repository drafts only (the job's `if`); the branch name is read from
+  # the event and used through `env:` only. The checkout below names the default
+  # branch because a declined, conflicting draft has no merge ref to check out.
+  pull_request:
     types:
       - closed
   schedule:
@@ -42,7 +51,9 @@ jobs:
   # A job whose `if` is false shows up as a bare grey "skipped" with no reason
   # (see metrics.yml). This one runs only when the feature is off and says so.
   turned-off:
-    if: vars.UPLOADS_REPO == '' && (github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'content:new-entry'))
+    if: >-
+      vars.UPLOADS_REPO == '' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'content:new-entry') && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'entry/')))
+      && (github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'content:new-entry'))
     runs-on: ubuntu-latest
     steps:
       - name: Say why nothing ran
@@ -50,7 +61,9 @@ jobs:
           echo "Uploads cleanup is turned off: the repository variable UPLOADS_REPO is not set, so there is no uploads repository to clean. Set it in Settings -> Secrets and variables -> Actions -> Variables to turn uploads on." >> "$GITHUB_STEP_SUMMARY"
 
   cleanup:
-    if: vars.UPLOADS_REPO != '' && (github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'content:new-entry'))
+    if: >-
+      vars.UPLOADS_REPO != '' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'content:new-entry') && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'entry/')))
+      && (github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'content:new-entry'))
     runs-on: ubuntu-latest
     permissions:
       # Checkout, and listing this repository's open issues for the sweep.
@@ -61,6 +74,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
       - name: Setup Node
@@ -99,7 +113,11 @@ jobs:
       - name: Delete unneeded uploads
         run: node scripts/uploads_cleanup.mjs
         env:
-          MODE: ${{ github.event_name == 'issues' && 'closed' || 'sweep' }}
+          MODE: ${{ github.event_name == 'issues' && 'closed' || github.event_name == 'pull_request' && 'pr-closed' || 'sweep' }}
+          # pr-closed: the issue is found from the draft branch name, which the
+          # script re-checks; the fork check is in the job's `if`.
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
           UPLOADS_TOKEN: ${{ steps.uploads-token.outputs.token }}
           UPLOADS_REPO: ${{ vars.UPLOADS_REPO }}
           CATALOG_REPO: ${{ github.repository }}
