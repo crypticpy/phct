@@ -128,7 +128,7 @@ workflow summary; the entry is still drafted without the file.
 
 | Warning says | Meaning | What to do |
 |---|---|---|
-| *"…could not be collected, because file uploads are not set up on this catalog…"* | The issue has `upload:` lines but the scaffold job had no way to read them: `UPLOADS_REPO`, `UPLOADS_APP_ID` or `UPLOADS_APP_PRIVATE_KEY` is missing, or the repository name is not `owner/name`. It appears once per answer. | Set the variable and both secrets. Then ask the submitter to make any small edit to the issue (or edit it yourself) to rebuild the draft. If you are turning uploads off for good, ask them to drag the file into the answer in place of the `upload:` line. |
+| *"…could not be collected, because file uploads are not set up on this catalog…"* | The issue has `upload:` lines but the scaffold job had no way to read them: `UPLOADS_REPO`, `UPLOADS_APP_ID` or `UPLOADS_APP_PRIVATE_KEY` is missing, the repository name is not `owner/name`, or GitHub refused to mint the App's token (wrong App ID or key, or the App is not installed on the uploads repository; the job's *Mint a read-only token* step shows the error, and the draft is built anyway). It appears once per answer. | Set or fix the variable and both secrets. Then ask the submitter to make any small edit to the issue (or edit it yourself) to rebuild the draft. If you are turning uploads off for good, ask them to drag the file into the answer in place of the `upload:` line. |
 | *"…could not be found — uploads are kept for a limited time, so it may have expired…"* | The file is not in the uploads repository: older than 14 days and swept, removed by the submitter, or the line was copied from another person's issue (files are looked up under the issue author's own id only). | Ask the submitter to drag the file into that answer on the issue, in place of the `upload:` line. |
 | *"Could not attach … (…)"* (deck), *"Could not download … (…)"* or *"Skipped …"* (screenshots) | The file was found but failed a check: not the type it claims, over the size cap, or its bytes do not match the reference. | Same as for a GitHub attachment: add it by hand in the pull request. |
 
@@ -141,7 +141,8 @@ the scaffolder:
 
 - When a submission's draft pull request is **merged or closed**, or its `content:new-entry` issue is
   **closed** by hand, the files the issue's body names are deleted, unless another open submission by
-  the same author still names them.
+  the same author still names them. A draft closed while its issue stays open (to restart it) deletes
+  nothing; if the issue closes moments later, the daily sweep below picks the files up.
 - **Every day** (04:47 UTC), any set of files whose newest file is more than 14 days old and that no
   *open* `content:new-entry` issue by the same author still names is deleted. This catches drafts that
   were never submitted.

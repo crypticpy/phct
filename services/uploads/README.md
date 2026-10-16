@@ -150,7 +150,8 @@ npx vercel deploy --prod                              # gives the address, e.g. 
   other loopback addresses for local testing.
 - Optional: `MIN_ACCOUNT_AGE_DAYS`, a whole number of days. GitHub accounts
   younger than that cannot upload (they can still submit and add files on
-  GitHub). Leave it unset to allow any account.
+  GitHub). Unset allows any account; a value such as `7` is recommended, so
+  throwaway accounts made to fill the uploads repository cannot upload.
 
 ### 4. Give the catalog's workflows access
 
@@ -165,7 +166,9 @@ Two workflows already in the catalog use them, and both do nothing while
 `UPLOADS_REPO` is unset:
 
 - **New entry from issue** (`new-entry.yml`) mints a read-only token for the
-  uploads repository for each run and gives it to the scaffold step alone.
+  uploads repository for each run and gives it to the scaffold step alone. If
+  minting fails, the entry is still drafted, with a warning for each file it
+  could not collect.
 - **Uploads cleanup** (`uploads-cleanup.yml`) mints a token that can delete
   branches. It runs when a `content:new-entry` issue closes, and every day at
   04:47 UTC, when it deletes any draft's files that are more than 14 days old

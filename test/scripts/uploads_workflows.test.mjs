@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 
-import { runs } from '../helpers/workflow_expr.mjs';
+import { evaluate, runs } from '../helpers/workflow_expr.mjs';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..', '.github', 'workflows');
 const load = (name) => YAML.parse(fs.readFileSync(path.join(DIR, name), 'utf8'));
@@ -35,6 +35,23 @@ test('new-entry: the token step runs only when UPLOADS_REPO is set and is read-o
     assert.equal(runs(token, { vars: { UPLOADS_REPO: v ? 'o/r' : '' } }), v);
     assert.equal(runs(split, { vars: { UPLOADS_REPO: v ? 'o/r' : '' } }), v);
   }
+});
+
+test('new-entry: a failed token mint never fails the submission; the scaffolder runs with an empty token', () => {
+  const steps = entry.jobs.scaffold.steps;
+  for (const id of ['uploads-repo', 'uploads-token']) {
+    assert.equal(step(entry.jobs.scaffold, id)['continue-on-error'], true, id);
+  }
+  // No condition of its own between the mint and the scaffolder: it runs, and
+  // a failed mint's output is simply empty (scripts/lib/uploads.mjs warns).
+  const scaffold = step(entry.jobs.scaffold, 'scaffold');
+  assert.equal(scaffold.if, undefined);
+  assert.equal(runs(scaffold, { vars: { UPLOADS_REPO: 'o/r' } }), true);
+  const between = steps.slice(
+    steps.indexOf(step(entry.jobs.scaffold, 'uploads-repo')),
+    steps.indexOf(scaffold)
+  );
+  for (const s of between) assert.equal(s['continue-on-error'], true, s.id ?? s.name);
 });
 
 test('new-entry: UPLOADS_TOKEN reaches exactly one step, the scaffolder, just before it', () => {
@@ -65,7 +82,19 @@ test('cleanup: triggers, empty top-level permissions, concurrency', () => {
   assert.notEqual(minute, '0');
   assert.match(hour, /^\d+$/);
   assert.deepEqual(cleanup.permissions, {});
-  assert.ok(cleanup.concurrency.group);
+});
+
+test('cleanup: one concurrency group per closed issue or pull request, and one for sweeps', () => {
+  // GitHub keeps one pending run per group, so a shared group would cancel
+  // queued close runs; each close keys its own group.
+  assert.equal(cleanup.concurrency['cancel-in-progress'], false);
+  const m = /^uploads-cleanup-\$\{\{ (.+) \}\}$/.exec(cleanup.concurrency.group);
+  assert.ok(m, cleanup.concurrency.group);
+  const group = (event) => `uploads-cleanup-${evaluate(m[1], { github: { event } })}`;
+  assert.equal(group({ issue: { number: 41 } }), 'uploads-cleanup-41');
+  assert.equal(group({ pull_request: { number: 42 } }), 'uploads-cleanup-42');
+  assert.equal(group({ schedule: '47 4 * * *' }), 'uploads-cleanup-sweep');
+  assert.equal(group({ inputs: { dry_run: true } }), 'uploads-cleanup-sweep');
 });
 
 test('cleanup: the real job needs UPLOADS_REPO and, for a closed issue, the entry label', () => {

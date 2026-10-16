@@ -269,8 +269,9 @@ Where the code differs from the plan above; the code wins.
   not keep, and the warning says to commit the file under that path.
 - **`new-entry.yml`'s "drag it onto this issue" text was left unchanged**, because dragging still works
   after an edit and for anyone who did not use the pickers.
-- **Cleanup also runs on `pull_request: closed`.** A closure made by the automation itself (a declined
-  submission) uses the built-in token, which does not start workflows, so `issues: closed` alone would
-  leave those files to the daily sweep. The workflow also runs when a same-repository `entry/<slug>-<n>`
-  draft pull request labelled `content:new-entry` closes, takes the issue number from the branch and the
-  body and author from the API, and keeps any set another open submission by the same author names.
+- **Cleanup also runs on `pull_request: closed`.** A closure made by the automation itself uses the
+  built-in token, which does not start workflows. The workflow also runs when a same-repository
+  `entry/<slug>-<n>` draft pull request labelled `content:new-entry` closes, takes the issue number from
+  the branch and the body and author from the API, and deletes only if that issue is already closed (a
+  draft closed by hand to restart it keeps its files). In practice this catches merges; a decline closes
+  the issue in a later run with the built-in token, so declined files wait for the daily sweep.

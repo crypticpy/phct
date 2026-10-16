@@ -42,9 +42,16 @@ on:
 
 permissions: {}
 
-# Never two deletions at once; a queued run waits rather than being dropped.
+# GitHub keeps only ONE pending run per concurrency group and cancels any
+# older pending one, so a single shared group would drop queued close runs.
+# Each closed issue or pull request gets a group of its own (a re-close of the
+# same one waits behind the first, and a dropped pending duplicate would have
+# done the same work); the daily and manual sweeps share the `sweep` group.
+# Runs in different groups may overlap: every deletion target comes from a
+# fresh ref listing and a ref that is already gone (404/422) counts as "already
+# gone", not a failure, so two runs deleting the same files is harmless.
 concurrency:
-  group: uploads-cleanup
+  group: uploads-cleanup-${{ github.event.issue.number || github.event.pull_request.number || 'sweep' }}
   cancel-in-progress: false
 
 jobs:

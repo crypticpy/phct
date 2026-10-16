@@ -13,7 +13,8 @@
  * token names a GitHub user (one `GET /user`) → account age → upload headers
  * → size (4 MiB, read with a hard cap) → magic bytes → sha256 → per-user caps
  * (3 drafts, 9 files each; an identical file already stored is answered
- * without writing) → blob, tree, parentless commit, branch.
+ * without writing) → blob, tree, parentless commit, branch → the caps again,
+ * removing this file's branch if a parallel upload pushed it over one.
  *
  * Every handler takes a WHATWG Request and returns a Response; `fetch` and the
  * clock are injectable, so the tests never touch the network.
@@ -317,18 +318,62 @@ async function upload(request, config, deps, cors) {
     return githubFailure(error, 'listing the uploader’s files', cors);
   }
   if (files.some((file) => file.set === set && file.sha256 === sha256)) return respond(201, body, cors);
-  const sets = new Set(files.map((file) => file.set));
-  if (!sets.has(set) && sets.size >= MAX_SETS) return rateLimited('too_many_drafts', CAP_RETRY_AFTER, cors);
-  if (files.filter((file) => file.set === set).length >= MAX_FILES_PER_SET) {
-    return rateLimited('too_many_files', CAP_RETRY_AFTER, cors);
-  }
+  const before = overCap(files, set, true);
+  if (before) return rateLimited(before, CAP_RETRY_AFTER, cors);
 
+  let created;
   try {
-    await writeUpload(deps, config, app.token, user.id, { set, sha256, ext, bytes });
+    created = await writeUpload(deps, config, app.token, user.id, { set, sha256, ext, bytes });
   } catch (error) {
     return githubFailure(error, 'storing the file', cors);
   }
-  return respond(201, body, cors);
+
+  // The check above and the write are not atomic, so parallel uploads can all
+  // pass it. Look again now that this file is stored: over a cap, remove the
+  // branch THIS request created, before anyone has been told it exists, and
+  // answer as the check would have. Only that branch is ever removed, so a
+  // racer that was answered 201 for a file of its own keeps it: the worst a
+  // race does is refuse every racer (each may retry), and since the last
+  // writer sees all the others, the caps hold. A branch this request did not
+  // create ("already exists") belongs to the request that did. One gap stays:
+  // the SAME file sent twice at once shares one branch, so a twin answered
+  // 201 from it can lose it to the creator's removal; that takes the same file
+  // twice in one draft, at a cap, in the same moment, and the scaffolder then
+  // warns that the file could not be found.
+  if (!created) return respond(201, body, cors);
+  let after;
+  try {
+    after = overCap(await listUserFiles(deps, config, app.token, user.id), set, false);
+  } catch (error) {
+    // The check before the write passed; a race on top of a failed re-read is
+    // too unlikely to cost the submitter a file that is stored.
+    console.error(`uploads: re-listing after a write failed (${error?.kind || error?.name || 'Error'}).`);
+    return respond(201, body, cors);
+  }
+  if (!after) return respond(201, body, cors);
+  try {
+    await deleteUpload(deps, config, app.token, user.id, { set, sha256 });
+  } catch (error) {
+    return githubFailure(error, 'removing a file over the cap', cors);
+  }
+  return rateLimited(after, CAP_RETRY_AFTER, cors);
+}
+
+/**
+ * Which per-user cap a listing breaks, if any. Before a write the new file
+ * must still fit (`adding`); after it, the listing already holds it.
+ * @param {Array<{set: string, sha256: string}>} files
+ * @param {string} set the draft the file goes into
+ * @param {boolean} adding whether the file is not in `files` yet
+ * @returns {'too_many_drafts'|'too_many_files'|null}
+ */
+function overCap(files, set, adding) {
+  const sets = new Set(files.map((file) => file.set));
+  if (adding) sets.add(set);
+  if (sets.size > MAX_SETS) return 'too_many_drafts';
+  const inSet = files.filter((file) => file.set === set).length + (adding ? 1 : 0);
+  if (inSet > MAX_FILES_PER_SET) return 'too_many_files';
+  return null;
 }
 
 /**

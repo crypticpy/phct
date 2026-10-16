@@ -378,6 +378,8 @@ test('a successful upload makes exactly these GitHub calls, with these bodies', 
       `POST ${base}/git/trees`,
       `POST ${base}/git/commits`,
       `POST ${base}/git/refs`,
+      // The caps again, now that the file is stored (parallel uploads).
+      `GET ${base}/git/matching-refs/heads/u/${USER_ID}/`,
     ]
   );
   const [blob, tree, commit, ref] = writes(github);
@@ -456,6 +458,117 @@ test('a tenth file in one draft is refused with 429; other users and malformed r
   assert.deepEqual(writes(full), []);
   // The listing asked only about this user's prefix.
   assert.ok(full.calls.some((c) => c.path.endsWith(`/git/matching-refs/heads/u/${USER_ID}/`)));
+});
+
+const REFS_ROUTE = 'POST /repos/acme/catalog-uploads/git/refs';
+const LIST_ROUTE = `GET /repos/acme/catalog-uploads/git/matching-refs/heads/u/${USER_ID}/`;
+const deletes = (github) => github.calls.filter((c) => c.method === 'DELETE');
+
+test('a parallel upload that lands a new draft first: this one removes only its own file and is 429', async () => {
+  const sets = ['a', 'b'].map((letter) => letter.repeat(26));
+  const racer = branch('7'.repeat(64), 'c'.repeat(26));
+  const github = fakeGitHub({
+    refs: sets.map((set) => branch('1'.repeat(64), set)),
+    // Another tab's write into a third draft lands between this one's check and write.
+    routes: { [REFS_ROUTE]: (_call, state) => void state.refs.add(racer) },
+  });
+  const bytes = png(600);
+  const refused = await call(request('POST', { body: bytes }), { github });
+  assert.equal(refused.status, 429);
+  assert.equal(refused.body.error, 'too_many_drafts');
+  assert.ok(Number(refused.response.headers.get('retry-after')) > 0);
+  assert.deepEqual(
+    deletes(github).map((c) => c.path),
+    [`/repos/acme/catalog-uploads/git/refs/heads/u/${USER_ID}/${SET}/${sha(bytes)}`]
+  );
+  assert.ok(github.state.refs.has(racer), 'the racer’s file is kept');
+  assert.equal(github.state.refs.size, 3);
+});
+
+test('a parallel upload that fills the draft first: this one removes only its own file and is 429', async () => {
+  const eight = Array.from({ length: 8 }, (_, i) => branch(String(i).repeat(64)));
+  const racer = branch('f'.repeat(64));
+  const github = fakeGitHub({
+    refs: eight,
+    routes: { [REFS_ROUTE]: (_call, state) => void state.refs.add(racer) },
+  });
+  const bytes = png(601);
+  const refused = await call(request('POST', { body: bytes }), { github });
+  assert.equal(refused.status, 429);
+  assert.equal(refused.body.error, 'too_many_files');
+  assert.equal(deletes(github).length, 1);
+  assert.ok(deletes(github)[0].path.endsWith(`/${SET}/${sha(bytes)}`));
+  assert.deepEqual([...github.state.refs].sort(), [...eight, racer].sort());
+});
+
+test('racing uploads never end over a cap, and every 201 file is still stored', async () => {
+  const sets = ['a', 'b'].map((letter) => letter.repeat(26));
+  const github = fakeGitHub({ refs: sets.map((set) => branch('1'.repeat(64), set)) });
+  const racers = ['p', 'q', 'r'].map((letter, i) => ({ set: letter.repeat(26), bytes: png(700 + i) }));
+  clearInstallationTokenCache();
+  const answers = await Promise.all(
+    racers.map(({ set, bytes }) =>
+      handleUpload(request('POST', { body: bytes, headers: { 'X-Upload-Set': set } }), ENV, {
+        fetch: github,
+        now: () => NOW,
+      })
+    )
+  );
+  // More than one racer got past the check before any wrote: a real race.
+  assert.ok(github.calls.filter((c) => `${c.method} ${c.path}` === REFS_ROUTE).length > 1);
+  const stored = [...github.state.refs];
+  assert.ok(new Set(stored.map((ref) => ref.split('/')[4])).size <= 3, stored.join('\n'));
+  answers.forEach((answer, i) => {
+    const ref = branch(sha(racers[i].bytes), racers[i].set);
+    if (answer.status === 201) assert.ok(github.state.refs.has(ref), `201 but gone: ${ref}`);
+    else {
+      assert.equal(answer.status, 429);
+      assert.ok(!github.state.refs.has(ref), `429 but kept: ${ref}`);
+    }
+  });
+  // The files that were there before the race are never removed.
+  for (const set of sets) assert.ok(github.state.refs.has(branch('1'.repeat(64), set)));
+});
+
+test('a branch this request did not create is never removed, even over a cap', async () => {
+  const eight = Array.from({ length: 8 }, (_, i) => branch(String(i).repeat(64)));
+  const bytes = png(602);
+  const github = fakeGitHub({
+    refs: eight,
+    routes: {
+      [REFS_ROUTE]: (_call, state) => {
+        state.refs.add(branch('f'.repeat(64)));
+        state.refs.add(branch(sha(bytes)));
+        return json(422, { message: 'Reference already exists' });
+      },
+    },
+  });
+  assert.equal((await call(request('POST', { body: bytes }), { github })).status, 201);
+  assert.deepEqual(deletes(github), []);
+});
+
+test('after a write: a failed re-list still answers 201; a failed removal is 503', async () => {
+  const sets = ['a', 'b'].map((letter) => letter.repeat(26));
+  let lists = 0;
+  const relistFails = fakeGitHub({
+    routes: { [LIST_ROUTE]: () => (++lists === 2 ? json(500, {}) : undefined) },
+  });
+  const bytes = png(603);
+  assert.equal((await call(request('POST', { body: bytes }), { github: relistFails })).status, 201);
+  assert.ok(relistFails.state.refs.has(branch(sha(bytes))));
+  assert.match(logged.join('\n'), /re-listing after a write failed/);
+
+  const removalFails = fakeGitHub({
+    refs: sets.map((set) => branch('1'.repeat(64), set)),
+    routes: {
+      [REFS_ROUTE]: (_call, state) => void state.refs.add(branch('7'.repeat(64), 'c'.repeat(26))),
+      [`DELETE /repos/acme/catalog-uploads/git/refs/heads/u/${USER_ID}/${SET}/${sha(bytes)}`]: () =>
+        json(500, {}),
+    },
+  });
+  const failed = await call(request('POST', { body: bytes }), { github: removalFails });
+  assert.equal(failed.status, 503);
+  assert.equal(failed.body.error, 'github_unavailable');
 });
 
 test('"Reference already exists" on the last write is a success (two tabs, same file)', async () => {

@@ -48,13 +48,15 @@ export async function listUserFiles(deps, repo, token, userId) {
 /**
  * Store one file: blob → tree → parentless commit → branch. A branch that
  * already exists (two tabs uploading the same file at once) is success: its
- * name is the file's hash, so it holds these same bytes.
+ * name is the file's hash, so it holds these same bytes. Resolves to whether
+ * THIS call created the branch, the only case in which the caller may remove
+ * it again.
  * @param {Deps} deps
  * @param {Repo} repo
  * @param {string} token installation token
  * @param {number} userId
  * @param {{set: string, sha256: string, ext: string, bytes: Uint8Array}} file
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} true when this call created the branch
  */
 export async function writeUpload(deps, repo, token, userId, { set, sha256, ext, bytes }) {
   const ref = `refs/heads/${uploadBranch(userId, { set, sha256 })}`;
@@ -78,10 +80,11 @@ export async function writeUpload(deps, repo, token, userId, { set, sha256, ext,
       error.kind === 'unprocessable' &&
       /already exists/i.test(error.githubMessage)
     ) {
-      return;
+      return false;
     }
     throw error;
   }
+  return true;
 }
 
 /**

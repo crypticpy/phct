@@ -11,7 +11,8 @@
  *   pr-closed  A draft pull request closed (merged or declined). Neither
  *           closing path is guaranteed to start `issues: closed` (a close made
  *           with GITHUB_TOKEN starts nothing), so the issue is found from the
- *           draft branch `entry/<slug>-<issue>` and handled as `closed`.
+ *           draft branch `entry/<slug>-<issue>` and handled as `closed`;
+ *           an issue that is still open is left alone.
  *   sweep   Daily: delete every set older than MAX_AGE_DAYS that no OPEN
  *           `content:new-entry` issue by the same author still references.
  *
@@ -98,6 +99,10 @@ export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = 
     return res;
   }
 
+  /**
+   * Every item of a list endpoint that paginates (`per_page`/`page`), such as
+   * the issue listing.
+   */
   async function pages(url, token) {
     const items = [];
     for (let page = 1; ; page += 1) {
@@ -112,6 +117,19 @@ export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = 
       items.push(...batch);
       if (batch.length < PAGE_SIZE) return items;
     }
+  }
+
+  /**
+   * The whole answer of a list endpoint in one call. `git/matching-refs` does
+   * not paginate: it ignores `per_page`/`page` and returns every match each
+   * time, so `pages()` would never see a short page and would loop forever.
+   */
+  async function all(url, token) {
+    const res = await call('GET', url, token);
+    if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+    const list = await res.json();
+    if (!Array.isArray(list)) throw new Error(`GET ${url} did not return a list`);
+    return list;
   }
 
   function requireCatalog() {
@@ -147,7 +165,7 @@ export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = 
   }
 
   // The ref listing: the only source of deletion targets.
-  const listing = await pages(`/repos/${uploadsRepo}/git/matching-refs/heads/u/`, env.UPLOADS_TOKEN);
+  const listing = await all(`/repos/${uploadsRepo}/git/matching-refs/heads/u/`, env.UPLOADS_TOKEN);
   const refs = [];
   for (const item of listing) {
     const m = REF_RE.exec(String(item?.ref ?? ''));
@@ -161,30 +179,34 @@ export async function cleanup({ env, fetch: fetchImpl = globalThis.fetch, now = 
   let kept = 0;
   const lines = [];
 
+  /** @param {string} reason */
+  function nothingToDo(reason) {
+    lines.push(`Uploads cleanup (${mode}): ${reason}`);
+    for (const line of lines) log(line);
+    return { mode, dryRun, listed: listing.length, ignored, deleted: [], gone: 0, kept: 0, failed: 0, lines };
+  }
+
   if (mode !== 'sweep') {
     let { ISSUE_AUTHOR_ID: authorId, ISSUE_BODY: body, ISSUE_NUMBER: number } = env;
     if (mode === 'pr-closed') {
       number = String(issueFromDraftBranch(env.PR_BRANCH) ?? '');
-      if (!number) {
-        lines.push(`Uploads cleanup (pr-closed): branch is not a draft branch; nothing to do`);
-        for (const line of lines) log(line);
-        return {
-          mode,
-          dryRun,
-          listed: listing.length,
-          ignored,
-          deleted: [],
-          gone: 0,
-          kept: 0,
-          failed: 0,
-          lines,
-        };
-      }
+      if (!number) return nothingToDo('branch is not a draft branch; nothing to do');
       requireCatalog();
       const res = await call('GET', `/repos/${env.CATALOG_REPO}/issues/${number}`, env.GITHUB_TOKEN);
       if (!res.ok) throw new Error(`GET issue ${number} failed: ${res.status}`);
       const issue = await res.json();
       if (issue.pull_request) throw new Error(`#${number} is a pull request, not an issue`);
+      // An issue that is still open outlives this draft (a maintainer closed it
+      // by hand to restart it, or another draft for the issue is open), and its
+      // files are still needed. A decline also closes the issue, but in a run
+      // of its own (submission-status.yml -> notify_github.mjs, after the pull
+      // request closed), and a merge's "Closes #N" may land a moment late; if
+      // the issue still reads open here, the daily sweep deletes the files
+      // once it is closed and they are past MAX_AGE_DAYS. Skipping can only
+      // ever keep files longer.
+      if (issue.state === 'open') {
+        return nothingToDo(`issue #${number} is still open; its files are kept`);
+      }
       authorId = String(issue.user?.id ?? '');
       body = issue.body;
     }

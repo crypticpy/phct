@@ -168,9 +168,15 @@ jobs:
       # minted in uploads-cleanup.yml, never here. The variable is split in a
       # step of its own because the action takes the owner and the repository
       # name separately and expressions cannot split a string.
+      #
+      # Both steps are non-fatal: a misconfigured or unreachable App must not
+      # cost a submitter their draft. A failed mint leaves the token empty, and
+      # the scaffolder drafts the entry anyway with one warning per `upload:`
+      # answer it could not collect (scripts/lib/uploads.mjs).
       - name: Split the uploads repository name
         id: uploads-repo
         if: vars.UPLOADS_REPO != ''
+        continue-on-error: true
         env:
           UPLOADS_REPO: ${{ vars.UPLOADS_REPO }}
         run: |
@@ -180,6 +186,7 @@ jobs:
       - name: Mint a read-only token for the uploads repository
         id: uploads-token
         if: vars.UPLOADS_REPO != ''
+        continue-on-error: true
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.UPLOADS_APP_ID }}

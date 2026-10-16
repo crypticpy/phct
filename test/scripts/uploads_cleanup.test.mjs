@@ -42,7 +42,8 @@ function fake({ refs = [], issues = [], deleteStatus = 204 } = {}) {
       );
       return new Response(null, { status: deleteStatus });
     }
-    if (u.pathname.endsWith('/git/matching-refs/heads/u/')) return json(slice(refs, url));
+    // Like GitHub: matching-refs ignores per_page/page and always answers in full.
+    if (u.pathname.endsWith('/git/matching-refs/heads/u/')) return json(refs);
     if (u.pathname.includes('/git/commits/')) {
       const r = bySha.get(u.pathname.split('/').pop());
       if (!r) return json({}, 404);
@@ -174,6 +175,23 @@ test('sweep: an unreadable commit keeps the set; a failed issue listing deletes 
   assert.deepEqual(broken.deletes(), []);
 });
 
+test('matching-refs is read in one unpaginated call: 250 refs terminate and are all deleted', async () => {
+  const refs = [];
+  for (let i = 0; i < 250; i += 1) refs.push(entry(7, SET_B, i.toString(16).padStart(64, '0'), 30));
+  refs.push(entry(8, SET_B, H1, 30));
+  for (const mode of ['closed', 'sweep']) {
+    const gh = fake({ refs });
+    const result = await run(gh, { MODE: mode, ISSUE_AUTHOR_ID: '7', ISSUE_BODY: refLine(SET_B, H1) });
+    const listings = gh.calls.filter((c) => c.url.includes('/git/matching-refs/'));
+    assert.equal(listings.length, 1, mode);
+    assert.ok(!/[?&](per_page|page)=/.test(listings[0].url), listings[0].url);
+    assert.equal(result.listed, 251, mode);
+    const expected = refs.filter((r) => mode === 'sweep' || r.ref.includes('/u/7/'));
+    assert.equal(gh.deletes().length, expected.length, mode);
+    assert.equal(new Set(gh.deletes()).size, expected.length, mode);
+  }
+});
+
 test('pagination: lists and issues beyond one page are all considered', async () => {
   const refs = [];
   for (let i = 0; i < 130; i += 1) refs.push(entry(7, 'e'.repeat(26), i.toString(16).padStart(64, '0'), 30));
@@ -281,11 +299,11 @@ test('issueFromDraftBranch: good, malformed and fork-like branch names', () => {
   }
 });
 
-test('pr-closed: the issue is found from the branch, fetched, and handled as closed (even if still open)', async () => {
+test('pr-closed: the issue is found from the branch, fetched, and handled as closed', async () => {
   const gh = fake({
     refs: [entry(7, SET_B, H1), entry(8, SET_B, H1), entry(7, SET_C, H1)],
     issues: [
-      { number: 41, user: { id: 7 }, body: refLine(SET_B, H1), state: 'open' },
+      { number: 41, user: { id: 7 }, body: refLine(SET_B, H1), state: 'closed' },
       { number: 42, user: { id: 7 }, body: refLine(SET_C, H1) },
     ],
   });
@@ -311,4 +329,18 @@ test('pr-closed: a branch that is not a draft branch does nothing, and a PR numb
   });
   await assert.rejects(run(pr, { MODE: 'pr-closed', PR_BRANCH: 'entry/x-41' }), /pull request/);
   assert.deepEqual(pr.deletes(), []);
+});
+
+test('pr-closed: an issue that is still open keeps its files and says why', async () => {
+  const gh = fake({
+    refs: [entry(7, SET_B, H1)],
+    issues: [{ number: 41, user: { id: 7 }, body: refLine(SET_B, H1), state: 'open' }],
+  });
+  const out = [];
+  const result = await run(gh, { MODE: 'pr-closed', PR_BRANCH: 'entry/water-41' }, out);
+  assert.deepEqual(gh.deletes(), []);
+  assert.deepEqual(result.deleted, []);
+  assert.equal(result.failed, 0);
+  assert.match(out.join('\n'), /#41 is still open/);
+  assert.deepEqual(result.lines, out);
 });
