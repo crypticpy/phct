@@ -231,7 +231,13 @@ test('both files are listed as generator outputs, so updates keep them regenerat
   const text = JSON.stringify(generated);
   for (const file of ['submit/answers.schema.json', 'submit/agent-instructions.txt']) {
     assert.ok(text.includes(file), `${file} in .phct/ownership.yml`);
-    assert.match(read('.gitattributes'), new RegExp(`^${file.replace(/\./g, '\\.')}\\s+merge=ours$`, 'm'));
+    const lines = read('.gitattributes')
+      .split('\n')
+      .map((line) => line.trim().split(/\s+/));
+    assert.ok(
+      lines.some(([path, attr]) => path === file && attr === 'merge=ours'),
+      `${file} merge=ours in .gitattributes`,
+    );
   }
 });
 
