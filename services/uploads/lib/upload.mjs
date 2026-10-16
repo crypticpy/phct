@@ -238,6 +238,7 @@ export async function readCapped(request, max) {
       if (done) break;
       total += value.byteLength;
       if (total > max) {
+        // The answer is already decided; a failed cancel only leaves the body unread.
         reader.cancel().catch(() => {});
         return 'too_large';
       }
