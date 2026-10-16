@@ -181,9 +181,9 @@ and in a `file` section, a bare `upload:k3j9…/77ab…04.pdf`.
 
 ### "Using an AI agent?"
 
-- `submit/agent-instructions.md` (Liquid, served as plain text) and
-  `submit/answers.schema.json` (Liquid, the `entries.json` pattern), both built from
-  `_data/schema.yml` so the allowed options cannot drift.
+- `submit/agent-instructions.txt` and `submit/answers.schema.json`, both written by
+  `npm run generate` (`scripts/lib/agent_files.mjs`) from `_data/schema.yml` so the allowed
+  options cannot drift; `--check` fails CI when they are stale.
 - The instructions cover: exact option strings; **one item per line** for list fields (the
   scaffolder splits on newlines and commas, `issue_body.mjs` `parseList`); alt text limits;
   screenshot size and a no-personal-information check; output JSON matching the schema. It
@@ -214,7 +214,7 @@ Workstreams own disjoint files. 4 and 5 share `submit/index.md`, so 5 starts aft
 | 2 | Scaffolder | `scripts/lib/{uploads,images,attachments,issue_body}.mjs`, `scripts/new_entry_from_issue.mjs`, their tests | Security-critical. Tests: another user's ref never resolves, sha mismatch rejected, uploads token never passed to generic fetchers, edit rebuild resolves again, feature off ⇒ unchanged behaviour. |
 | 3 | Workflows | `.github/workflows/{new-entry,uploads-cleanup}.yml` | actionlint; `test/helpers/workflow_expr.mjs` tests for the skip conditions; cleanup never deletes a referenced open set. |
 | 4 | Submit page | `_data/site.yml`, `scripts/validate.mjs` (+ test), `submit/index.md`, `assets/js/submit/{uploads,direct,draft,review}.js` | JSDOM tests on the `submit-form.html` fixture; a11y flow test. |
-| 5 | Agent path | `submit/agent-instructions.md`, `submit/answers.schema.json`, `assets/js/submit/import.js` | Schema JSON validates every shipped preset's sample answers; import runs `validateAll`. |
+| 5 | Agent path | `submit/agent-instructions.txt`, `submit/answers.schema.json`, `assets/js/submit/import.js` | Schema JSON validates every shipped preset's sample answers; import runs `validateAll`. |
 | 6 | Docs | `services/uploads/README.md`, `services/github-signin/README.md`, `docs/{configuration,admin-guide,decisions}.md`, `SECURITY.md`, `CHANGELOG.md` | Setup steps mirror the sign-in README. Decision entry: why sign-in is required and why a second App. |
 
 **Gates:** `npm test`, `npm run test:ruby`, `npm run lint`, `npm run validate`,

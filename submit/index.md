@@ -14,6 +14,7 @@ scripts:
   - "/assets/js/submit/review.js"
   - "/assets/js/submit/steps.js"
   - "/assets/js/submit/shortform.js"
+  - "/assets/js/submit/import.js"
   - "/assets/js/submit.js"
 ---
 {%- comment -%}
@@ -56,6 +57,10 @@ scripts:
                               [data-shortform-toggle] and [data-shortform-note]
                               (assets/js/submit/shortform.js); removed at boot
                               when every question is required
+    [data-import]             "Using an AI agent?": links to the generated files and
+                              the Import answers box (assets/js/submit/import.js),
+                              with [data-import-input|button|status|report] and
+                              the inline [data-import-confirm] block
     [data-review]             empty container the "check your answers" step and
                               the confirmation panel are rendered into
     [data-review-next]        <template> holding the full "what happens next"
@@ -207,6 +212,35 @@ form says the same (assets/js/configurator/issue-template.js). {%- endcomment -%
   {%- if cfg.modules.governance -%}
   <p class="mt-3 text-sm text-brand-muted">Before you start, the <a class="font-medium text-brand-primary underline-offset-2 hover:underline" href="{{ '/governance/' | relative_url }}">governance page</a> has the five things reviewers check and the rules on privacy and licensing — you keep ownership of anything you share.</p>
   {%- endif -%}
+  {%- comment -%}
+    "Using an AI agent?": the two generated files (scripts/lib/agent_files.mjs,
+    written by `npm run generate`) and the box that loads an agent's JSON into
+    the form (assets/js/submit/import.js). Always present: it needs no service.
+    Only the box needs scripting, so it ships hidden.
+  {%- endcomment -%}
+  <details class="mt-6 rounded-lg border border-brand-line bg-surface-base p-4 text-sm text-brand-ink" data-form-chrome data-import>
+    <summary class="cursor-pointer font-semibold">Using an AI agent?</summary>
+    <div class="mt-3 space-y-3">
+      <p class="text-brand-muted">An assistant such as Claude, ChatGPT or Copilot can draft your answers with you. Give it the <a class="font-medium text-brand-primary underline underline-offset-2 hover:no-underline" href="{{ '/submit/agent-instructions.txt' | relative_url }}">instructions</a>; they say what each question asks and which answers are allowed. Its answers are shaped by this <a class="font-medium text-brand-primary underline underline-offset-2 hover:no-underline" href="{{ '/submit/answers.schema.json' | relative_url }}">JSON Schema</a>. Then paste the JSON it gives you below. Screenshots and files are not part of it: add them on this page or in the GitHub issue.</p>
+      <div data-js-only hidden>
+        <label class="field-label" for="import-json">Answers from your agent (JSON)</label>
+        <p class="field-help mt-1" id="import-json-help">Importing fills in the form and checks it. Nothing is sent, and you can still change every answer.</p>
+        <textarea class="field-input mt-2 min-h-[8rem] font-mono text-xs" id="import-json" rows="8" spellcheck="false" autocomplete="off" aria-describedby="import-json-help import-json-status" data-import-input></textarea>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" class="btn-secondary btn-sm" data-import-button>Import answers</button>
+        </div>
+        <div class="mt-3 rounded-lg border border-brand-line p-3" data-import-confirm hidden>
+          <p data-import-confirm-text></p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button type="button" class="btn-primary btn-sm" data-import-confirm-yes>Replace them</button>
+            <button type="button" class="btn-ghost btn-sm" data-import-confirm-no>Keep mine</button>
+          </div>
+        </div>
+        <p class="mt-3 text-brand-muted" id="import-json-status" role="status" aria-live="polite" data-import-status></p>
+        <ul class="mt-2 list-disc space-y-1 pl-5 text-brand-muted" data-import-report hidden></ul>
+      </div>
+    </div>
+  </details>
   </div>
   {% if sub_art != '' %}<div class="page-art hidden lg:block" aria-hidden="true">{% include picture.html src=sub_art alt='' sizes="256px" class="h-auto w-full" %}</div>{% endif %}
 </section>

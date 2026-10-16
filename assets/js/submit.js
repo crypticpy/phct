@@ -1,7 +1,7 @@
 /**
  * Submit form — entry point. Wires the pieces in assets/js/submit/*.js:
  * fields (registry) → validate → repeatable → preview → draft → handoff →
- * review, and direct (Sign in with GitHub) and uploads (file pickers for
+ * review, import (an AI agent's JSON), and direct (Sign in with GitHub) and uploads (file pickers for
  * signed-in submitters) when the site has them on.
  *
  * Loaded last by the `scripts:` list in submit/index.md front matter, so every
@@ -438,6 +438,21 @@
       direct && form.dataset.uploadsUrl && typeof ns.initUploads === 'function'
         ? ns.initUploads({ form: form, fields: fields, direct: direct, draft: draft, onChange: refresh })
         : null;
+
+    // "Using an AI agent?" (assets/js/submit/import.js): the pasted JSON fills
+    // the form, then the form's own validation reports on it.
+    if (typeof ns.initImport === 'function') {
+      ns.initImport({
+        root: root,
+        fields: fields,
+        summary: summary,
+        afterFill: function (problems) {
+          progress.errors(problems);
+          if (shortform) shortform.refresh();
+          refresh();
+        },
+      });
+    }
 
     /**
      * Send the answers straight to GitHub as the signed-in submitter. The
