@@ -145,6 +145,7 @@ test('every other ownership change still fails closed', () => {
     );
 
   refused(`${current}gen/b.json merge=ours\n`, { ...context, currentFiles: ['gen/b.json'] }); // the deployment has the file
+  refused(`${current}gen/b.json merge=ours\n`, { ...context, exists: (file) => file === 'gen/b.json' }); // untracked on disk
   refused(`${current}gen/b.json merge=ours\n`, { ...context, generated: [] }); // not a generator output
   refused(`${current}gen/b.json merge=ours\n`, {}); // no context: strict
   refused(`${current}gen/** merge=ours\n`, { ...context, generated: ['gen/**'] }); // a glob
@@ -201,6 +202,35 @@ test('the updater adopts a new generated output end to end and leaves it for gen
   assert.equal(fs.readFileSync(path.join(root, 'config/site.yml'), 'utf8'), 'name: downstream\n');
   assert.equal(fs.existsSync(path.join(root, 'out/answers.json')), false, 'left for npm run generate');
   assert.ok(result.preserve.includes('out/answers.json'));
+});
+
+test('an untracked file at a new generated path stops the update before it writes', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phct-generated-untracked-'));
+  git(root, 'init', '--quiet', '--initial-branch=main');
+  git(root, 'config', 'user.name', 'PHCT test');
+  git(root, 'config', 'user.email', 'test@example.invalid');
+  fs.mkdirSync(path.join(root, '.phct'));
+  fs.writeFileSync(path.join(root, '.gitattributes'), 'config/** merge=ours\n');
+  fs.writeFileSync(path.join(root, '.phct/ownership.yml'), 'ownership:\n  generated: []\n');
+  fs.writeFileSync(path.join(root, 'app.txt'), 'parent v1\n');
+  git(root, 'add', '.');
+  git(root, 'commit', '--quiet', '-m', 'parent v1');
+  git(root, 'tag', 'v1.0.0');
+  fs.writeFileSync(path.join(root, '.gitattributes'), 'config/** merge=ours\nout.json merge=ours\n');
+  fs.writeFileSync(path.join(root, '.phct/ownership.yml'), 'ownership:\n  generated:\n    - out.json\n');
+  fs.writeFileSync(path.join(root, 'app.txt'), 'parent v2\n');
+  git(root, 'add', '.');
+  git(root, 'commit', '--quiet', '-m', 'parent v2');
+  git(root, 'tag', 'v1.1.0');
+  git(root, 'checkout', '--quiet', '-b', 'downstream', 'v1.0.0');
+  fs.writeFileSync(path.join(root, 'out.json'), 'hand-made, never committed\n');
+
+  assert.throws(
+    () => applyUpdate({ root, from: 'v1.0.0', to: 'v1.1.0' }),
+    /changes the deployment ownership contract/
+  );
+  assert.equal(fs.readFileSync(path.join(root, 'app.txt'), 'utf8'), 'parent v1\n');
+  assert.equal(fs.readFileSync(path.join(root, 'out.json'), 'utf8'), 'hand-made, never committed\n');
 });
 
 test('the CLI runs when invoked through a symlinked path', () => {

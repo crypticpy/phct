@@ -122,18 +122,19 @@ const sameRule = (a, b) => a.pattern === b.pattern && a.owned === b.owned;
  * nothing: the update leaves it alone and `npm run generate` writes it from
  * the deployment's own data. Each added rule must be a literal `merge=ours`
  * path, listed in the target's `ownership.generated`, absent from the
- * deployment, and still protected after every target rule; the existing rules
+ * deployment (tracked or not), and still protected after every target rule; the existing rules
  * must survive in order. Anything else returns null.
  *
  * @param {{pattern: string, owned: boolean}[]} currentRules
  * @param {{pattern: string, owned: boolean}[]} targetRules
- * @param {{generated?: string[], currentFiles?: string[]}} context
+ * @param {{generated?: string[], currentFiles?: string[], exists?: (file: string) => boolean}} context
+ *   `exists` reports a path on disk, so an untracked file there counts as present
  * @returns {string[]|null} the adopted paths, or null when the change is not of that kind
  */
 export function generatedOutputAdditions(
   currentRules,
   targetRules,
-  { generated = [], currentFiles = [] } = {}
+  { generated = [], currentFiles = [], exists = () => false } = {}
 ) {
   const added = [];
   let next = 0;
@@ -150,6 +151,7 @@ export function generatedOutputAdditions(
     !rule.pattern.endsWith('/') &&
     generated.includes(rule.pattern) &&
     !present.has(rule.pattern) &&
+    !exists(rule.pattern) &&
     isForkOwned(targetRules, rule.pattern);
   return added.every(adoptable) ? added.map((rule) => rule.pattern) : null;
 }
@@ -210,6 +212,16 @@ function targetGeneratedPaths(root, to) {
   return Array.isArray(generated) ? generated.filter((item) => typeof item === 'string') : [];
 }
 
+/** Anything at the path, including a dangling symlink. */
+function pathExists(file) {
+  try {
+    fs.lstatSync(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function nulList(output) {
   const values = String(output ?? '').split('\0');
   if (values.at(-1) === '') values.pop();
@@ -248,6 +260,7 @@ export function applyUpdate({ root = ROOT, from, to }) {
   const { rules, adopted } = resolveOwnershipContract(currentAttributes, targetAttributes, {
     generated: targetGeneratedPaths(root, to),
     currentFiles,
+    exists: (file) => pathExists(path.join(root, file)),
   });
   const changes = parseNameStatusZ(
     git(root, ['diff', '--name-status', '-z', '--find-renames', from, to, '--'])

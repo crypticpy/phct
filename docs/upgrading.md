@@ -39,7 +39,7 @@ content.
 One change needs no migration: a release that only adds new generated files, such as a new file
 `npm run generate` writes from your configuration. The updater adopts those rules itself when every
 added rule is a single file (not a pattern) marked `merge=ours`, listed under `ownership.generated`
-in the release's `.phct/ownership.yml`, and absent from your repository, and when every existing
+in the release's `.phct/ownership.yml`, and absent from your working tree (committed or not), and when every existing
 rule is kept in order. It leaves those files alone, `npm run generate` writes them from your data,
 and the run's log names them. Anything else, including a new pattern, a path PHCT takes back, or a
 file you already have, still fails closed. The updater that runs is the one your deployment already
