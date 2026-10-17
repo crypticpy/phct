@@ -296,7 +296,8 @@ test('feature off: no pickers, no script, no data attribute — in the markup an
     !SCRIPTS.some((src) => /uploads/.test(src)),
     'the uploads scripts must not be in the always-on list'
   );
-  assert.match(read('_data/site.yml'), /^ {2}uploads_url: ""/m, 'uploads must be off by default');
+  // _data/site.yml belongs to the deployment (merge=ours), which may have
+  // turned uploads on, so off-by-default is checked on the snapshot below.
   assert.doesNotMatch(FIXTURE, /uploads/i, 'the off-by-default snapshot mentions uploads');
 
   // At runtime: signed in, but no uploads script and no attribute.

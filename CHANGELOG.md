@@ -8,6 +8,22 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.12] — 2026-10-16
+
+Twelfth candidate. rc.11 failed closed in a deployment's update (nothing was
+published) on a test that read the deployment's own `site.yml`; rc.12 fixes that
+test and otherwise carries rc.11 unchanged.
+
+### Fixed
+
+- A test added in rc.11 failed inside a real deployment's PHCT update, which
+  runs the template's suite on the deployment's own files.
+  `submit_uploads.test.mjs` required `_data/site.yml` to carry a blank
+  `submit.uploads_url`, which a deployment's own `site.yml` need not have. That
+  file belongs to the deployment, so the check is gone; off-by-default is still
+  checked on the submit page's own snapshot and at runtime. The submit page and
+  the upload code were not at fault.
+
 ## [1.11.0-rc.11] — 2026-10-16
 
 Eleventh candidate. It adds optional file uploads on the submit page (off by
@@ -1780,7 +1796,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.11...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.12...HEAD
+[1.11.0-rc.12]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.11...v1.11.0-rc.12
 [1.11.0-rc.11]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.10...v1.11.0-rc.11
 [1.11.0-rc.10]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.9...v1.11.0-rc.10
 [1.11.0-rc.9]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.8...v1.11.0-rc.9
