@@ -8,6 +8,12 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+## [1.11.0-rc.11] — 2026-10-16
+
+Eleventh candidate. It adds optional file uploads on the submit page (off by
+default; they need `submit.signin_url` and a deployed uploads service) and the
+"Using an AI agent?" path (#114).
+
 ### Added
 
 - Optional **attach files on the submit page**. Set `submit.uploads_url` in
@@ -1774,7 +1780,8 @@ fixed in this release, and the remaining P3s are listed in `docs/roadmap.md`.
   in-browser and CLI configurators, GitHub-issue submission flow, events /
   cohorts / resources modules, Lunr search, thumbnails workflow.
 
-[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.10...HEAD
+[Unreleased]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.11...HEAD
+[1.11.0-rc.11]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.10...v1.11.0-rc.11
 [1.11.0-rc.10]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.9...v1.11.0-rc.10
 [1.11.0-rc.9]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.8...v1.11.0-rc.9
 [1.11.0-rc.8]: https://github.com/crypticpy/phct/compare/v1.11.0-rc.7...v1.11.0-rc.8
