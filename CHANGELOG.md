@@ -19,9 +19,10 @@ test and otherwise carries rc.11 unchanged.
 - A test added in rc.11 failed inside a real deployment's PHCT update, which
   runs the template's suite on the deployment's own files.
   `submit_uploads.test.mjs` required `_data/site.yml` to carry a blank
-  `submit.uploads_url`, which a deployment's own `site.yml` need not have. The
-  check now applies to the template only (no `.phct-version.json`). The submit
-  page and the upload code were not at fault.
+  `submit.uploads_url`, which a deployment's own `site.yml` need not have. That
+  file belongs to the deployment, so the check is gone; off-by-default is still
+  checked on the submit page's own snapshot and at runtime. The submit page and
+  the upload code were not at fault.
 
 ## [1.11.0-rc.11] — 2026-10-16
 
