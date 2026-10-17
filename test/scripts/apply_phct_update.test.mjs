@@ -153,6 +153,8 @@ test('every other ownership change still fails closed', () => {
   refused(`${current}gen/b.json merge=ours\nconfig/reclaimed/** !merge\n`); // a reclaim rides along
   refused('config/template/** !merge\nconfig/** merge=ours\ngen/b.json merge=ours\n'); // reordered
   refused('config/** merge=ours\ngen/b.json merge=ours\n'); // an existing rule removed
+  // Added before an existing exception glob that unprotects it: still template-owned.
+  refused('config/** merge=ours\nconfig/template/out.json merge=ours\nconfig/template/** !merge\n');
   assert.equal(
     generatedOutputAdditions(forkOwnershipRules(current), forkOwnershipRules(current), context),
     null
