@@ -43,7 +43,7 @@
    * @param {{form: HTMLFormElement, fields: object[], direct: object, draft?: object,
    *   onChange?: () => void}} options `direct` is what initDirect returned
    * @returns {null|{restore: (record: object|null) => void, reset: () => void,
-   *   hasFiles: (field: object) => boolean, count: () => number}}
+   *   hasFiles: (field: object) => boolean, count: () => number, held: () => number}}
    *   null when the page has nothing to upload to or with
    */
   ns.initUploads = function initUploads(options) {
@@ -668,6 +668,14 @@
       },
       count: function count() {
         return mode() === 'ready' ? everyItem().filter((item) => item.status === 'done').length : 0;
+      },
+      /**
+       * Uploaded files still in the draft whatever the sign-in state: after
+       * the sign-in expires, count() is 0 but these are still stored, and
+       * only a fresh sign-in as their owner can send them.
+       */
+      held: function held() {
+        return owner ? everyItem().filter((item) => item.status === 'done').length : 0;
       },
     };
   };

@@ -1016,6 +1016,32 @@ test('a failed send with files: GitHub’s form is offered as the copy-out box, 
   assert.equal(ctx.storedDraft().uploads.files.screenshots.length, 1, 'a failed send lost the draft');
 });
 
+test('a send that finds the sign-in expired says only a fresh sign-in keeps the files', async () => {
+  const ctx = await boot({ issueStatus: 401 });
+  fillRequired(ctx);
+  await pick(ctx, 'screenshots', [png(ctx)]);
+  describe(ctx, 'screenshots', 0, 'The queue');
+  assert.equal(tryReview(ctx), true);
+  await submitToGitHub(ctx);
+  ctx.form.querySelector('[data-direct-action="fallback"]').click();
+  await settle();
+
+  assert.deepEqual(ctx.opened, [], 'GitHub’s form opened without saying the files were left behind');
+  assert.match(
+    ctx.form.querySelector('[data-submit-status]').textContent,
+    /Your GitHub sign-in has expired, so the file you uploaded is not in the box or the link below\. To keep it, sign in again/
+  );
+  const link = ctx.form.querySelector('[data-fallback-link]');
+  assert.equal(link.hidden, false);
+  assert.doesNotMatch(ctx.form.querySelector('[data-fallback-body]').value, /upload:/);
+  await settleDraft();
+  assert.equal(
+    ctx.storedDraft().uploads.files.screenshots.length,
+    1,
+    'the expired sign-in lost the draft’s files'
+  );
+});
+
 test('a failed send without files: GitHub’s form opens as before, with no files warning', async () => {
   const ctx = await boot({ issueStatus: 422 });
   fillRequired(ctx);

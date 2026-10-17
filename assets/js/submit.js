@@ -494,11 +494,30 @@
      * "Use GitHub's form instead" after a direct send failed. The prefilled
      * link never carries `upload:` lines (handoff.js), so with files attached
      * it would drop them unannounced: hand over the copy-out box instead,
-     * which carries them, and say why. No files, or no repository: the
+     * which carries them, and say why. Files held by an expired sign-in: say
+     * that only signing in again keeps them. No files, or no repository: the
      * ordinary link hand-off.
      */
     function fallbackWithFiles() {
       const files = uploads ? uploads.count() : 0;
+      const held = uploads ? uploads.held() : 0;
+      if (files === 0 && held > 0 && form.dataset.repo) {
+        // The sign-in expired (a 401 signs the page out): the files are still
+        // stored, but nothing sent from a signed-out page can name them.
+        ns.exitReview(form);
+        const url = ns.issueUrl(form, fields, entryTitle());
+        showFallback(
+          'Your GitHub sign-in has expired, so ' +
+            (held === 1 ? 'the file you uploaded is' : 'the ' + held + ' files you uploaded are') +
+            ' not in the box or the link below. To keep ' +
+            (held === 1 ? 'it' : 'them') +
+            ', sign in again and send from this page. To go on without ' +
+            (held === 1 ? 'it' : 'them') +
+            ', use GitHub’s form.',
+          url.length <= MAX_URL ? url : blankFormUrl()
+        );
+        return;
+      }
       if (files === 0 || !form.dataset.repo) {
         send();
         return;
