@@ -116,7 +116,7 @@ test('a reference resolves ref → commit → tree → blob, re-hashed, with the
     assert.equal(init.headers['x-github-api-version'], '2022-11-28');
     assert.equal(
       init.headers.accept,
-      index === 3 ? 'application/vnd.github.raw' : 'application/vnd.github+json'
+      index === 3 ? 'application/vnd.github.raw+json' : 'application/vnd.github+json'
     );
   }
 });

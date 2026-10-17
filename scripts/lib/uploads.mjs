@@ -163,7 +163,7 @@ export function uploadResolver(
         // Judged before a byte of the file moves.
         if (!(Number(entry.size) <= maxBytes)) throw new Error(sizeCapMessage(maxBytes));
 
-        const response = await get(`blobs/${sha(entry.sha)}`, signal, 'application/vnd.github.raw');
+        const response = await get(`blobs/${sha(entry.sha)}`, signal, 'application/vnd.github.raw+json');
         const declared = Number(response.headers?.get?.('content-length'));
         if (Number.isFinite(declared) && declared > maxBytes) throw new Error(sizeCapMessage(maxBytes));
         const streamed = typeof response.body?.[Symbol.asyncIterator] === 'function';
