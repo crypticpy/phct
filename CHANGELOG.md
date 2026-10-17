@@ -8,6 +8,14 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- The upload service refused every upload with "GitHub could not save the file
+  just now". Since 2026 GitHub issues App installation tokens in a longer,
+  stateless form (`ghs_<app id>_<JWT>`, about 520 characters, with `.` and `-`),
+  and the service only accepted the old 40-character form. It now accepts both,
+  using GitHub's published pattern. Submitters' sign-in tokens are unaffected.
+
 ## [1.11.0-rc.12] — 2026-10-16
 
 Twelfth candidate. rc.11 failed closed in a deployment's update (nothing was
