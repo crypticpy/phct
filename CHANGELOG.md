@@ -8,6 +8,19 @@ major version, and each entry says so when it happens.
 
 ## [Unreleased]
 
+### Fixed
+
+- A release that added a generated file (as rc.11 did with
+  `submit/answers.schema.json` and `submit/agent-instructions.txt`) could not be
+  applied to a deployment without two hand-made pull requests. The updater
+  refused the new ownership rules until the deployment had migrated, and the
+  deployment's ownership check refused the migration until it had the new
+  generator. The updater now adopts rules that only protect new generated
+  files the deployment does not have, and `npm run generate` writes them. Every
+  other ownership change still fails closed. This takes effect from the update
+  after the one that ships it, because a deployment runs the updater it
+  already has.
+
 ## [1.11.0-rc.13] — 2026-10-17
 
 Thirteenth candidate. It carries rc.12 plus one fix to the upload service, so a
