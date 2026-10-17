@@ -296,7 +296,12 @@ test('feature off: no pickers, no script, no data attribute — in the markup an
     !SCRIPTS.some((src) => /uploads/.test(src)),
     'the uploads scripts must not be in the always-on list'
   );
-  assert.match(read('_data/site.yml'), /^ {2}uploads_url: ""/m, 'uploads must be off by default');
+  // Off by default is the template's own site.yml. A deployment's update runs
+  // this suite on its own site.yml (it carries .phct-version.json), which need
+  // not have the key at all, or may have turned uploads on.
+  if (!fs.existsSync(path.join(ROOT, '.phct-version.json'))) {
+    assert.match(read('_data/site.yml'), /^ {2}uploads_url: ""/m, 'uploads must be off by default');
+  }
   assert.doesNotMatch(FIXTURE, /uploads/i, 'the off-by-default snapshot mentions uploads');
 
   // At runtime: signed in, but no uploads script and no attribute.
